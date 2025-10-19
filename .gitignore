@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.env.*
+instance/*.db
+Nutrition/instance/*.db
+*.sqlite3
+*.db
+
+# Data (adjust if you want to commit specific datasets)
+*.csv
+*.tsv
+*.parquet
+*.feather
+Nutrition/data/*.json
+
+# Models / binaries
+*.pkl
+*.joblib
+*.h5
+*.onnx
+
+# Logs/temp
+*.log
+.tmp/
+.cache/
+
+# Flutter/Dart (subproject)
+Nutrition/nutrition_flutter/.dart_tool/
+Nutrition/nutrition_flutter/.flutter-plugins*
+Nutrition/nutrition_flutter/.packages
+Nutrition/nutrition_flutter/.metadata
+Nutrition/nutrition_flutter/build/
+Nutrition/nutrition_flutter/ios/Pods/
+Nutrition/nutrition_flutter/android/.gradle/
+Nutrition/nutrition_flutter/android/build/
+Nutrition/nutrition_flutter/macos/Flutter/ephemeral/
+Nutrition/nutrition_flutter/linux/flutter/ephemeral/
+Nutrition/nutrition_flutter/windows/flutter/ephemeral/
+Nutrition/nutrition_flutter/web/.dart_tool/
+
+# Android/iOS local files
+Nutrition/nutrition_flutter/android/local.properties
+**/*.keystore
+**/*.jks
+**/*.xcuserdatad/
+**/*.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+
+# IDE / OS
+*.iml
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local copies/backups
+Nutrition copy/
+
