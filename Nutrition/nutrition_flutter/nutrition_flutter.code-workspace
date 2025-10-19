@@ -1,0 +1,45 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "dart.flutterSdkPath": null,
+        "dart.sdkPath": null
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "nutrition_flutter (Flutter RMX3241)",
+                "cwd": ".",
+                "request": "launch",
+                "type": "dart",
+                "deviceId": "RMX3241",
+                "args": [
+                    "--dart-define=API_BASE_URL=http://10.0.2.2:5000"
+                ]
+            },
+            {
+                "name": "nutrition_flutter (Flutter Debug)",
+                "cwd": ".",
+                "request": "launch",
+                "type": "dart",
+                "args": [
+                    "--dart-define=API_BASE_URL=http://10.0.2.2:5000"
+                ]
+            },
+            {
+                "name": "nutrition_flutter (Flutter Release)",
+                "cwd": ".",
+                "request": "launch",
+                "type": "dart",
+                "flutterMode": "release",
+                "args": [
+                    "--dart-define=API_BASE_URL=http://10.0.2.2:5000"
+                ]
+            }
+        ]
+    }
+}
