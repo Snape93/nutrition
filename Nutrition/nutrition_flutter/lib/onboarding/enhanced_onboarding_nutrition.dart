@@ -276,29 +276,6 @@ class _EnhancedOnboardingNutritionState
         _isLoading = false;
       });
 
-      // Update local database with comprehensive user data
-      final db = await UserDatabase().database;
-      await db.update(
-        'users',
-        {
-          'sex': widget.gender,
-          'height': widget.height,
-          'weight': widget.weight,
-          'target_weight': widget.targetWeight,
-          'activity_level': widget.activityLevel,
-          'goal': widget.goal,
-          'current_mood': widget.currentMood,
-          'energy_level': widget.energyLevel,
-          'dietary_preferences': _selectedPreferences.join(','),
-          'allergies': _allergiesController.text.trim(),
-          'favorites': _favoritesController.text.trim(),
-          'dislikes': _dislikesController.text.trim(),
-          'daily_calorie_goal': _predictedCalories,
-        },
-        where: 'username = ? OR email = ?',
-        whereArgs: [widget.usernameOrEmail, widget.usernameOrEmail],
-      );
-
       // Mark tutorial as seen after successful onboarding completion
       await UserDatabase().markTutorialAsSeen(widget.usernameOrEmail);
 

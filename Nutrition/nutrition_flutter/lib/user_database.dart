@@ -127,10 +127,12 @@ class UserDatabase {
   Future<void> markTutorialAsSeen(String usernameOrEmail) async {
     try {
       await http
-          .put(
-            Uri.parse('${config.apiBase}/user/$usernameOrEmail'),
+          .post(
+            Uri.parse(
+              '${config.apiBase}/user/$usernameOrEmail/complete-tutorial',
+            ),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'has_seen_tutorial': true}),
+            body: jsonEncode({}),
           )
           .timeout(const Duration(seconds: 10));
     } catch (e) {

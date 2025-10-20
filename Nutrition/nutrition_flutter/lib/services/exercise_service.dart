@@ -105,7 +105,7 @@ class ExerciseService {
     if (difficulty != null && difficulty.isNotEmpty) {
       final allowed = difficulty.map((d) => d.toLowerCase()).toSet();
       filtered = filtered.where(
-        (e) => allowed.contains(e.difficulty.toLowerCase()),
+        (e) => allowed.contains(e.exerciseDifficulty.toLowerCase()),
       );
     }
     if (equipment != null && equipment.isNotEmpty) {
@@ -184,7 +184,7 @@ class ExerciseService {
   static Future<List<String>> getAvailableCategories() async {
     // Derived from local data heuristics
     final all = await fetchAllExercises();
-    final categories = all.map((e) => e.category).toSet().toList();
+    final categories = all.map((e) => e.exerciseCategory).toSet().toList();
     categories.sort();
     return categories;
   }

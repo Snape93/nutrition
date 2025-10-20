@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'models/exercise.dart';
 import 'services/exercise_service.dart';
+import 'services/processed_exercise_service.dart';
 import 'theme_service.dart';
-import 'exercise_timer_screen.dart';
 import 'user_database.dart'; // Add this import
 
 class ExerciseCategoryScreen extends StatefulWidget {
@@ -66,9 +66,20 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
     }
 
     try {
-      final categoryExercises = await ExerciseService.getExercisesByCategory(
-        widget.category,
-      );
+      // Try to load from processed exercise service first
+      List<Exercise> categoryExercises;
+      try {
+        categoryExercises =
+            await ProcessedExerciseService.getExercisesByCategory(
+              widget.category,
+            );
+      } catch (e) {
+        // Fallback to original service
+        categoryExercises = await ExerciseService.getExercisesByCategory(
+          widget.category,
+        );
+      }
+
       if (!mounted) return;
       setState(() {
         exercises = categoryExercises;
@@ -320,7 +331,7 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  _getExerciseIcon(exercise.category),
+                  _getExerciseIcon(exercise.exerciseCategory),
                   color: primaryColor,
                   size: isVerySmallScreen ? 24 : 32,
                 ),
@@ -358,15 +369,17 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                           ),
                           decoration: BoxDecoration(
                             color: _getDifficultyColor(
-                              exercise.difficulty,
+                              exercise.exerciseDifficulty,
                             ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            exercise.difficulty,
+                            exercise.exerciseDifficulty,
                             style: TextStyle(
                               fontSize: 10,
-                              color: _getDifficultyColor(exercise.difficulty),
+                              color: _getDifficultyColor(
+                                exercise.exerciseDifficulty,
+                              ),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -490,8 +503,10 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                             Expanded(
                               child: _buildInfoCard(
                                 'Difficulty',
-                                exercise.difficulty,
-                                _getDifficultyColor(exercise.difficulty),
+                                exercise.exerciseDifficulty,
+                                _getDifficultyColor(
+                                  exercise.exerciseDifficulty,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -573,7 +588,7 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  'Estimated ${exercise.estimatedCaloriesPerMinute} calories burned per minute',
+                                  'Estimated ${exercise.exerciseCaloriesPerMinute.toStringAsFixed(1)} calories burned per minute',
                                   style: TextStyle(
                                     fontSize: 16,
                                     color: primaryColor,
@@ -630,20 +645,6 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _startExerciseTimer(Exercise exercise) {
-    Navigator.pop(context);
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => ExerciseTimerScreen(
-              exercise: exercise,
-              usernameOrEmail: widget.usernameOrEmail,
-            ),
       ),
     );
   }

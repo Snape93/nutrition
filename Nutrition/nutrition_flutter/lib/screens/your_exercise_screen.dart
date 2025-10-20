@@ -39,9 +39,29 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
   String _category = 'Cardio';
   String _intensity = 'Medium';
   bool _submitting = false;
+  String? _userGender;
 
-  Color get _primaryColor => ThemeService.getPrimaryColor(null);
-  Color get _backgroundColor => ThemeService.getBackgroundColor(null);
+  Color get _primaryColor => ThemeService.getPrimaryColor(_userGender);
+  Color get _backgroundColor => ThemeService.getBackgroundColor(_userGender);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserGender();
+  }
+
+  Future<void> _loadUserGender() async {
+    try {
+      final gender = await UserDatabase().getUserSex(widget.usernameOrEmail);
+      if (mounted) {
+        setState(() {
+          _userGender = gender;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user gender: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -136,9 +156,13 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
       backgroundColor: _backgroundColor,
       appBar: AppBar(
         title: const Text('Your Exercise'),
-        backgroundColor: Colors.white,
+        backgroundColor: _backgroundColor,
         foregroundColor: _primaryColor,
         elevation: 0.5,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: _primaryColor),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -156,8 +180,12 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
                 children: [
                   TextFormField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Exercise name *',
+                      labelStyle: TextStyle(color: _primaryColor),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: _primaryColor, width: 2),
+                      ),
                     ),
                     validator:
                         (v) =>
@@ -171,8 +199,15 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           value: _category,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Category',
+                            labelStyle: TextStyle(color: _primaryColor),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(
+                                color: _primaryColor,
+                                width: 2,
+                              ),
+                            ),
                           ),
                           items: const [
                             DropdownMenuItem(
@@ -196,8 +231,15 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           value: _intensity,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Intensity',
+                            labelStyle: TextStyle(color: _primaryColor),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(
+                                color: _primaryColor,
+                                width: 2,
+                              ),
+                            ),
                           ),
                           items: const [
                             DropdownMenuItem(value: 'Low', child: Text('Low')),
@@ -223,8 +265,15 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
                         child: TextFormField(
                           controller: _durationController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Duration (min)',
+                            labelStyle: TextStyle(color: _primaryColor),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(
+                                color: _primaryColor,
+                                width: 2,
+                              ),
+                            ),
                           ),
                           validator: (v) {
                             if ((v == null || v.isEmpty) &&
@@ -247,7 +296,16 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
                         child: TextFormField(
                           controller: _repsController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Reps'),
+                          decoration: InputDecoration(
+                            labelText: 'Reps',
+                            labelStyle: TextStyle(color: _primaryColor),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(
+                                color: _primaryColor,
+                                width: 2,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -255,7 +313,16 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
                         child: TextFormField(
                           controller: _setsController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Sets'),
+                          decoration: InputDecoration(
+                            labelText: 'Sets',
+                            labelStyle: TextStyle(color: _primaryColor),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(
+                                color: _primaryColor,
+                                width: 2,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -263,8 +330,12 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _notesController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Notes (equipment, description, etc.)',
+                      labelStyle: TextStyle(color: _primaryColor),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: _primaryColor, width: 2),
+                      ),
                     ),
                     maxLines: 3,
                   ),
@@ -273,11 +344,29 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: _submitting ? null : _submit,
-                      icon: const Icon(Icons.send),
+                      icon:
+                          _submitting
+                              ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                              : const Icon(Icons.send),
                       label: Text(_submitting ? 'Submitting...' : 'Submit'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _primaryColor,
                         foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
+                        shadowColor: _primaryColor.withValues(alpha: 0.3),
                       ),
                     ),
                   ),

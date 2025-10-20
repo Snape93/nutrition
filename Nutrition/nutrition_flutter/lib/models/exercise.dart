@@ -6,6 +6,10 @@ class Exercise {
   final String target;
   final String gifUrl;
   final List<String> instructions;
+  final String? category;
+  final String? difficulty;
+  final double? estimatedCaloriesPerMinute;
+  final List<String>? tags;
 
   Exercise({
     required this.id,
@@ -15,6 +19,10 @@ class Exercise {
     required this.target,
     required this.gifUrl,
     required this.instructions,
+    this.category,
+    this.difficulty,
+    this.estimatedCaloriesPerMinute,
+    this.tags,
   });
 
   factory Exercise.fromJson(Map<String, dynamic> json) {
@@ -26,6 +34,11 @@ class Exercise {
       target: json['target'] ?? '',
       gifUrl: json['gifUrl'] ?? '',
       instructions: List<String>.from(json['instructions'] ?? []),
+      category: json['category'],
+      difficulty: json['difficulty'],
+      estimatedCaloriesPerMinute:
+          json['estimatedCaloriesPerMinute']?.toDouble(),
+      tags: json['tags'] != null ? List<String>.from(json['tags']) : null,
     );
   }
 
@@ -38,11 +51,19 @@ class Exercise {
       'target': target,
       'gifUrl': gifUrl,
       'instructions': instructions,
+      'category': category,
+      'difficulty': difficulty,
+      'estimatedCaloriesPerMinute': estimatedCaloriesPerMinute,
+      'tags': tags,
     };
   }
 
-  // Get category based on bodyPart and target
-  String get category {
+  // Get category - use stored value or fallback to computed
+  String get exerciseCategory {
+    if (category != null) {
+      return category!;
+    }
+
     final bodyPartLower = bodyPart.toLowerCase();
     final targetLower = target.toLowerCase();
     final nameLower = name.toLowerCase();
@@ -92,8 +113,12 @@ class Exercise {
     return 'Strength';
   }
 
-  // Get difficulty level based on equipment and body part
-  String get difficulty {
+  // Get difficulty level - use stored value or fallback to computed
+  String get exerciseDifficulty {
+    if (difficulty != null) {
+      return difficulty!;
+    }
+
     if (equipment.toLowerCase() == 'body weight') {
       return 'Beginner';
     } else if (equipment.toLowerCase() == 'barbell' ||
@@ -104,23 +129,27 @@ class Exercise {
     }
   }
 
-  // Get estimated calories burned per minute (rough estimate)
-  int get estimatedCaloriesPerMinute {
-    switch (category) {
+  // Get estimated calories burned per minute - use stored value or fallback to computed
+  double get exerciseCaloriesPerMinute {
+    if (estimatedCaloriesPerMinute != null) {
+      return estimatedCaloriesPerMinute!;
+    }
+
+    switch (exerciseCategory) {
       case 'Cardio':
-        return 8;
+        return 8.0;
       case 'Strength':
-        return 5;
+        return 5.0;
       case 'Yoga':
-        return 3;
+        return 3.0;
       case 'Flexibility':
-        return 2;
+        return 2.0;
       case 'Dance':
-        return 7;
+        return 7.0;
       case 'Sports':
-        return 6;
+        return 6.0;
       default:
-        return 4;
+        return 4.0;
     }
   }
 }

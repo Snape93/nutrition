@@ -157,7 +157,7 @@ class _ExerciseTimerScreenState extends State<ExerciseTimerScreen>
         exerciseName: widget.exercise.name,
         durationSeconds: _totalTime - _timeLeft, // Actual time spent
         caloriesBurned:
-            widget.exercise.estimatedCaloriesPerMinute *
+            widget.exercise.exerciseCaloriesPerMinute *
             ((_totalTime - _timeLeft) / 60),
         setsCompleted: 1,
         notes: 'Completed via timer',
@@ -225,7 +225,7 @@ class _ExerciseTimerScreenState extends State<ExerciseTimerScreen>
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          _getExerciseIcon(widget.exercise.category),
+                          _getExerciseIcon(widget.exercise.exerciseCategory),
                           color: primaryColor,
                           size: isVerySmallScreen ? 30 : 40,
                         ),

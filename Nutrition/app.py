@@ -1,8 +1,6 @@
 # pyright: reportCallIssue=false
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import joblib
-import numpy as np
 import pandas as pd
 from nutrition_model import NutritionModel
 import os
@@ -19,29 +17,12 @@ import csv
 # Load environment variables
 load_dotenv()
 
-"""
-Deprecated: External ExerciseDB seeding has been removed in favor of a curated local dataset.
-"""
-
-def local_seed_exercises():
-    """Return a small, offline seed list of exercises for each category."""
-    return [
-        # Cardio
-        {"id": "loc_cardio_1", "name": "Jumping Jacks", "bodyPart": "cardio", "equipment": "body weight", "target": "cardiovascular", "gifUrl": "", "instructions": ["Stand tall","Jump legs apart and raise arms","Return and repeat"]},
-        {"id": "loc_cardio_2", "name": "High Knees", "bodyPart": "cardio", "equipment": "body weight", "target": "cardiovascular", "gifUrl": "", "instructions": ["Run in place","Drive knees high"]},
-        {"id": "loc_cardio_3", "name": "Mountain Climbers", "bodyPart": "cardio", "equipment": "body weight", "target": "core", "gifUrl": "", "instructions": ["Plank position","Alternate knee drives"]},
-        {"id": "loc_cardio_4", "name": "Burpees", "bodyPart": "cardio", "equipment": "body weight", "target": "full body", "gifUrl": "", "instructions": ["Squat","Kick back","Push-up (optional)","Jump up"]},
-        # Strength
-        {"id": "loc_strength_1", "name": "Push-up", "bodyPart": "chest", "equipment": "body weight", "target": "pectorals", "gifUrl": "", "instructions": ["Plank","Lower chest","Press up"]},
-        {"id": "loc_strength_2", "name": "Bodyweight Squat", "bodyPart": "upper legs", "equipment": "body weight", "target": "glutes", "gifUrl": "", "instructions": ["Feet shoulder-width","Sit back","Stand"]},
-        {"id": "loc_strength_3", "name": "Lunge", "bodyPart": "upper legs", "equipment": "body weight", "target": "quads", "gifUrl": "", "instructions": ["Step forward","Lower knee","Return"]},
-        {"id": "loc_strength_4", "name": "Plank", "bodyPart": "waist", "equipment": "body weight", "target": "abs", "gifUrl": "", "instructions": ["Elbows under shoulders","Hold neutral line"]},
-        # Flexibility/Mobility
-        {"id": "loc_flex_1", "name": "Hamstring Stretch", "bodyPart": "leg", "equipment": "body weight", "target": "flexibility", "gifUrl": "", "instructions": ["Hinge at hips","Hold stretch"]},
-        {"id": "loc_flex_2", "name": "Cat-Cow", "bodyPart": "back", "equipment": "body weight", "target": "mobility", "gifUrl": "", "instructions": ["Arch and round spine","Breathe"]},
-        {"id": "loc_flex_3", "name": "Child's Pose", "bodyPart": "back", "equipment": "body weight", "target": "yoga", "gifUrl": "", "instructions": ["Hips to heels","Arms forward","Relax"]},
-        {"id": "loc_flex_4", "name": "Hip Flexor Stretch", "bodyPart": "hip", "equipment": "body weight", "target": "flexibility", "gifUrl": "", "instructions": ["Half-kneel","Shift forward","Hold"]},
-    ]
+# Ensure instance directory exists for SQLite databases
+try:
+    base_dir = os.path.dirname(__file__)
+    os.makedirs(os.path.join(base_dir, 'instance'), exist_ok=True)
+except Exception:
+    pass
 
 def normalize_category(category: str) -> str:
     """Map any legacy or granular category to one of three standard buckets."""
@@ -62,65 +43,7 @@ def category_aliases(requested: str):
     # Strength fallback
     return ['Strength', 'strength']
 
-def categorize_exercise(exercise_data):
-    """Categorize exercise based on name, body part, and target into 3 buckets."""
-    name_lower = exercise_data.get('name', '').lower()
-    body_part = exercise_data.get('bodyPart', '').lower()
-    target = exercise_data.get('target', '').lower()
-
-    # Cardio: explicit cardio or common cardio verbs/contexts, sports, dance
-    if (
-        body_part == 'cardio'
-        or 'run' in name_lower
-        or 'jump' in name_lower
-        or 'bike' in name_lower
-        or 'cycle' in name_lower
-        or 'cardio' in name_lower
-        or 'zumba' in name_lower
-        or 'dance' in name_lower
-        or 'salsa' in name_lower
-        or 'basketball' in name_lower
-        or 'soccer' in name_lower
-        or 'tennis' in name_lower
-        or 'volleyball' in name_lower
-        or 'sport' in name_lower
-    ):
-        return 'Cardio'
-
-    # Flexibility/Mobility: yoga, stretch, mobility, flexibility
-    if (
-        'yoga' in name_lower
-        or 'pose' in name_lower
-        or 'meditation' in name_lower
-        or 'stretch' in name_lower
-        or 'mobility' in name_lower
-        or 'flexibility' in name_lower
-        or 'yoga' in target
-        or 'flexibility' in target
-    ):
-        return 'Flexibility/Mobility'
-
-    # Default bucket: Strength
-    return 'Strength'
-
-def get_difficulty_level(equipment):
-    """Determine difficulty level based on equipment"""
-    equipment_lower = equipment.lower()
-    if equipment_lower == 'body weight':
-        return 'Beginner'
-    elif equipment_lower in ['barbell', 'dumbbell', 'kettlebell']:
-        return 'Intermediate'
-    else:
-        return 'Advanced'
-
-def get_calories_per_minute(category):
-    """Get estimated calories burned per minute by 3-category model."""
-    calories_map = {
-        'Cardio': 8,
-        'Strength': 5,
-        'Flexibility/Mobility': 3,
-    }
-    return calories_map.get(category, 5)  # Default to Strength if unknown
+ 
 
 app = Flask(__name__)
 CORS(app)
@@ -235,6 +158,7 @@ class ExerciseSession(db.Model):
     sets_completed = db.Column(db.Integer, default=1)
     notes = db.Column(db.Text)
     date = db.Column(db.Date, nullable=False, default=date.today)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # --- User-submitted custom exercises ---
 class UserExerciseSubmission(db.Model):
@@ -254,7 +178,6 @@ class UserExerciseSubmission(db.Model):
     notes = db.Column(db.Text)
     est_calories = db.Column(db.Integer)
     status = db.Column(db.String(20), default='pending')  # pending|approved|rejected
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class User(db.Model):
@@ -295,6 +218,7 @@ class User(db.Model):
     data_importance = db.Column(db.String(50), nullable=True)
     is_metric = db.Column(db.Boolean, default=True)
     daily_calorie_goal = db.Column(db.Integer, nullable=True)
+    has_seen_tutorial = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -356,38 +280,6 @@ nutrition_model = NutritionModel()
 with app.app_context():
     db.create_all()
     print("[SUCCESS] Database tables initialized successfully")
-    # Auto-seed exercises on first run if database is empty
-    try:
-        if Exercise.query.count() == 0:
-            print("[INFO] No exercises found. Importing from local CSV dataset...")
-            csv_path = os.path.join(os.path.dirname(__file__), 'data', 'exercises.csv')
-            added, updated = _import_exercises_from_csv_path(csv_path)
-            if added == 0 and updated == 0:
-                print("[WARNING] CSV not found or invalid; seeding minimal offline set.")
-                exercises_data = local_seed_exercises()
-                for exercise_data in exercises_data:
-                    try:
-                        ex = Exercise(
-                            exercise_id=exercise_data.get('id'),
-                            name=exercise_data.get('name', ''),
-                            body_part=exercise_data.get('bodyPart', ''),
-                            equipment=exercise_data.get('equipment', ''),
-                            target=exercise_data.get('target', ''),
-                            gif_url=exercise_data.get('gifUrl', ''),
-                            instructions=json.dumps(exercise_data.get('instructions', [])),
-                            category=categorize_exercise(exercise_data),
-                            difficulty=get_difficulty_level(exercise_data.get('equipment', '')),
-                            estimated_calories_per_minute=get_calories_per_minute(categorize_exercise(exercise_data))
-                        )
-                        db.session.add(ex)
-                    except Exception:
-                        continue
-                db.session.commit()
-                print("[SUCCESS] Seeded minimal offline set.")
-            else:
-                print(f"[SUCCESS] Imported exercises from CSV (added={added}, updated={updated}).")
-    except Exception as e:
-        print(f"[WARNING] Exercise seeding skipped: {e}")
 
 # Load Filipino food dataset at startup (robust path + encoding)
 try:
@@ -528,19 +420,7 @@ def normalize_measurements(weight: float, height: float) -> tuple[float, float]:
     except Exception:
         return float(weight), float(height)
 
-@app.route('/exercises/sync', methods=['POST'])
-def sync_exercises():
-    """Deprecated passthrough: populate from local CSV instead of external API."""
-    try:
-        csv_path = os.path.join(os.path.dirname(__file__), 'data', 'exercises.csv')
-        added, updated = _import_exercises_from_csv_path(csv_path)
-        return jsonify({
-            'success': True,
-            'message': f'Imported from CSV (added={added}, updated={updated})',
-            'total_exercises': Exercise.query.count()
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+ 
 
 @app.route('/exercises', methods=['GET'])
 def get_exercises():
@@ -568,42 +448,7 @@ def get_exercises():
         
         exercises = query.order_by(Exercise.name.asc()).limit(limit).all()
 
-        # If this category is underpopulated, opportunistically seed locally and retry once
-        if category and len(exercises) < 10:
-            try:
-                seeds = local_seed_exercises()
-                wanted = normalize_category(category)
-                added = 0
-                for exd in seeds:
-                    cat = categorize_exercise(exd)
-                    if cat != wanted:
-                        continue
-                    exists = Exercise.query.filter_by(exercise_id=exd.get('id')).first()
-                    if exists:
-                        continue
-                    ex = Exercise(
-                        exercise_id=exd.get('id'),
-                        name=exd.get('name', ''),
-                        body_part=exd.get('bodyPart', ''),
-                        equipment=exd.get('equipment', ''),
-                        target=exd.get('target', ''),
-                        gif_url=exd.get('gifUrl', ''),
-                        instructions=json.dumps(exd.get('instructions', [])),
-                        category=cat,
-                        difficulty=get_difficulty_level(exd.get('equipment', '')),
-                        estimated_calories_per_minute=get_calories_per_minute(cat)
-                    )
-                    db.session.add(ex)
-                    added += 1
-                if added > 0:
-                    db.session.commit()
-                    query = Exercise.query
-                    if category:
-                        aliases = category_aliases(category)
-                        query = query.filter(Exercise.category.in_(aliases))
-                    exercises = query.order_by(Exercise.name.asc()).limit(limit).all()
-            except Exception:
-                pass
+        # No automatic seeding; return what exists
         
         return jsonify({
             'success': True,
@@ -624,70 +469,7 @@ def get_exercises():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/exercises/import', methods=['POST'])
-def import_exercises_from_csv():
-    """Import exercises from a local CSV file path or default data/exercises.csv.
-
-    Accepts optional JSON body: { "path": "absolute/or/relative/path.csv" }
-    Columns required: id,name,category,body_part,target,equipment,difficulty,calories_per_minute,instructions,tags
-    """
-    try:
-        body = request.get_json(silent=True) or {}
-        csv_path = body.get('path') or os.path.join(os.path.dirname(__file__), 'data', 'exercises.csv')
-        if not os.path.isabs(csv_path):
-            csv_path = os.path.join(os.path.dirname(__file__), csv_path)
-        if not os.path.exists(csv_path):
-            return jsonify({ 'success': False, 'error': f'CSV not found: {csv_path}' }), 400
-
-        added = 0
-        updated = 0
-        with open(csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            required = {
-                'id','name','category','body_part','target','equipment','difficulty','calories_per_minute','instructions','tags'
-            }
-            if not required.issubset(set([c.strip() for c in reader.fieldnames or []])):
-                return jsonify({ 'success': False, 'error': 'CSV missing required headers' }), 400
-            for row in reader:
-                try:
-                    ext_id = row.get('id')
-                    existing = Exercise.query.filter_by(exercise_id=ext_id).first()
-                    if existing:
-                        existing.name = row.get('name','')
-                        existing.body_part = row.get('body_part','')
-                        existing.equipment = row.get('equipment','')
-                        existing.target = row.get('target','')
-                        existing.gif_url = existing.gif_url or ''
-                        existing.instructions = json.dumps([s.strip() for s in row.get('instructions','').split(';') if s.strip()])
-                        existing.category = row.get('category','')
-                        existing.difficulty = row.get('difficulty','')
-                        try:
-                            existing.estimated_calories_per_minute = int(float(row.get('calories_per_minute', '5')))
-                        except Exception:
-                            existing.estimated_calories_per_minute = 5
-                        updated += 1
-                    else:
-                        ex = Exercise(
-                            exercise_id=ext_id,
-                            name=row.get('name',''),
-                            body_part=row.get('body_part',''),
-                            equipment=row.get('equipment',''),
-                            target=row.get('target',''),
-                            gif_url='',
-                            instructions=json.dumps([s.strip() for s in row.get('instructions','').split(';') if s.strip()]),
-                            category=row.get('category',''),
-                            difficulty=row.get('difficulty',''),
-                            estimated_calories_per_minute=int(float(row.get('calories_per_minute', '5')))
-                        )
-                        db.session.add(ex)
-                        added += 1
-                except Exception:
-                    continue
-        db.session.commit()
-        return jsonify({ 'success': True, 'added': added, 'updated': updated, 'total_exercises': Exercise.query.count() })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({ 'success': False, 'error': str(e) }), 500
+ 
 
 @app.route('/exercises/categories', methods=['GET'])
 def get_exercise_categories():
@@ -1391,10 +1173,16 @@ def register_user():
         if not username:
             return jsonify({'error': 'Username is required'}), 400
         
-        # Check if user already exists
-        existing_user = User.query.filter_by(username=username).first()
-        if existing_user:
-            return jsonify({'success': False, 'message': 'Username already exists'}), 409
+        # Check if username already exists
+        existing_username = User.query.filter_by(username=username).first()
+        if existing_username:
+            return jsonify({'success': False, 'message': 'Username already taken'}), 409
+        
+        # Check if email already exists
+        if email:
+            existing_email = User.query.filter_by(email=email).first()
+            if existing_email:
+                return jsonify({'success': False, 'message': 'Email already used'}), 409
         
         # Calculate daily calorie goal (normalized + calibrated)
         try:
@@ -1530,13 +1318,33 @@ def login_user():
                 'id': user.id,
                 'username': user.username,
                 'email': user.email,
-                'has_seen_tutorial': True  # Default to True for now
+                'has_seen_tutorial': getattr(user, 'has_seen_tutorial', False)
             }
         }), 200
         
     except Exception as e:
         print(f"[ERROR] Login failed: {e}")
         return jsonify({'error': f'Login failed: {str(e)}'}), 500
+
+@app.route('/user/<username>/complete-tutorial', methods=['POST'])
+def complete_tutorial(username):
+    """Mark tutorial as completed for a user"""
+    try:
+        user = User.query.filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        user.has_seen_tutorial = True
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Tutorial marked as completed'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to update tutorial status: {str(e)}'}), 500
 
 @app.route('/user/<username>', methods=['GET'])
 def get_user(username):

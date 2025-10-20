@@ -7,7 +7,11 @@ from flask_sqlalchemy import SQLAlchemy
 # This script is intended to be run with the project root as CWD
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/nutrition.db'
+# Use Neon URL from environment; fail fast if missing
+neon_url = os.environ.get('NEON_DATABASE_URL')
+if not neon_url:
+  raise SystemExit('NEON_DATABASE_URL must be set to run this script')
+app.config['SQLALCHEMY_DATABASE_URI'] = neon_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -68,6 +72,7 @@ def main():
 
 if __name__ == '__main__':
   main()
+
 
 
 

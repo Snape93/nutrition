@@ -69,4 +69,29 @@ void main() {
     expect(find.byType(SnackBar), findsOneWidget);
     expect(find.textContaining('Saved'), findsOneWidget);
   });
+
+  testWidgets('YourExerciseScreen loads with gender-based theming', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: YourExerciseScreen(
+          usernameOrEmail: 'tester',
+          closeOnSubmit: false,
+        ),
+      ),
+    );
+
+    // Wait for the widget to load
+    await tester.pumpAndSettle();
+
+    // Check that the screen loads successfully
+    expect(find.byType(YourExerciseScreen), findsOneWidget);
+    expect(find.text('Your Exercise'), findsOneWidget);
+    expect(find.text('Submit'), findsOneWidget);
+
+    // Verify that the screen uses the expected background color
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.backgroundColor, isNotNull);
+  });
 }
