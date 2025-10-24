@@ -1529,6 +1529,133 @@ def update_user(username):
         print(f"[ERROR] Failed to update user {username}: {e}")
         return jsonify({'error': f'Failed to update user: {str(e)}'}), 500
 
+@app.route('/user/<username>/email', methods=['PUT'])
+def change_user_email(username):
+    """Change user email address"""
+    try:
+        user = User.query.filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        data = request.get_json()
+        if not data or 'new_email' not in data:
+            return jsonify({'error': 'New email is required'}), 400
+        
+        new_email = data['new_email'].strip()
+        
+        # Validate email format
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, new_email):
+            return jsonify({'error': 'Invalid email format'}), 400
+        
+        # Check if email is already in use by another user
+        existing_user = User.query.filter_by(email=new_email).first()
+        if existing_user and existing_user.username != username:
+            return jsonify({'error': 'Email already in use'}), 409
+        
+        # Update email
+        user.email = new_email
+        db.session.commit()
+        
+        print(f"[SUCCESS] Email changed for user {username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Email changed successfully',
+            'new_email': new_email
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to change email for user {username}: {e}")
+        return jsonify({'error': f'Failed to change email: {str(e)}'}), 500
+
+@app.route('/user/<username>/password', methods=['PUT'])
+def change_user_password(username):
+    """Change user password"""
+    try:
+        user = User.query.filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        
+        if not current_password or not new_password:
+            return jsonify({'error': 'Current password and new password are required'}), 400
+        
+        # Verify current password
+        if not check_password_hash(user.password, current_password):
+            return jsonify({'error': 'Current password is incorrect'}), 401
+        
+        # Validate new password
+        if len(new_password) < 6:
+            return jsonify({'error': 'New password must be at least 6 characters long'}), 400
+        
+        # Update password
+        user.password = generate_password_hash(new_password)
+        db.session.commit()
+        
+        print(f"[SUCCESS] Password changed for user {username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Password changed successfully'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to change password for user {username}: {e}")
+        return jsonify({'error': f'Failed to change password: {str(e)}'}), 500
+
+@app.route('/user/<username>', methods=['DELETE'])
+def delete_user_account(username):
+    """Delete user account and all associated data"""
+    try:
+        user = User.query.filter_by(username=username).first()
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Delete all associated data
+        # Delete food logs
+        FoodLog.query.filter_by(user=username).delete()
+        
+        # Delete exercise logs
+        ExerciseLog.query.filter_by(user=username).delete()
+        
+        # Delete weight logs
+        WeightLog.query.filter_by(user=username).delete()
+        
+        # Delete workout logs
+        WorkoutLog.query.filter_by(user=username).delete()
+        
+        # Delete custom exercises
+        UserExerciseSubmission.query.filter_by(user=username).delete()
+        
+        # Delete the user
+        db.session.delete(user)
+        db.session.commit()
+        
+        print(f"[SUCCESS] User account {username} deleted successfully")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Account deleted successfully'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to delete user account {username}: {e}")
+        return jsonify({'error': f'Failed to delete account: {str(e)}'}), 500
+
 @app.route('/foods/search', methods=['GET'])
 def search_foods():
     query = request.args.get('query', '').strip().lower()
@@ -1694,11 +1821,21 @@ def recommend_foods():
             final_recs.append(food)
     return jsonify({'recommended': final_recs})
 
-# --- Progress Endpoints ---
+# --- Enhanced Progress Endpoints ---
 @app.route('/progress/weight')
 def progress_weight():
     user = request.args.get('user')
-    logs = WeightLog.query.filter_by(user=user).order_by(WeightLog.date).all()
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    query = WeightLog.query.filter_by(user=user)
+    
+    if start_date:
+        query = query.filter(WeightLog.date >= datetime.fromisoformat(start_date).date())
+    if end_date:
+        query = query.filter(WeightLog.date <= datetime.fromisoformat(end_date).date())
+    
+    logs = query.order_by(WeightLog.date).all()
     return jsonify([
         {'date': log.date.isoformat(), 'weight': log.weight}
         for log in logs
@@ -1707,7 +1844,17 @@ def progress_weight():
 @app.route('/progress/calories')
 def progress_calories():
     user = request.args.get('user')
-    logs = FoodLog.query.filter_by(user=user).order_by(FoodLog.date).all()
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    query = FoodLog.query.filter_by(user=user)
+    
+    if start_date:
+        query = query.filter(FoodLog.date >= datetime.fromisoformat(start_date).date())
+    if end_date:
+        query = query.filter(FoodLog.date <= datetime.fromisoformat(end_date).date())
+    
+    logs = query.order_by(FoodLog.date).all()
     return jsonify([
         {'date': log.date.isoformat(), 'calories': log.calories}
         for log in logs
@@ -1716,7 +1863,17 @@ def progress_calories():
 @app.route('/progress/workouts')
 def progress_workouts():
     user = request.args.get('user')
-    logs = WorkoutLog.query.filter_by(user=user).order_by(WorkoutLog.date).all()
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    query = WorkoutLog.query.filter_by(user=user)
+    
+    if start_date:
+        query = query.filter(WorkoutLog.date >= datetime.fromisoformat(start_date).date())
+    if end_date:
+        query = query.filter(WorkoutLog.date <= datetime.fromisoformat(end_date).date())
+    
+    logs = query.order_by(WorkoutLog.date).all()
     return jsonify([
         {'date': log.date.isoformat(), 'type': log.type, 'duration': log.duration, 'calories_burned': log.calories_burned}
         for log in logs
@@ -1725,14 +1882,334 @@ def progress_workouts():
 @app.route('/progress/summary')
 def progress_summary():
     user = request.args.get('user')
-    latest_weight = WeightLog.query.filter_by(user=user).order_by(WeightLog.date.desc()).first()
-    total_calories = db.session.query(db.func.sum(FoodLog.calories)).filter_by(user=user).scalar() or 0
-    total_workouts = WorkoutLog.query.filter_by(user=user).count()
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    # Build date filter
+    date_filter = {}
+    if start_date:
+        date_filter['start'] = datetime.fromisoformat(start_date).date()
+    if end_date:
+        date_filter['end'] = datetime.fromisoformat(end_date).date()
+    
+    # Get latest weight
+    weight_query = WeightLog.query.filter_by(user=user)
+    if 'start' in date_filter:
+        weight_query = weight_query.filter(WeightLog.date >= date_filter['start'])
+    if 'end' in date_filter:
+        weight_query = weight_query.filter(WeightLog.date <= date_filter['end'])
+    
+    latest_weight = weight_query.order_by(WeightLog.date.desc()).first()
+    
+    # Get total calories
+    calories_query = db.session.query(db.func.sum(FoodLog.calories)).filter_by(user=user)
+    if 'start' in date_filter:
+        calories_query = calories_query.filter(FoodLog.date >= date_filter['start'])
+    if 'end' in date_filter:
+        calories_query = calories_query.filter(FoodLog.date <= date_filter['end'])
+    
+    total_calories = calories_query.scalar() or 0
+    
+    # Get total workouts
+    workout_query = WorkoutLog.query.filter_by(user=user)
+    if 'start' in date_filter:
+        workout_query = workout_query.filter(WorkoutLog.date >= date_filter['start'])
+    if 'end' in date_filter:
+        workout_query = workout_query.filter(WorkoutLog.date <= date_filter['end'])
+    
+    total_workouts = workout_query.count()
+    
+    # Get total exercise duration
+    duration_query = db.session.query(db.func.sum(WorkoutLog.duration)).filter_by(user=user)
+    if 'start' in date_filter:
+        duration_query = duration_query.filter(WorkoutLog.date >= date_filter['start'])
+    if 'end' in date_filter:
+        duration_query = duration_query.filter(WorkoutLog.date <= date_filter['end'])
+    
+    total_duration = duration_query.scalar() or 0
+    
+    # Get total calories burned
+    calories_burned_query = db.session.query(db.func.sum(WorkoutLog.calories_burned)).filter_by(user=user)
+    if 'start' in date_filter:
+        calories_burned_query = calories_burned_query.filter(WorkoutLog.date >= date_filter['start'])
+    if 'end' in date_filter:
+        calories_burned_query = calories_burned_query.filter(WorkoutLog.date <= date_filter['end'])
+    
+    total_calories_burned = calories_burned_query.scalar() or 0
+    
     return jsonify({
         'calories': total_calories,
         'weight': latest_weight.weight if latest_weight else None,
         'workouts': total_workouts,
+        'total_duration': total_duration,
+        'total_calories_burned': total_calories_burned,
     })
+
+# New comprehensive progress endpoints
+@app.route('/progress/daily-summary')
+def progress_daily_summary():
+    user = request.args.get('user')
+    target_date = request.args.get('date')
+    
+    if target_date:
+        date_obj = datetime.fromisoformat(target_date).date()
+    else:
+        date_obj = date.today()
+    
+    # Get daily data
+    daily_calories = db.session.query(db.func.sum(FoodLog.calories)).filter_by(user=user, date=date_obj).scalar() or 0
+    daily_workouts = WorkoutLog.query.filter_by(user=user, date=date_obj).all()
+    daily_weight = WeightLog.query.filter_by(user=user, date=date_obj).first()
+    
+    total_duration = sum(workout.duration for workout in daily_workouts)
+    total_calories_burned = sum(workout.calories_burned for workout in daily_workouts)
+    
+    # Get user goals
+    user_obj = User.query.filter_by(username=user).first()
+    calorie_goal = _compute_daily_goal_for_user(user_obj) if user_obj else 2000
+    
+    return jsonify({
+        'date': date_obj.isoformat(),
+        'calories': {
+            'current': daily_calories,
+            'goal': calorie_goal,
+            'remaining': max(0, calorie_goal - daily_calories),
+            'percentage': min(1.0, daily_calories / calorie_goal) if calorie_goal > 0 else 0
+        },
+        'weight': {
+            'current': daily_weight.weight if daily_weight else None,
+            'previous': None  # Would need to get previous day's weight
+        },
+        'exercise': {
+            'duration': total_duration,
+            'calories_burned': total_calories_burned,
+            'sessions': len(daily_workouts),
+            'average_intensity': total_calories_burned / total_duration if total_duration > 0 else 0
+        },
+        'achievements': _get_daily_achievements(daily_calories, calorie_goal, total_duration, len(daily_workouts)),
+        'recommendations': _get_daily_recommendations(daily_calories, calorie_goal, total_duration)
+    })
+
+@app.route('/progress/weekly-summary')
+def progress_weekly_summary():
+    user = request.args.get('user')
+    week_start = request.args.get('week_start')
+    
+    if week_start:
+        start_date = datetime.fromisoformat(week_start).date()
+    else:
+        # Get start of current week (Monday)
+        today = date.today()
+        start_date = today - timedelta(days=today.weekday())
+    
+    end_date = start_date + timedelta(days=6)
+    
+    # Get weekly aggregated data
+    weekly_calories = db.session.query(db.func.sum(FoodLog.calories)).filter(
+        FoodLog.user == user,
+        FoodLog.date >= start_date,
+        FoodLog.date <= end_date
+    ).scalar() or 0
+    
+    weekly_workouts = WorkoutLog.query.filter(
+        WorkoutLog.user == user,
+        WorkoutLog.date >= start_date,
+        WorkoutLog.date <= end_date
+    ).all()
+    
+    total_duration = sum(workout.duration for workout in weekly_workouts)
+    total_calories_burned = sum(workout.calories_burned for workout in weekly_workouts)
+    
+    # Get user goals
+    user_obj = User.query.filter_by(username=user).first()
+    daily_calorie_goal = _compute_daily_goal_for_user(user_obj) if user_obj else 2000
+    weekly_calorie_goal = daily_calorie_goal * 7
+    
+    return jsonify({
+        'week_start': start_date.isoformat(),
+        'week_end': end_date.isoformat(),
+        'calories': {
+            'current': weekly_calories,
+            'goal': weekly_calorie_goal,
+            'remaining': max(0, weekly_calorie_goal - weekly_calories),
+            'percentage': min(1.0, weekly_calories / weekly_calorie_goal) if weekly_calorie_goal > 0 else 0,
+            'daily_average': weekly_calories / 7
+        },
+        'exercise': {
+            'total_duration': total_duration,
+            'total_calories_burned': total_calories_burned,
+            'sessions': len(weekly_workouts),
+            'daily_average_duration': total_duration / 7,
+            'consistency': len(set(workout.date for workout in weekly_workouts)) / 7
+        },
+        'achievements': _get_weekly_achievements(weekly_calories, weekly_calorie_goal, total_duration, len(weekly_workouts)),
+        'trends': _get_weekly_trends(user, start_date, end_date)
+    })
+
+@app.route('/progress/monthly-summary')
+def progress_monthly_summary():
+    user = request.args.get('user')
+    month_start = request.args.get('month_start')
+    
+    if month_start:
+        start_date = datetime.fromisoformat(month_start).date()
+    else:
+        # Get start of current month
+        today = date.today()
+        start_date = today.replace(day=1)
+    
+    # Get end of month
+    if start_date.month == 12:
+        end_date = start_date.replace(year=start_date.year + 1, month=1, day=1) - timedelta(days=1)
+    else:
+        end_date = start_date.replace(month=start_date.month + 1, day=1) - timedelta(days=1)
+    
+    # Get monthly aggregated data
+    monthly_calories = db.session.query(db.func.sum(FoodLog.calories)).filter(
+        FoodLog.user == user,
+        FoodLog.date >= start_date,
+        FoodLog.date <= end_date
+    ).scalar() or 0
+    
+    monthly_workouts = WorkoutLog.query.filter(
+        WorkoutLog.user == user,
+        WorkoutLog.date >= start_date,
+        WorkoutLog.date <= end_date
+    ).all()
+    
+    total_duration = sum(workout.duration for workout in monthly_workouts)
+    total_calories_burned = sum(workout.calories_burned for workout in monthly_workouts)
+    
+    # Get user goals
+    user_obj = User.query.filter_by(username=user).first()
+    daily_calorie_goal = _compute_daily_goal_for_user(user_obj) if user_obj else 2000
+    monthly_calorie_goal = daily_calorie_goal * end_date.day
+    
+    return jsonify({
+        'month_start': start_date.isoformat(),
+        'month_end': end_date.isoformat(),
+        'calories': {
+            'current': monthly_calories,
+            'goal': monthly_calorie_goal,
+            'remaining': max(0, monthly_calorie_goal - monthly_calories),
+            'percentage': min(1.0, monthly_calories / monthly_calorie_goal) if monthly_calorie_goal > 0 else 0,
+            'daily_average': monthly_calories / end_date.day
+        },
+        'exercise': {
+            'total_duration': total_duration,
+            'total_calories_burned': total_calories_burned,
+            'sessions': len(monthly_workouts),
+            'daily_average_duration': total_duration / end_date.day,
+            'consistency': len(set(workout.date for workout in monthly_workouts)) / end_date.day
+        },
+        'achievements': _get_monthly_achievements(monthly_calories, monthly_calorie_goal, total_duration, len(monthly_workouts)),
+        'trends': _get_monthly_trends(user, start_date, end_date)
+    })
+
+@app.route('/progress/goals', methods=['GET', 'POST'])
+def progress_goals():
+    user = request.args.get('user') or request.json.get('user')
+    
+    if request.method == 'GET':
+        # Get user goals
+        user_obj = User.query.filter_by(username=user).first()
+        if not user_obj:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'calories': _compute_daily_goal_for_user(user_obj),
+            'steps': 10000,  # Default step goal
+            'water': 2000,   # Default water goal in ml
+            'exercise': 30,   # Default exercise goal in minutes
+            'sleep': 8,       # Default sleep goal in hours
+        })
+    
+    elif request.method == 'POST':
+        # Update user goals
+        goals = request.json.get('goals', {})
+        
+        # Update user profile with new goals
+        user_obj = User.query.filter_by(username=user).first()
+        if not user_obj:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Update activity level if provided
+        if 'activity_level' in goals:
+            user_obj.activity_level = goals['activity_level']
+        
+        # Update goal if provided
+        if 'goal' in goals:
+            user_obj.goal = goals['goal']
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Goals updated successfully'})
+
+# Helper functions for progress calculations
+def _get_daily_achievements(calories, goal, duration, sessions):
+    achievements = []
+    
+    if calories >= goal:
+        achievements.append('🎯 Daily calorie goal achieved!')
+    if duration >= 30:
+        achievements.append('💪 30+ minutes of exercise!')
+    if sessions >= 2:
+        achievements.append('🏋️ Multiple workout sessions!')
+    
+    return achievements
+
+def _get_daily_recommendations(calories, goal, duration):
+    recommendations = []
+    
+    if calories < goal * 0.5:
+        recommendations.append('Consider adding a healthy snack to reach your calorie goal')
+    if duration < 15:
+        recommendations.append('Even 15 minutes of exercise can make a difference')
+    
+    return recommendations
+
+def _get_weekly_achievements(calories, goal, duration, sessions):
+    achievements = []
+    
+    if calories >= goal:
+        achievements.append('🏆 Weekly calorie goal achieved!')
+    if duration >= 150:  # 30 min * 5 days
+        achievements.append('💪 Consistent exercise week!')
+    if sessions >= 5:
+        achievements.append('🔥 5+ workout sessions this week!')
+    
+    return achievements
+
+def _get_weekly_trends(user, start_date, end_date):
+    # Calculate trends for the week
+    trends = {
+        'calories_trend': 'stable',  # Would calculate actual trend
+        'exercise_trend': 'stable',
+        'consistency_score': 0.8
+    }
+    return trends
+
+def _get_monthly_achievements(calories, goal, duration, sessions):
+    achievements = []
+    
+    if calories >= goal:
+        achievements.append('🏆 Monthly calorie goal achieved!')
+    if duration >= 600:  # 30 min * 20 days
+        achievements.append('💪 Excellent exercise consistency!')
+    if sessions >= 20:
+        achievements.append('🔥 20+ workout sessions this month!')
+    
+    return achievements
+
+def _get_monthly_trends(user, start_date, end_date):
+    # Calculate trends for the month
+    trends = {
+        'calories_trend': 'stable',  # Would calculate actual trend
+        'exercise_trend': 'stable',
+        'consistency_score': 0.8,
+        'improvement_areas': ['hydration', 'sleep']
+    }
+    return trends
 
 def calculate_streak(user):
     today = date.today()

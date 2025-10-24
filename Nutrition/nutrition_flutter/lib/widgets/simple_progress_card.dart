@@ -71,7 +71,7 @@ class SimpleProgressCard extends StatelessWidget {
             const SizedBox(height: AppDesignSystem.spaceLG),
             LinearProgressIndicator(
               value: progress,
-              backgroundColor: AppDesignSystem.outline.withOpacity(0.3),
+              backgroundColor: AppDesignSystem.outline.withValues(alpha: 0.3),
               valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
               minHeight: 8,
             ),

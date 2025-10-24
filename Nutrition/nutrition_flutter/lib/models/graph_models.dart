@@ -45,7 +45,7 @@ class ProfessionalColors {
   // Get gradient colors based on gender and metric type
   static List<Color> getGradientForMetric(String metric, String? gender) {
     final baseColor = getColorForMetric(metric, gender);
-    return [baseColor, baseColor.withOpacity(0.6)];
+    return [baseColor, baseColor.withValues(alpha: 0.6)];
   }
 }
 

@@ -106,7 +106,7 @@ class _YourExerciseScreenState extends State<YourExerciseScreen> {
     setState(() => _submitting = false);
     final detail = [
       if (duration != null) 'for ${duration}m',
-      if (reps != null && sets != null) '${sets}x${reps}',
+      if (reps != null && sets != null) '$sets x $reps',
     ].join(' ');
 
     // Fire-and-forget backend submission

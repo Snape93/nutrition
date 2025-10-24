@@ -110,7 +110,7 @@ class _TimeRangeSelectorState extends State<TimeRangeSelector>
                   isSelected
                       ? [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -126,7 +126,7 @@ class _TimeRangeSelectorState extends State<TimeRangeSelector>
                 color:
                     isSelected
                         ? ProfessionalColors.onSurface
-                        : ProfessionalColors.onSurface.withOpacity(0.7),
+                        : ProfessionalColors.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ),
@@ -217,7 +217,7 @@ class _TimeRangeSelectorState extends State<TimeRangeSelector>
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: ProfessionalColors.onSurface.withOpacity(0.7),
+            color: ProfessionalColors.onSurface.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 8),
@@ -235,7 +235,7 @@ class _TimeRangeSelectorState extends State<TimeRangeSelector>
                 Icon(
                   Icons.calendar_today,
                   size: 16,
-                  color: ProfessionalColors.onSurface.withOpacity(0.6),
+                  color: ProfessionalColors.onSurface.withValues(alpha: 0.6),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -248,7 +248,7 @@ class _TimeRangeSelectorState extends State<TimeRangeSelector>
                       color:
                           date != null
                               ? ProfessionalColors.onSurface
-                              : ProfessionalColors.onSurface.withOpacity(0.5),
+                              : ProfessionalColors.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ),

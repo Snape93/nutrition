@@ -137,7 +137,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
                     TimeRangeUtils.getDisplayLabel(widget.config.timeRange),
                     style: TextStyle(
                       fontSize: 12,
-                      color: ProfessionalColors.onSurface.withOpacity(0.6),
+                      color: ProfessionalColors.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -151,7 +151,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: widget.statistics.trendColor.withOpacity(0.1),
+                        color: widget.statistics.trendColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -180,7 +180,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
                       onPressed: widget.onRefresh,
                       icon: Icon(
                         Icons.refresh,
-                        color: ProfessionalColors.onSurface.withOpacity(0.6),
+                        color: ProfessionalColors.onSurface.withValues(alpha: 0.6),
                         size: 20,
                       ),
                     ),
@@ -234,9 +234,9 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
       ),
       child: Column(
         children: [
@@ -296,7 +296,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
               'Loading chart data...',
               style: TextStyle(
                 fontSize: 14,
-                color: ProfessionalColors.onSurface.withOpacity(0.6),
+                color: ProfessionalColors.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -316,13 +316,13 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: metadata.color.withOpacity(0.1),
+                color: metadata.color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(50),
               ),
               child: Icon(
                 metadata.icon,
                 size: 32,
-                color: metadata.color.withOpacity(0.6),
+                color: metadata.color.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 16),
@@ -340,7 +340,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: ProfessionalColors.onSurface.withOpacity(0.6),
+                color: ProfessionalColors.onSurface.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 16),
@@ -398,7 +398,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
           horizontalInterval: _calculateInterval(),
           getDrawingHorizontalLine:
               (value) => FlLine(
-                color: ProfessionalColors.outline.withOpacity(0.3),
+                color: ProfessionalColors.outline.withValues(alpha: 0.3),
                 strokeWidth: 1,
                 dashArray: [5, 5],
               ),
@@ -442,7 +442,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
             ),
             belowBarData: BarAreaData(
               show: true,
-              color: widget.config.primaryColor.withOpacity(0.1),
+              color: widget.config.primaryColor.withValues(alpha: 0.1),
             ),
           ),
         ],
@@ -477,7 +477,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
           horizontalInterval: _calculateInterval(),
           getDrawingHorizontalLine:
               (value) => FlLine(
-                color: ProfessionalColors.outline.withOpacity(0.3),
+                color: ProfessionalColors.outline.withValues(alpha: 0.3),
                 strokeWidth: 1,
                 dashArray: [5, 5],
               ),
@@ -537,7 +537,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: ProfessionalColors.background.withOpacity(0.5),
+        color: ProfessionalColors.background.withValues(alpha: 0.5),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(16),
           bottomRight: Radius.circular(16),
@@ -570,7 +570,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
           label,
           style: TextStyle(
             fontSize: 12,
-            color: ProfessionalColors.onSurface.withOpacity(0.6),
+            color: ProfessionalColors.onSurface.withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 4),
@@ -624,7 +624,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
       '${value.toInt()}${metadata.unit}',
       style: TextStyle(
         fontSize: 10,
-        color: ProfessionalColors.onSurface.withOpacity(0.6),
+        color: ProfessionalColors.onSurface.withValues(alpha: 0.6),
       ),
     );
   }
@@ -636,7 +636,7 @@ class _ProfessionalGraphCardState extends State<ProfessionalGraphCard>
       _formatDateShort(dataPoint.date),
       style: TextStyle(
         fontSize: 10,
-        color: ProfessionalColors.onSurface.withOpacity(0.6),
+        color: ProfessionalColors.onSurface.withValues(alpha: 0.6),
       ),
     );
   }

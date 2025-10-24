@@ -4,8 +4,8 @@ import 'widgets/emoji_selector.dart';
 import 'widgets/sex_specific_theme.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../../config.dart' as config; // centralized apiBase
-import '../../home.dart'; // for HomePage
+import '../config.dart' as config; // centralized apiBase
+import '../home.dart'; // for HomePage
 import 'package:nutrition_flutter/user_database.dart';
 
 class EnhancedOnboardingNutrition extends StatefulWidget {

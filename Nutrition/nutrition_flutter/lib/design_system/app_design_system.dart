@@ -229,7 +229,7 @@ class AppDesignSystem {
           elevation != null
               ? [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: elevation * 2,
                   offset: Offset(0, elevation),
                 ),
@@ -247,7 +247,7 @@ class AppDesignSystem {
       backgroundColor: backgroundColor ?? primaryColor,
       foregroundColor: Colors.white,
       elevation: elevationLow,
-      shadowColor: primaryColor.withOpacity(0.3),
+      shadowColor: primaryColor.withValues(alpha: 0.3),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radiusMD),
       ),

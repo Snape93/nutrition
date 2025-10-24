@@ -447,17 +447,20 @@ class ConnectPlatformsScreenState extends State<ConnectPlatformsScreen>
                     height: 48,
                     child: OutlinedButton.icon(
                       onPressed: () async {
+                        final scaffoldMessenger = ScaffoldMessenger.of(context);
                         final diag =
                             await HealthService.diagnoseHealthConnectVisibility();
                         // Simple presentation
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Diagnostics captured. Check logs for details.',
+                        if (mounted) {
+                          scaffoldMessenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Diagnostics captured. Check logs for details.',
+                              ),
+                              backgroundColor: Colors.blue,
                             ),
-                            backgroundColor: Colors.blue,
-                          ),
-                        );
+                          );
+                        }
                         debugPrint(
                           '🧭 Diagnostics summary: isInstalled=${diag['isInstalled']}, hasPermissionsProbe=${diag['hasPermissionsProbe']}, dataProbeCount=${diag['dataProbeCount']}',
                         );

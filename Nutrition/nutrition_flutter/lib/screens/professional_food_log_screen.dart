@@ -554,8 +554,8 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                             style: AppDesignSystem.bodySmall,
                           ),
                           onPressed: () => fetchAndSelectFood(food.foodName),
-                          backgroundColor: AppDesignSystem.outline.withOpacity(
-                            0.1,
+                          backgroundColor: AppDesignSystem.outline.withValues(
+                            alpha: 0.1,
                           ),
                         ),
                       ),

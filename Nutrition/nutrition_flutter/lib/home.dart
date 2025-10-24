@@ -5,7 +5,7 @@ import 'settings.dart';
 import 'theme_service.dart';
 import 'user_database.dart';
 import 'screens/professional_food_log_screen.dart';
-import 'screens/progress_screen.dart';
+import 'screens/beautiful_progress_screen.dart';
 import 'my_app.dart'; // Import routeObserver
 import 'history_screen.dart'; // Added import for HistoryScreen
 import 'exercise_screen.dart'; // Added import for ExerciseScreen
@@ -13,7 +13,6 @@ import 'exercise_category_screen.dart';
 import 'screens/your_exercise_screen.dart';
 import 'connect_platforms.dart'; // Added import for ConnectPlatformsScreen
 import 'services/health_service.dart'; // Added import for HealthService
-import 'test_health_widget.dart'; // Added import for Health Connect test
 import 'services/remaining_service.dart';
 // Removed graph-related imports to prevent paused exceptions
 
@@ -381,30 +380,14 @@ class _HomePageState extends State<HomePage> with RouteAware {
               }
             },
           ),
-
-          SizedBox(height: isVerySmallScreen ? 12 : 16),
-
-          // Health Connect Test Card (Debug)
-          _buildMenuCard(
-            icon: Icons.health_and_safety,
-            title: 'Health Connect Test',
-            subtitle: 'Test Health Connect integration and data retrieval',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const HealthConnectTestWidget(),
-                ),
-              );
-            },
-          ),
         ],
       );
     } else if (_selectedIndex == 1) {
       // Exercise tab content
       bodyContent = ExerciseScreen(usernameOrEmail: widget.usernameOrEmail);
     } else if (_selectedIndex == 3) {
-      // Progress tab content - new progress screen with weight tracking
-      bodyContent = ProgressScreen(
+      // Progress tab content - beautiful progress screen with real-time data
+      bodyContent = BeautifulProgressScreen(
         usernameOrEmail: widget.usernameOrEmail,
         userSex: userSex,
       );

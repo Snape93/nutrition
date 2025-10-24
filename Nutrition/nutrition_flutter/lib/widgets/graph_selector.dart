@@ -102,7 +102,7 @@ class _GraphSelectorState extends State<GraphSelector>
             decoration: BoxDecoration(
               color:
                   isSelected
-                      ? metadata.color.withOpacity(0.1)
+                      ? metadata.color.withValues(alpha: 0.1)
                       : ProfessionalColors.surface,
               borderRadius: BorderRadius.circular(28),
               border: Border.all(
@@ -113,14 +113,14 @@ class _GraphSelectorState extends State<GraphSelector>
                   isSelected
                       ? [
                         BoxShadow(
-                          color: metadata.color.withOpacity(0.2),
+                          color: metadata.color.withValues(alpha: 0.2),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
                       ]
                       : [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 4,
                           offset: const Offset(0, 1),
                         ),
@@ -135,7 +135,7 @@ class _GraphSelectorState extends State<GraphSelector>
                   color:
                       isSelected
                           ? metadata.color
-                          : ProfessionalColors.onSurface.withOpacity(0.7),
+                          : ProfessionalColors.onSurface.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -177,7 +177,7 @@ class _GraphSelectorState extends State<GraphSelector>
               border: Border.all(color: ProfessionalColors.outline, width: 1),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 1),
                 ),
@@ -189,7 +189,7 @@ class _GraphSelectorState extends State<GraphSelector>
                 Icon(
                   Icons.add,
                   size: 20,
-                  color: ProfessionalColors.onSurface.withOpacity(0.7),
+                  color: ProfessionalColors.onSurface.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -279,7 +279,7 @@ class _AddMetricDialog extends StatelessWidget {
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
-                    color: ProfessionalColors.onSurface.withOpacity(0.6),
+                    color: ProfessionalColors.onSurface.withValues(alpha: 0.6),
                   ),
                 ],
               ),
@@ -307,7 +307,7 @@ class _AddMetricDialog extends StatelessWidget {
           Icon(
             Icons.check_circle_outline,
             size: 48,
-            color: ProfessionalColors.success.withOpacity(0.6),
+            color: ProfessionalColors.success.withValues(alpha: 0.6),
           ),
           const SizedBox(height: 16),
           Text(
@@ -324,7 +324,7 @@ class _AddMetricDialog extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: ProfessionalColors.onSurface.withOpacity(0.6),
+              color: ProfessionalColors.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -352,7 +352,7 @@ class _AddMetricDialog extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: metadata.color.withOpacity(0.1),
+                      color: metadata.color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(metadata.icon, color: metadata.color, size: 20),
@@ -375,8 +375,8 @@ class _AddMetricDialog extends StatelessWidget {
                           metadata.subtitle,
                           style: TextStyle(
                             fontSize: 14,
-                            color: ProfessionalColors.onSurface.withOpacity(
-                              0.6,
+                            color: ProfessionalColors.onSurface.withValues(
+                              alpha: 0.6,
                             ),
                           ),
                         ),
@@ -386,7 +386,7 @@ class _AddMetricDialog extends StatelessWidget {
                   Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
-                    color: ProfessionalColors.onSurface.withOpacity(0.4),
+                    color: ProfessionalColors.onSurface.withValues(alpha: 0.4),
                   ),
                 ],
               ),

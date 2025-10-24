@@ -305,7 +305,7 @@ class _ProfessionalHomeScreenState extends State<ProfessionalHomeScreen> {
       icon: const Icon(Icons.water_drop),
       label: Text(label),
       style: ElevatedButton.styleFrom(
-        backgroundColor: _primaryColor.withOpacity(0.1),
+        backgroundColor: _primaryColor.withValues(alpha: 0.1),
         foregroundColor: _primaryColor,
         elevation: 0,
       ),

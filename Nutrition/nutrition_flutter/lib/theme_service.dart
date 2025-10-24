@@ -21,7 +21,7 @@ class ThemeService {
         primary: primaryColor,
         surface: AppDesignSystem.surface,
         onSurface: AppDesignSystem.onSurface,
-        background: AppDesignSystem.background,
+        // background property is deprecated, using surface instead
         error: AppDesignSystem.error,
       ),
       textTheme: _buildTextTheme(),
