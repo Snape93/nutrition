@@ -1,0 +1,886 @@
+[
+  {
+    "id": "1",
+    "name": "Aerobic Dance",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 7.18,
+    "instructions": [
+      "Start with feet shoulder-width apart. 2. Follow rhythmic movements combining steps, jumps, and arm movements. 3. Maintain continuous motion for duration. 4. Keep core engaged throughout."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "5",
+    "name": "Badminton",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Racket",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 5.25,
+    "instructions": [
+      "Hold racket with proper grip. 2. Move quickly around court. 3. Hit shuttlecock over net. 4. Combine footwork with arm movements."
+    ],
+    "tags": [
+      "sport"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "11",
+    "name": "Basketball",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Basketball",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 7.44,
+    "instructions": [
+      "Dribble ball with fingertips. 2. Move around court with quick direction changes. 3. Include jumping, shooting, and defensive movements. 4. Maintain high intensity."
+    ],
+    "tags": [
+      "sport"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "12",
+    "name": "Battle Ropes",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Battle Ropes",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Hold rope ends with both hands. 2. Create waves by moving arms up and down alternately. 3. Keep core engaged and knees slightly bent. 4. Maintain rhythm for duration."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "15",
+    "name": "Box Jumps",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Plyo Box",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Stand facing sturdy box. 2. Swing arms and jump onto box. 3. Land softly with bent knees. 4. Step down and repeat."
+    ],
+    "tags": [
+      "plyometric"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "16",
+    "name": "Boxing",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Gloves",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 10.5,
+    "instructions": [
+      "Stand in fighting stance. 2. Throw punches (jab, cross, hooks). 3. Move feet constantly. 4. Combine offense and defense."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "17",
+    "name": "Burpees",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Start standing. 2. Drop to plank position. 3. Perform push-up. 4. Jump feet to hands and explosively jump up."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "21",
+    "name": "Canoeing",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Canoe",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 5.25,
+    "instructions": [
+      "Sit in canoe with paddle. 2. Rotate torso and pull paddle through water. 3. Alternate sides. 4. Maintain steady rhythm."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "26",
+    "name": "Climbing Stairs",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Stairs",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 7.44,
+    "instructions": [
+      "Step onto first stair. 2. Push through leg to lift body. 3. Continue alternating legs. 4. Maintain steady pace."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "29",
+    "name": "Cross-Country Skiing",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Skis",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 12.25,
+    "instructions": [
+      "Slide skis in alternating pattern. 2. Use poles to propel forward. 3. Coordinate arm and leg movements. 4. Maintain gliding motion."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "31",
+    "name": "Cycling (Moderate)",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Bicycle",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 7.0,
+    "instructions": [
+      "Sit on bike with proper posture. 2. Pedal in smooth circular motion. 3. Maintain steady cadence. 4. Keep core engaged."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "32",
+    "name": "Cycling (Vigorous)",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Bicycle",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 12.25,
+    "instructions": [
+      "Sit on bike in aggressive position. 2. Pedal at high intensity. 3. Include sprints and climbs. 4. Maintain high heart rate."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "33",
+    "name": "Dancing (Fast)",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Move to fast-paced music. 2. Incorporate jumps and dynamic movements. 3. Maintain continuous motion. 4. Let rhythm guide movements."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "40",
+    "name": "Elliptical Trainer",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Elliptical",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Place feet on pedals. 2. Hold handles. 3. Move in smooth elliptical motion. 4. Coordinate arms and legs."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "44",
+    "name": "Football (American)",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Football",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Perform explosive movements. 2. Include sprints and direction changes. 3. Engage in physical contact play. 4. Maintain high intensity."
+    ],
+    "tags": [
+      "sport"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "48",
+    "name": "Golf",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Golf Clubs",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 4.38,
+    "instructions": [
+      "Walk between holes carrying clubs. 2. Swing club with rotation. 3. Maintain walking pace. 4. Include bending to place ball."
+    ],
+    "tags": [
+      "sport"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "54",
+    "name": "High Knees",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Hip Flexors",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Stand in place. 2. Run lifting knees to hip height. 3. Pump arms. 4. Maintain quick pace."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "55",
+    "name": "Hiking (Uphill)",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 7.0,
+    "instructions": [
+      "Walk on inclined terrain. 2. Use full foot placement. 3. Maintain steady breathing. 4. Use arms for balance."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "57",
+    "name": "Ice Skating",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Ice Skates",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Glide on ice with alternating legs. 2. Push off with each stride. 3. Maintain balance. 4. Include turns and stops."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "60",
+    "name": "Indoor Rowing",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Rowing Machine",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 7.0,
+    "instructions": [
+      "Sit with feet strapped in. 2. Pull handle to chest while legs extend. 3. Return arms first, then bend knees. 4. Maintain smooth rhythm."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "63",
+    "name": "Jump Rope",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Jump Rope",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 11.38,
+    "instructions": [
+      "Hold rope handles. 2. Swing rope over head. 3. Jump as rope passes under feet. 4. Land softly on balls of feet."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "64",
+    "name": "Jump Squats",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Start in squat position. 2. Explode upward jumping. 3. Land softly. 4. Immediately go into next squat."
+    ],
+    "tags": [
+      "plyometric"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "65",
+    "name": "Jumping Jacks",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 7.44,
+    "instructions": [
+      "Start with feet together, arms at sides. 2. Jump feet apart while raising arms overhead. 3. Jump back to start. 4. Maintain rhythm."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "66",
+    "name": "Kayaking",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Kayak",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 4.38,
+    "instructions": [
+      "Sit in kayak with paddle. 2. Rotate torso and pull paddle. 3. Alternate sides in rhythm. 4. Maintain forward momentum."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "68",
+    "name": "Kettlebell Swings",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Glutes",
+    "equipment": "Kettlebell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Stand with kettlebell between feet. 2. Hinge and swing kettlebell back. 3. Thrust hips forward to swing kettlebell up. 4. Let gravity bring it down."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "69",
+    "name": "Kickboxing",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 10.5,
+    "instructions": [
+      "Stand in fighting stance. 2. Throw punches and kicks in combinations. 3. Move feet constantly. 4. Maintain high intensity."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "78",
+    "name": "Medicine Ball Slams",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Core",
+    "equipment": "Medicine Ball",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Hold medicine ball overhead. 2. Slam ball down forcefully. 3. Catch on bounce. 4. Repeat with power."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "79",
+    "name": "Mountain Climbers",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Core",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Start in plank position. 2. Drive one knee to chest. 3. Quickly switch legs. 4. Maintain plank position."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "90",
+    "name": "Racquetball",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Racquet",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Move quickly around court. 2. Hit ball against wall. 3. Include lunging and reaching. 4. Maintain high activity."
+    ],
+    "tags": [
+      "sport"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "96",
+    "name": "Rowing (Vigorous)",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Rowing Machine",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 10.5,
+    "instructions": [
+      "Sit with feet strapped. 2. Pull handle explosively. 3. Drive with legs then arms. 4. Maintain high stroke rate."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "97",
+    "name": "Running (6 mph)",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Maintain upright posture. 2. Land midfoot. 3. Pump arms. 4. Keep steady pace."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "98",
+    "name": "Running (8 mph)",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 11.38,
+    "instructions": [
+      "Maintain forward lean. 2. Quick foot turnover. 3. Powerful arm drive. 4. Sustain fast pace."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "100",
+    "name": "Shadow Boxing",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 7.44,
+    "instructions": [
+      "Stand in fighting stance. 2. Throw punches in combinations. 3. Move feet and body. 4. Visualize opponent."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "105",
+    "name": "Skateboarding",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Skateboard",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 4.38,
+    "instructions": [
+      "Push off with one foot. 2. Balance on board. 3. Steer by shifting weight. 4. Include tricks if skilled."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "106",
+    "name": "Skiing (Downhill)",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Skis",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 5.25,
+    "instructions": [
+      "Position in athletic stance. 2. Turn by shifting weight. 3. Maintain balance. 4. Control speed with edges."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "109",
+    "name": "Soccer",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Soccer Ball",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Run continuously around field. 2. Dribble and pass ball. 3. Include sprints and direction changes. 4. Maintain high activity."
+    ],
+    "tags": [
+      "sport"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "110",
+    "name": "Spinning (Indoor Cycling)",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Stationary Bike",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 10.5,
+    "instructions": [
+      "Sit on bike with proper form. 2. Pedal at high intensity. 3. Include intervals and climbs. 4. Follow instructor cues."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "112",
+    "name": "Sprinting",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 14.0,
+    "instructions": [
+      "Explode from start. 2. Drive knees high. 3. Pump arms powerfully. 4. Maximum effort running."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "113",
+    "name": "Squat Jumps",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Lower into squat. 2. Explode upward jumping. 3. Land softly in squat. 4. Repeat immediately."
+    ],
+    "tags": [
+      "plyometric"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "114",
+    "name": "Stair Stepper",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Machine",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 7.0,
+    "instructions": [
+      "Step on pedals. 2. Alternate stepping motion. 3. Maintain upright posture. 4. Keep steady pace."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "120",
+    "name": "Swimming (Freestyle Moderate)",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 7.0,
+    "instructions": [
+      "Stroke with alternating arms. 2. Kick legs in flutter motion. 3. Turn head to breathe. 4. Maintain steady pace."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "121",
+    "name": "Swimming (Freestyle Vigorous)",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 10.5,
+    "instructions": [
+      "Stroke powerfully. 2. Kick aggressively. 3. Minimize breathing. 4. Maintain high speed."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "123",
+    "name": "Tennis",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Racket",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 7.0,
+    "instructions": [
+      "Move around court quickly. 2. Hit ball with forehand and backhand. 3. Include running and lateral movements. 4. Maintain rally."
+    ],
+    "tags": [
+      "sport"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "125",
+    "name": "Treadmill Running (5 mph)",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Cardiovascular System",
+    "equipment": "Treadmill",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 7.44,
+    "instructions": [
+      "Set moderate pace. 2. Maintain upright posture. 3. Land midfoot. 4. Keep steady breathing."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "130",
+    "name": "Volleyball",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "Volleyball",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Move around court. 2. Jump to spike and block. 3. Dive and lunge for ball. 4. Maintain active play."
+    ],
+    "tags": [
+      "sport"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "131",
+    "name": "Walking (3 mph)",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.15,
+    "instructions": [
+      "Step heel to toe. 2. Swing arms naturally. 3. Maintain upright posture. 4. Keep steady pace."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "132",
+    "name": "Walking (4 mph)",
+    "category": "Cardio",
+    "bodyPart": "Legs",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 4.38,
+    "instructions": [
+      "Walk at brisk pace. 2. Pump arms more vigorously. 3. Take longer strides. 4. Increase heart rate."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "133",
+    "name": "Wall Balls",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Quadriceps",
+    "equipment": "Medicine Ball",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Hold medicine ball at chest. 2. Squat down. 3. Explode up throwing ball to target. 4. Catch and repeat."
+    ],
+    "tags": [
+      "full-body"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "135",
+    "name": "Water Aerobics",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 4.38,
+    "instructions": [
+      "Move through water with various exercises. 2. Use water resistance. 3. Include jumping and reaching. 4. Maintain continuous motion."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "140",
+    "name": "Yoga (Hatha)",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Full Body",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 2.45,
+    "instructions": [
+      "Move through various poses. 2. Focus on breathing. 3. Hold poses for duration. 4. Transition smoothly."
+    ],
+    "tags": [
+      "yoga"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "141",
+    "name": "Yoga (Power/Vinyasa)",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Full Body",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Flow through dynamic sequences. 2. Coordinate breath with movement. 3. Hold challenging poses. 4. Maintain continuous flow."
+    ],
+    "tags": [
+      "yoga"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "142",
+    "name": "Zumba",
+    "category": "Cardio",
+    "bodyPart": "Full Body",
+    "target": "Cardiovascular System",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 7.44,
+    "instructions": [
+      "Follow dance choreography. 2. Move to Latin music rhythms. 3. Include jumps and turns. 4. Maintain high energy."
+    ],
+    "tags": [
+      "cardio"
+    ],
+    "gifUrl": ""
+  }
+]

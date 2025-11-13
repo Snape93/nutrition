@@ -1,0 +1,348 @@
+Food Name,Category,Serving Size,Calories,Protein (g),Carbs (g),Fat (g),Fiber (g),Sodium (mg),Calcium (mg),Iron (mg)
+White Rice,Staple,1 cup (158g),204,4.2,44.5,0.4,0.6,1,16,1.5
+Boiled Egg,Protein,1 large (50g),78,6.3,0.6,5.3,0,62,25,0.9
+Fried Egg,Protein,1 large (50g),90,6.2,0.6,7.0,0,94,28,1.0
+Chicken Adobo,Main Dish,1 cup (250g),334,34,15,19,1.2,1520,45,2.8
+Pandesal,Bread,1 piece (25g),80,2.5,15,1.0,0.5,120,8,0.3
+Banana (Lakatan),Fruit,1 med (118g),105,1.3,27,0.3,3.1,1,6,0.3
+Sinigang na Baboy,Main Dish,1 cup (250g),285,22,18,12,3.5,980,35,2.5
+Pork Tocino,Main Dish,2 slices (56g),180,10,12,11,0,480,10,0.7
+Longganisa,Main Dish,2 pieces (50g),170,7,6,14,0,420,8,0.5
+Bangus (Milkfish),Fish,1 fillet (85g),162,22,0,8,0,65,42,1.2
+Tilapia,Fish,1 fillet (87g),111,22,0,2.3,0,50,11,1.0
+Pinakbet,Vegetable,1 cup (200g),90,3,18,1,4.2,420,35,1.5
+Laing,Vegetable,1 cup (200g),180,4,12,14,3.5,720,60,2.0
+Puto,Snack,2 pieces (60g),120,2,28,0.5,0.5,90,10,0.2
+Halo-halo,Dessert,1 cup (300g),285,4,65,6,2.5,125,45,1.2
+Leche Flan,Dessert,1 slice (100g),180,6,30,4,0,95,125,1.2
+Buko Juice,Beverage,1 cup (240ml),46,0.5,11,0,0.2,25,15,0.1
+Coffee,Beverage,1 cup (240ml),2,0.3,0,0,0,5,4,0
+Apple,Fruit,1 med (182g),95,0.5,25,0.3,4.4,2,11,0.2
+Milk,Dairy,1 cup (244g),149,7.7,12,8,0,105,276,0.1
+Tapsilog,Main Dish,1 meal (300g),450,25,45,18,2.5,980,55,2.2
+Chicken Inasal,Main Dish,1 piece (120g),210,28,2,10,0,420,20,1.0
+Pork Sisig,Appetizer,1 cup (150g),350,18,8,28,1.2,1080,35,2.0
+Beef Caldereta,Stew,1 cup (250g),320,22,18,18,2.1,1150,65,2.5
+Pancit Canton,Noodles,1 cup (150g),220,7,32,7,1.5,720,25,1.0
+Pancit Bihon,Noodles,1 cup (150g),190,6,35,3,1.2,680,20,0.8
+Lumpia Shanghai,Appetizer,3 pieces (90g),180,8,18,8,1.0,420,15,0.7
+Lechon Kawali,Main Dish,1 meal (300g),600,30,8,50,0.5,1250,30,2.5
+Ginataang Langka,Main Dish,1 cup (200g),180,4,18,12,3.0,580,45,1.2
+Adobong Sitaw,Vegetable,1 cup (200g),120,5,18,4,2.8,350,20,1.0
+Pinapaitan,Stew,1 cup (250g),210,18,4,12,1.5,980,40,2.0
+Tinola, Soup,1 cup (200g),110,12,6,4,1.8,420,25,1.2
+Bistek Tagalog,Main Dish,1 cup (200g),250,20,10,14,1.0,890,35,2.0
+La Paz Batchoy,Soup,1 bowl (250g),320,18,38,10,2.0,1150,40,2.5
+Goto,Soup,1 bowl (250g),180,8,28,4,1.5,720,25,1.0
+Arroz Caldo, Porridge,1 bowl (250g),210,10,32,4,1.2,680,20,1.0
+Champorado,Porridge,1 bowl (250g),190,4,38,2,2.5,90,15,1.2
+Taho,Snack,1 cup (200g),160,6,32,2,1.5,125,45,1.0
+Turon,Snack,1 piece (80g),140,2,28,4,1.2,85,25,0.8
+Maja Blanca,Dessert,1 slice (100g),120,2,22,4,1.0,35,15,0.5
+Ube Halaya,Dessert,1 slice (100g),180,2,42,3,1.5,85,35,1.0
+Suman,Dessert,2 pieces (100g),150,3,32,2,1.2,25,35,0.7
+Bibingka,Dessert,1 slice (100g),285,6,65,12,2.1,25,35,1.5
+Kutsinta,Snack,2 pieces (60g),90,1,22,0.2,0.5,10,5,0.2
+Ensaymada,Bread,1 piece (50g),180,4,28,6,0.8,120,20,0.5
+Monay,Bread,1 piece (60g),160,4,30,2,1.0,110,18,0.4
+Spanish Bread,Bread,1 piece (40g),130,3,22,3,0.7,90,12,0.3
+Cheese Roll,Bread,1 piece (45g),140,4,20,4,0.5,95,15,0.4
+Corned Beef,Meat,1 serving (85g),150,12,0,10,0,820,8,1.2
+Hotdog,Meat,1 piece (45g),120,4,4,10,0,480,6,0.5
+Tuna (Canned),Fish,1 can (155g),180,22,0,8,0,320,12,1.0
+Sardines (Canned),Fish,1 can (155g),140,16,0,7,0,320,15,1.2
+Galunggong,Fish,1 piece (60g),90,12,0,4,0,50,10,0.8
+Tuyo,Fish,2 pieces (30g),70,8,0,3,0,480,8,0.6
+Tinapa,Fish,1 piece (50g),110,14,0,5,0,420,12,0.9
+Shrimp,Seafood,6 pieces (60g),70,13,1,1,0,120,30,0.3
+Crab,Seafood,1 piece (100g),97,21,0,1,0,320,50,0.8
+Squid,Seafood,1 piece (60g),52,9,1,1,0,44,32,0.4
+Ampalaya,Vegetable,1 cup (100g),20,1,4,0.2,2.0,5,18,0.5
+Malunggay Leaves,Vegetable,1 cup (30g),20,2,3,0.3,1.2,7,60,0.6
+Kangkong,Vegetable,1 cup (50g),13,1.5,2,0.2,1.0,6,30,0.4
+Eggplant,Vegetable,1 cup (82g),35,0.8,8,0.2,2.5,2,9,0.2
+Okra,Vegetable,1 cup (100g),33,2,7,0.2,3.2,7,81,0.6
+Carrot,Vegetable,1 med (61g),25,0.6,6,0.1,1.7,42,20,0.2
+Potato,Vegetable,1 med (150g),110,3,26,0.2,2.4,7,20,0.7
+Tomato,Vegetable,1 med (123g),22,1.1,5,0.2,1.5,6,15,0.3
+Cabbage,Vegetable,1 cup (89g),22,1.1,5,0.1,2.2,16,36,0.2
+Lettuce,Vegetable,1 cup (36g),5,0.5,1,0.1,0.5,2,13,0.1
+Papaya,Fruit,1 cup (140g),55,0.9,14,0.2,2.5,4,30,0.3
+Pineapple,Fruit,1 cup (165g),82,0.9,22,0.2,2.3,2,21,0.5
+Watermelon,Fruit,1 cup (152g),46,0.9,12,0.2,0.6,2,11,0.2
+Mango,Fruit,1 cup (165g),99,1.4,25,0.6,2.6,2,18,0.2
+Orange,Fruit,1 med (131g),62,1.2,15,0.2,3.1,0,52,0.1
+Grapes,Fruit,1 cup (151g),104,1.1,27,0.2,1.4,3,15,0.5
+Guava,Fruit,1 cup (165g),112,4.2,24,1.6,8.9,3,30,0.4
+Apple (Green),Fruit,1 med (182g),95,0.5,25,0.3,4.4,2,11,0.2
+Banana (Saba),Fruit,1 piece (100g),120,1.3,31,0.3,2.6,1,7,0.3
+Avocado,Fruit,1 cup (150g),240,3,12,22,10,11,18,1.1
+Strawberry,Fruit,1 cup (152g),49,1,12,0.5,3,2,24,0.4
+Blueberry,Fruit,1 cup (148g),84,1.1,21,0.5,3.6,1,9,0.4
+Pear,Fruit,1 med (178g),101,0.6,27,0.2,5.5,2,15,0.2
+Peach,Fruit,1 med (150g),59,1.4,14,0.4,2.3,0,9,0.4
+Rambutan,Fruit,5 pieces (100g),68,0.9,16,0.2,0.9,2,8,0.2
+Lanzones,Fruit,10 pieces (100g),57,1,15,0.2,2.3,1,9,0.2
+Langka (Jackfruit),Fruit,1 cup (165g),155,2.4,40,0.5,2.6,3,34,0.6
+Durian,Fruit,1 cup (243g),357,3.6,66,13,9.2,5,20,1.0
+Chico,Fruit,1 med (100g),83,0.4,20,1.1,5.3,12,21,0.8
+Santol,Fruit,1 med (100g),67,0.6,17,0.2,2.3,2,10,0.2
+Guyabano,Fruit,1 cup (225g),150,2.3,38,0.7,7.4,14,30,1.0
+Macapuno,Dessert,1/2 cup (60g),90,0.5,22,0.5,1.0,10,8,0.2
+Buko Pandan,Dessert,1 cup (200g),180,2,38,4,1.2,25,15,0.4
+Mais con Yelo,Dessert,1 cup (200g),160,3,36,2,1.5,20,12,0.3
+Banana Cue,Snack,1 stick (90g),180,1,44,0.5,2.5,5,10,0.3
+Camote Cue,Snack,1 stick (90g),160,1,40,0.2,2.8,4,12,0.4
+Chicharon,Snack,1 cup (30g),160,8,0,14,0,320,10,0.5
+Cornick,Snack,1 pack (28g),130,2,18,6,1.5,180,4,0.3
+SkyFlakes,Bread,3 pieces (25g),120,2,22,3,0.5,120,8,0.3
+Fita Crackers,Snack,5 pieces (25g),120,2,18,4,0.5,110,6,0.2
+Egg Pie,Dessert,1 slice (100g),260,6,38,10,0.8,120,40,1.0
+Yema,Dessert,3 pieces (30g),120,2,24,2,0.2,20,8,0.1
+Polvoron,Snack,2 pieces (30g),140,2,22,6,0.5,30,10,0.2
+Pastillas,Snack,3 pieces (30g),110,2,20,3,0.2,25,12,0.2
+Otap,Bread,2 pieces (30g),140,2,24,5,0.5,60,10,0.2
+Mamon,Bread,1 piece (50g),160,4,26,4,0.5,80,15,0.3
+Hopia,Snack,2 pieces (60g),180,4,32,4,1.0,90,12,0.4
+Pianono,Snack,1 slice (40g),120,2,20,3,0.5,60,8,0.2
+Barquillos,Snack,5 sticks (30g),110,2,22,2,0.5,30,6,0.1
+Turones de Mani,Snack,2 pieces (40g),140,3,24,4,0.8,40,10,0.3
+Peanut Butter,Spread,2 tbsp (32g),190,7,8,16,2.0,140,17,0.6
+Mayonnaise,Condiment,1 tbsp (13g),90,0,1,10,0,70,4,0.1
+Ketchup,Condiment,1 tbsp (17g),20,0,5,0,0.2,160,6,0.1
+Soy Sauce,Condiment,1 tbsp (15g),10,2,1,0,0.1,900,2,0.1
+Vinegar,Condiment,1 tbsp (15g),3,0,0,0,0,0,1,0
+Fish Sauce,Condiment,1 tbsp (15g),10,2,1,0,0.1,1200,2,0.1
+Salt,Condiment,1 tsp (6g),0,0,0,0,0,2325,0,0
+Pepper,Condiment,1 tsp (2g),5,0.2,1,0,0.5,1,8,0.1
+Sugar,Condiment,1 tbsp (12g),48,0,12,0,0,0,1,0
+Butter,Spread,1 tbsp (14g),102,0.1,0,12,0,91,3,0
+Margarine,Spread,1 tbsp (14g),100,0,0,11,0,90,2,0
+Cheese, Dairy,1 slice (21g),70,4,1,6,0,120,150,0.2
+Yogurt, Dairy,1 cup (245g),150,8,18,4,0,110,300,0.1
+Powdered Milk, Dairy,3 tbsp (24g),120,6,12,6,0,90,220,0.1
+Ice Cream, Dessert,1/2 cup (66g),137,2,16,7,0.5,53,84,0.2
+Soft Drink, Beverage,1 can (330ml),140,0,36,0,0,30,4,0
+Iced Tea, Beverage,1 cup (240ml),90,0,23,0,0,10,2,0
+Hot Chocolate, Beverage,1 cup (240ml),192,3,32,6,1.5,120,120,1.0
+Energy Drink, Beverage,1 can (250ml),110,0,28,0,0,80,2,0
+Bottled Water, Beverage,1 bottle (500ml),0,0,0,0,0,0,0,0
+Sarsiado,Main Dish,1 cup (200g),180,14,8,10,2.0,420,30,1.2
+Dinuguan,Main Dish,1 cup (200g),320,18,6,26,1.5,980,40,2.0
+Papaitan,Main Dish,1 cup (200g),210,18,4,12,1.5,980,40,2.0
+Igado,Main Dish,1 cup (200g),250,20,8,16,1.2,890,35,1.8
+Menudo,Main Dish,1 cup (200g),280,16,12,18,1.5,950,30,2.0
+Afritada,Main Dish,1 cup (200g),260,14,18,14,2.0,900,28,1.5
+Nilaga,Main Dish,1 cup (200g),220,16,10,10,1.8,850,25,1.2
+Pochero,Main Dish,1 cup (200g),240,14,20,12,2.2,900,30,1.5
+Humba,Main Dish,1 cup (200g),350,18,12,28,1.0,1100,40,2.2
+Estofado,Main Dish,1 cup (200g),300,14,18,20,1.5,950,28,1.8
+Pakbet,Vegetable,1 cup (200g),90,3,18,1,4.2,420,35,1.5
+Ginisang Monggo,Vegetable,1 cup (200g),180,10,28,2,4.0,420,60,2.0
+Ginisang Ampalaya,Vegetable,1 cup (200g),70,3,12,2,3.5,350,30,1.0
+Ginisang Pechay,Vegetable,1 cup (200g),60,2,10,1,2.5,320,25,0.8
+Ginisang Repolyo,Vegetable,1 cup (200g),65,2,12,1,2.8,330,28,0.9
+Ginisang Sitaw,Vegetable,1 cup (200g),80,3,14,1,3.0,340,30,1.0
+Ginisang Talong,Vegetable,1 cup (200g),75,2,14,1,2.7,320,28,0.8
+Ginisang Kalabasa,Vegetable,1 cup (200g),90,2,18,1,3.2,330,30,1.0
+Ginisang Baguio Beans,Vegetable,1 cup (200g),85,3,16,1,3.0,340,32,1.0
+Ginisang Patola,Vegetable,1 cup (200g),60,2,10,1,2.5,320,25,0.8
+Ginisang Upo,Vegetable,1 cup (200g),55,2,10,1,2.2,310,22,0.7
+Ginisang Sayote,Vegetable,1 cup (200g),60,2,12,1,2.4,315,24,0.8
+Ginisang Malunggay,Vegetable,1 cup (200g),70,4,10,1,3.5,325,40,1.2
+Ginisang Kamote Tops,Vegetable,1 cup (200g),65,3,12,1,3.0,320,35,1.0
+Ginisang Alugbati,Vegetable,1 cup (200g),60,3,10,1,2.8,315,32,0.9
+Ginisang Kangkong,Vegetable,1 cup (200g),60,3,10,1,2.7,310,30,0.8
+Ginisang Mustasa,Vegetable,1 cup (200g),65,3,12,1,2.9,320,34,1.0
+Ginisang Labanos,Vegetable,1 cup (200g),55,2,10,1,2.3,310,22,0.7
+Ginisang Gabi,Vegetable,1 cup (200g),70,2,14,1,2.6,320,28,0.9
+Ginisang Sayote Tops,Vegetable,1 cup (200g),60,3,10,1,2.5,315,30,0.8
+Ginisang Bataw,Vegetable,1 cup (200g),70,3,12,1,2.8,320,32,0.9
+Ginisang Sigarilyas,Vegetable,1 cup (200g),75,3,14,1,3.0,325,34,1.0
+Ginisang Kadyos,Vegetable,1 cup (200g),80,4,14,1,3.2,330,36,1.1
+Ginisang Togue,Vegetable,1 cup (200g),70,4,12,1,3.0,320,30,1.0
+Ginisang Bataw at Patani,Vegetable,1 cup (200g),80,4,14,1,3.1,330,35,1.1
+Ginisang Sayote at Carrots,Vegetable,1 cup (200g),65,3,12,1,2.7,320,30,0.9
+Ginisang Kalabasa at Sitaw,Vegetable,1 cup (200g),85,3,16,1,3.2,330,32,1.0
+Ginisang Ampalaya at Itlog,Vegetable,1 cup (200g),90,4,12,2,3.5,340,35,1.2
+Ginisang Pechay at Tokwa,Vegetable,1 cup (200g),95,5,10,3,2.8,350,40,1.3
+Ginisang Repolyo at Giniling,Vegetable,1 cup (200g),120,6,12,6,2.5,360,45,1.5
+Ginisang Talbos ng Kamote,Vegetable,1 cup (200g),70,4,12,1,3.0,320,35,1.0
+Ginisang Kalabasa at Malunggay,Vegetable,1 cup (200g),80,4,14,1,3.2,330,38,1.1
+Ginisang Upo at Hipon,Vegetable,1 cup (200g),85,5,12,2,2.8,340,40,1.2
+Ginisang Patani at Baboy,Vegetable,1 cup (200g),130,7,14,6,2.5,380,45,1.6
+Ginisang Baguio Beans at Baboy,Vegetable,1 cup (200g),135,7,14,7,2.6,385,46,1.7
+Ginisang Sayote at Baboy,Vegetable,1 cup (200g),120,6,12,5,2.4,370,44,1.5
+Ginisang Repolyo at Baboy,Vegetable,1 cup (200g),125,6,12,6,2.5,375,45,1.6
+Ginisang Pechay at Baboy,Vegetable,1 cup (200g),120,6,10,6,2.3,370,44,1.5
+Ginisang Kangkong at Baboy,Vegetable,1 cup (200g),120,6,10,6,2.2,370,44,1.5
+Ginisang Talong at Baboy,Vegetable,1 cup (200g),125,6,12,6,2.4,375,45,1.6
+Ginisang Kalabasa at Baboy,Vegetable,1 cup (200g),130,6,14,7,2.6,380,46,1.7
+Ginisang Sitaw at Baboy,Vegetable,1 cup (200g),125,6,12,6,2.5,375,45,1.6
+Ginisang Bataw at Baboy,Vegetable,1 cup (200g),130,6,14,7,2.6,380,46,1.7
+Ginisang Patani at Itlog,Vegetable,1 cup (200g),110,5,14,4,2.3,350,40,1.3
+Ginisang Baguio Beans at Itlog,Vegetable,1 cup (200g),115,5,14,5,2.4,355,41,1.4
+Ginisang Sayote at Itlog,Vegetable,1 cup (200g),100,4,12,3,2.1,340,39,1.2
+Ginisang Repolyo at Itlog,Vegetable,1 cup (200g),105,4,12,4,2.2,345,40,1.3
+Ginisang Pechay at Itlog,Vegetable,1 cup (200g),100,4,10,4,2.0,340,39,1.2
+Ginisang Kangkong at Itlog,Vegetable,1 cup (200g),100,4,10,4,1.9,340,39,1.2
+Ginisang Talong at Itlog,Vegetable,1 cup (200g),105,4,12,4,2.2,345,40,1.3
+Ginisang Kalabasa at Itlog,Vegetable,1 cup (200g),110,4,14,5,2.4,350,41,1.4
+Ginisang Sitaw at Itlog,Vegetable,1 cup (200g),105,4,12,4,2.3,345,40,1.3
+Ginisang Bataw at Itlog,Vegetable,1 cup (200g),110,4,14,5,2.4,350,41,1.4
+Ginisang Patani at Tokwa,Vegetable,1 cup (200g),120,6,14,5,2.5,360,42,1.5
+Ginisang Baguio Beans at Tokwa,Vegetable,1 cup (200g),125,6,14,6,2.6,365,43,1.6
+Ginisang Sayote at Tokwa,Vegetable,1 cup (200g),110,5,12,4,2.2,350,41,1.4
+Ginisang Repolyo at Tokwa,Vegetable,1 cup (200g),115,5,12,5,2.3,355,42,1.5
+Ginisang Pechay at Tokwa,Vegetable,1 cup (200g),110,5,10,5,2.1,350,41,1.4
+Ginisang Kangkong at Tokwa,Vegetable,1 cup (200g),110,5,10,5,2.0,350,41,1.4
+Ginisang Talong at Tokwa,Vegetable,1 cup (200g),115,5,12,5,2.3,355,42,1.5
+Ginisang Kalabasa at Tokwa,Vegetable,1 cup (200g),120,5,14,6,2.5,360,43,1.6
+Ginisang Sitaw at Tokwa,Vegetable,1 cup (200g),115,5,12,5,2.4,355,42,1.5
+Ginisang Bataw at Tokwa,Vegetable,1 cup (200g),120,5,14,6,2.5,360,43,1.6
+Chicken Tinola,Main Dish,1 cup (200g),120,14,6,4,1.8,420,25,1.2
+Chicken Sopas,Soup,1 cup (200g),180,8,24,6,1.5,720,30,1.0
+Chicken Macaroni Salad,Salad,1 cup (200g),320,10,38,14,2.0,480,40,1.2
+Chicken Sandwich,Sandwich,1 piece (120g),250,12,28,10,2.0,420,30,1.0
+Egg Sandwich,Sandwich,1 piece (120g),220,10,26,8,1.8,400,28,0.9
+Tuna Sandwich,Sandwich,1 piece (120g),230,14,26,8,1.8,420,32,1.1
+Ham Sandwich,Sandwich,1 piece (120g),240,12,28,9,1.8,440,34,1.2
+Cheese Sandwich,Sandwich,1 piece (120g),230,10,28,8,1.8,420,36,1.1
+Clubhouse Sandwich,Sandwich,1 piece (180g),350,18,38,14,2.5,680,50,1.5
+BLT Sandwich,Sandwich,1 piece (150g),320,14,30,16,2.0,620,40,1.3
+Corned Beef Sandwich,Sandwich,1 piece (120g),240,12,26,9,1.8,420,32,1.1
+Hotdog Sandwich,Sandwich,1 piece (120g),250,10,28,12,1.8,480,30,1.0
+Pork Asado,Main Dish,1 cup (200g),320,18,12,22,1.5,980,35,1.8
+Pork Giniling,Main Dish,1 cup (200g),280,14,14,18,1.2,900,30,1.5
+Pork Picadillo,Main Dish,1 cup (200g),270,12,16,16,1.0,880,28,1.2
+Pork Pata Tim,Main Dish,1 cup (200g),350,16,10,28,1.0,1100,40,2.2
+Pork Dinakdakan,Main Dish,1 cup (200g),340,18,8,26,1.2,1200,38,2.0
+Pork Kilawin,Main Dish,1 cup (200g),300,14,6,24,1.0,1050,32,1.5
+Pork Lechon Paksiw,Main Dish,1 cup (200g),320,16,10,24,1.0,1050,28,1.5
+Pork Menudo,Main Dish,1 cup (200g),280,16,12,18,1.5,950,30,2.0
+Pork Nilaga,Main Dish,1 cup (200g),220,16,10,10,1.8,850,25,1.2
+Pork Sinigang,Main Dish,1 cup (200g),210,14,8,10,1.5,800,22,1.0
+Pork Tocino,Main Dish,1 cup (200g),320,16,12,24,1.0,980,30,1.2
+Pork Torta,Main Dish,1 cup (200g),300,14,10,22,1.2,950,28,1.8
+Pork Binagoongan,Main Dish,1 cup (200g),340,18,10,26,1.5,1200,30,1.8
+Pork Bopis,Main Dish,1 cup (200g),280,14,8,20,1.0,900,28,1.5
+Pork Igado,Main Dish,1 cup (200g),250,12,8,16,1.2,890,25,1.2
+Pork Sisig,Main Dish,1 cup (200g),350,18,8,28,1.2,1080,35,2.0
+Pork Tapa,Main Dish,1 cup (200g),320,16,8,24,1.0,980,30,1.2
+Pork Tokwa,Main Dish,1 cup (200g),280,14,10,18,1.2,900,28,1.5
+Pork Adobo,Main Dish,1 cup (200g),320,16,8,24,1.0,980,30,1.2
+Pork Afritada,Main Dish,1 cup (200g),260,14,18,14,2.0,900,28,1.5
+Pork Caldereta,Main Dish,1 cup (200g),320,18,18,18,2.1,1150,65,2.5
+Pork Curry,Main Dish,1 cup (200g),290,14,14,18,2.0,900,35,1.5
+Pork Estofado,Main Dish,1 cup (200g),300,14,18,20,1.5,950,28,1.8
+Pork Humba,Main Dish,1 cup (200g),350,18,12,28,1.0,1100,40,2.2
+Pork Mechado,Main Dish,1 cup (200g),320,16,10,24,1.0,1050,28,1.5
+Pork Pochero,Main Dish,1 cup (200g),240,14,20,12,2.2,900,30,1.5
+Pork Sinangag,Main Dish,1 cup (200g),220,8,38,4,1.2,720,20,1.0
+Pork Sotanghon,Main Dish,1 cup (200g),210,8,36,3,1.0,680,18,0.8
+Pork Tinola,Main Dish,1 cup (200g),120,10,6,4,1.8,420,25,1.2
+Pork Tortang Talong,Main Dish,1 cup (200g),180,8,10,10,1.5,420,18,0.8
+Quaker Oats, Cereal,1 cup (234g),150,5,27,3,4,0,20,1.5
+Corn Flakes, Cereal,1 cup (28g),100,2,24,0,1,200,0,0.5
+Coco Crunch, Cereal,1 cup (30g),120,2,25,1,2,90,0,1.0
+Milo, Beverage,3 tbsp (24g),110,2,20,2,1,40,80,1.2
+Nescafe 3-in-1, Beverage,1 sachet (20g),80,1,16,2,0,30,40,0.2
+Yakult, Beverage,1 bottle (80ml),50,1,12,0,0,15,40,0.1
+Dutch Mill, Beverage,1 bottle (90ml),70,2,14,1,0,30,60,0.2
+Magnolia Fresh Milk, Dairy,1 cup (244g),150,8,12,8,0,120,300,0.1
+Bear Brand Powdered Milk, Dairy,3 tbsp (24g),120,6,12,6,0,90,220,0.1
+Alaska Condensed Milk, Dairy,2 tbsp (40g),130,3,22,3,0,60,100,0.1
+Eden Cheese, Dairy,1 slice (21g),70,4,1,6,0,120,150,0.2
+Kraft Cheddar Cheese, Dairy,1 slice (21g),80,5,1,7,0,130,160,0.2
+Selecta Ice Cream, Dessert,1/2 cup (66g),140,2,16,7,0.5,55,85,0.2
+Magnolia Ice Cream, Dessert,1/2 cup (66g),135,2,15,7,0.5,53,84,0.2
+Chippy, Snack,1 pack (28g),150,2,16,9,1,180,10,0.5
+Piattos, Snack,1 pack (28g),140,2,15,8,1,170,8,0.4
+Nova, Snack,1 pack (28g),120,2,18,5,2,160,6,0.3
+Oishi Prawn Crackers, Snack,1 pack (28g),130,2,17,6,1,150,5,0.2
+Oishi Marty's Cracklin, Snack,1 pack (28g),120,2,18,5,2,160,6,0.3
+Oreo, Snack,3 pieces (34g),160,2,25,7,1,135,20,1.0
+SkyFlakes Fit, Bread,3 pieces (25g),110,2,20,2,1,110,8,0.3
+Gardenia Classic Bread, Bread,1 slice (25g),70,2,13,1,1,120,10,0.3
+Gardenia Wheat Bread, Bread,1 slice (25g),60,2,11,1,1,110,12,0.4
+Tasty Bread, Bread,1 slice (25g),70,2,13,1,1,120,10,0.3
+Monde Mamon, Bread,1 piece (50g),160,4,26,4,0.5,80,15,0.3
+Fudgee Barr, Snack,1 bar (38g),140,2,22,5,0.5,90,10,0.2
+Rebisco Crackers, Snack,2 pieces (20g),90,2,14,3,0.5,80,6,0.2
+Hansel Mocha Sandwich, Snack,2 pieces (20g),100,1,15,4,0.5,70,5,0.2
+Presto Creams, Snack,2 pieces (20g),100,1,15,4,0.5,70,5,0.2
+Choc Nut, Snack,2 pieces (20g),110,2,12,6,1,40,10,0.2
+Flat Tops, Snack,3 pieces (18g),90,1,12,5,0.5,30,8,0.1
+Cloud 9, Snack,1 bar (28g),120,1,18,5,0.5,40,10,0.2
+Hany, Snack,2 pieces (20g),110,2,12,6,1,40,10,0.2
+Mik-Mik, Snack,1 sachet (10g),40,1,8,1,0,10,2,0.1
+Nagaraya Cracker Nuts, Snack,1 pack (28g),140,3,14,8,1,160,8,0.3
+Piaya, Snack,1 piece (40g),130,2,28,2,1.0,60,10,0.3
+Pastimallows, Snack,3 pieces (30g),110,1,22,2,0.2,20,8,0.1
+Butterscotch, Snack,1 bar (30g),120,1,20,4,0.5,30,8,0.2
+Suman sa Lihiya, Dessert,1 piece (60g),90,2,20,0.5,0.5,10,6,0.2
+Sapin-Sapin, Dessert,1 slice (50g),100,1,22,1,0.5,15,8,0.2
+Mangosteen, Fruit,1 piece (60g),60,1,15,0.2,1.5,2,10,0.2
+Lanzones, Fruit,10 pieces (100g),57,1,15,0.2,2.3,1,9,0.2
+Santol, Fruit,1 med (100g),67,0.6,17,0.2,2.3,2,10,0.2
+Singkamas, Vegetable,1 cup (130g),49,1,12,0.1,6.4,4,20,0.6
+Sayote, Vegetable,1 cup (132g),25,1,6,0.1,2.2,2,17,0.3
+Patola, Vegetable,1 cup (100g),20,1,4,0.1,1.2,2,15,0.2
+Saluyot, Vegetable,1 cup (100g),35,2,7,0.2,3.0,3,40,0.5
+Sago't Gulaman, Beverage,1 glass (250ml),180,1,45,0,0.5,20,10,0.2
+Salabat, Beverage,1 cup (240ml),30,0,7,0,0.2,5,2,0.1
+Buko Shake, Beverage,1 glass (250ml),120,1,28,1,0.5,15,12,0.2
+Mais, Vegetable,1 ear (90g),77,2,19,1,2.0,15,2,0.5
+Kamote, Vegetable,1 med (130g),112,2,26,0.1,3.9,36,39,0.7
+Ube, Vegetable,1 cup (133g),140,1,37,0.1,4.1,10,20,0.5
+Taro (Gabi), Vegetable,1 cup (132g),187,1,45,0.1,6.7,15,40,0.8
+Dalandan, Fruit,1 med (120g),60,1,15,0.1,2.0,2,20,0.3
+Pomelo, Fruit,1 cup (190g),72,1,18,0.2,1.9,1,20,0.3
+Rambutan, Fruit,5 pieces (100g),68,0.9,16,0.2,0.9,2,8,0.2
+Durian, Fruit,1 cup (243g),357,3.6,66,13,9.2,5,20,1.0
+Chico, Fruit,1 med (100g),83,0.4,20,1.1,5.3,12,21,0.8
+Atis, Fruit,1 med (100g),94,2,23,0.3,4.4,7,24,0.7
+Guava, Fruit,1 cup (165g),112,4.2,24,1.6,8.9,3,30,0.4
+Star Apple (Kaimito), Fruit,1 med (100g),67,1,17,0.2,3.3,4,15,0.3
+Tamarind, Fruit,1 cup (120g),287,3,75,0.6,6.1,34,74,2.8
+Bignay, Fruit,1 cup (100g),60,1,15,0.2,2.0,2,10,0.2
+Aratiles, Fruit,1 cup (100g),60,1,15,0.2,2.0,2,10,0.2
+Macapuno, Dessert,1/2 cup (60g),90,0.5,22,0.5,1.0,10,8,0.2
+Buko Pandan, Dessert,1 cup (200g),180,2,38,4,1.2,25,15,0.4
+Mais con Yelo, Dessert,1 cup (200g),160,3,36,2,1.5,20,12,0.3
+Banana Cue, Snack,1 stick (90g),180,1,44,0.5,2.5,5,10,0.3
+Camote Cue, Snack,1 stick (90g),160,1,40,0.2,2.8,4,12,0.4
+Chicharon, Snack,1 cup (30g),160,8,0,14,0,320,10,0.5
+Cornick, Snack,1 pack (28g),130,2,18,6,1.5,180,4,0.3
+SkyFlakes, Bread,3 pieces (25g),120,2,22,3,0.5,120,8,0.3
+Fita Crackers, Snack,5 pieces (25g),120,2,18,4,0.5,110,6,0.2
+Egg Pie, Dessert,1 slice (100g),260,6,38,10,0.8,120,40,1.0
+Yema, Dessert,3 pieces (30g),120,2,24,2,0.2,20,8,0.1
+Polvoron, Snack,2 pieces (30g),140,2,22,6,0.5,30,10,0.2
+Pastillas, Snack,3 pieces (30g),110,2,20,3,0.2,25,12,0.2
+Otap, Bread,2 pieces (30g),140,2,24,5,0.5,60,10,0.2
+Mamon, Bread,1 piece (50g),160,4,26,4,0.5,80,15,0.3
+Hopia, Snack,2 pieces (60g),180,4,32,4,1.0,90,12,0.4
+Pianono, Snack,1 slice (40g),120,2,20,3,0.5,60,8,0.2
+Barquillos, Snack,5 sticks (30g),110,2,22,2,0.5,30,6,0.1
+Turones de Mani, Snack,2 pieces (40g),140,3,24,4,0.8,40,10,0.3
+Peanut Butter, Spread,2 tbsp (32g),190,7,8,16,2.0,140,17,0.6
+Mayonnaise, Condiment,1 tbsp (13g),90,0,1,10,0,70,4,0.1
+Ketchup, Condiment,1 tbsp (17g),20,0,5,0,0.2,160,6,0.1
+Soy Sauce, Condiment,1 tbsp (15g),10,2,1,0,0.1,900,2,0.1
+Vinegar, Condiment,1 tbsp (15g),3,0,0,0,0,0,1,0
+Fish Sauce, Condiment,1 tbsp (15g),10,2,1,0,0.1,1200,2,0.1
+Salt, Condiment,1 tsp (6g),0,0,0,0,0,2325,0,0
+Pepper, Condiment,1 tsp (2g),5,0.2,1,0,0.5,1,8,0.1
+Sugar, Condiment,1 tbsp (12g),48,0,12,0,0,0,1,0
+Butter, Spread,1 tbsp (14g),102,0.1,0,12,0,91,3,0
+Margarine, Spread,1 tbsp (14g),100,0,0,11,0,90,2,0
+Cheese, Dairy,1 slice (21g),70,4,1,6,0,120,150,0.2
+Yogurt, Dairy,1 cup (245g),150,8,18,4,0,110,300,0.1
+Powdered Milk, Dairy,3 tbsp (24g),120,6,12,6,0,90,220,0.1
+Ice Cream, Dessert,1/2 cup (66g),137,2,16,7,0.5,53,84,0.2
+Soft Drink, Beverage,1 can (330ml),140,0,36,0,0,30,4,0
+Iced Tea, Beverage,1 cup (240ml),90,0,23,0,0,10,2,0
+Hot Chocolate, Beverage,1 cup (240ml),192,3,32,6,1.5,120,120,1.0
+Energy Drink, Beverage,1 can (250ml),110,0,28,0,0,80,2,0
+Bottled Water, Beverage,1 bottle (500ml),0,0,0,0,0,0,0,0 

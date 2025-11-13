@@ -1,0 +1,12 @@
+flask==2.3.3
+flask-cors==4.0.0
+scikit-learn==1.6.1
+pandas==2.0.3
+numpy==1.24.3
+joblib==1.3.2
+python-dotenv==1.0.0
+gunicorn==21.2.0
+requests==2.31.0
+flask_sqlalchemy==3.1.1
+psycopg2-binary==2.9.7
+pytz>=2023.3; python_version < "3.9"  # Optional: for timezone support on Python < 3.9 

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Health Connect permissions array - MUST match what we request in code -->
+    <!-- Minimal permissions to avoid broad permission prompts that get denied -->
+    <string-array name="health_permissions">
+        <item>android.permission.health.READ_STEPS</item>
+        <item>android.permission.health.WRITE_STEPS</item>
+    </string-array>
+
+    <!-- Supported data types for Health Connect discovery -->
+    <!-- Minimal data types to match our minimal permissions -->
+    <string-array name="supported_data_types">
+        <item>androidx.health.records.StepsRecord</item>
+    </string-array>
+</resources>

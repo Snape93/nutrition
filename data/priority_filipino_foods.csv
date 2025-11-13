@@ -1,0 +1,14 @@
+food_name_english,food_name_filipino,food_group,meal_category,energy_kcal,protein_g,fat_total_g,carbohydrates_g,dietary_fiber_g,calcium_mg,iron_mg,vitamin_c_mg,serving_size_g,household_measure,fnri_code,data_source
+Chicken Adobo,Adobong Manok,Meat and Poultry,Ulam,232,19.8,14.5,5.2,1.5,28,1.8,2.1,150,1 cup,,FNRI_Manual
+Pork Sinigang,Sinigang na Baboy,Meat and Poultry,Sabaw,165,12.5,8.2,10.3,4.5,35,2.1,18.5,250,1 bowl,,FNRI_Manual
+Kare-kare,Kare-kare,Meat and Poultry,Ulam,285,18.2,20.5,12.8,3.2,85,3.1,8.5,200,1 cup,,FNRI_Manual
+Chicken Tinola,Tinolang Manok,Meat and Poultry,Sabaw,145,18.5,6.2,5.8,2.1,45,1.5,12.3,250,1 bowl,,FNRI_Manual
+Bitter Melon,Ampalaya,Vegetables,Gulay,20,1.0,0.2,4.0,2.5,25,2.8,85.0,100,1/2 cup sliced,,FNRI_Manual
+Moringa Leaves,Malunggay,Vegetables,Gulay,35,2.5,0.5,6.0,2.0,185,4.0,51.0,100,1 cup leaves,,FNRI_Manual
+Water Spinach,Kangkong,Vegetables,Gulay,25,2.0,0.3,4.0,2.5,55,2.1,35.0,100,1 cup chopped,,FNRI_Manual
+"White Rice, cooked",Kanin,Cereals and Grains,Kanin,130,2.7,0.3,28.0,0.4,10,0.2,0.0,100,1/2 cup,,FNRI_Manual
+"Brown Rice, cooked",Brown Rice,Cereals and Grains,Kanin,111,2.6,0.9,23.0,1.8,10,0.4,0.0,100,1/2 cup,,FNRI_Manual
+"Mango, ripe",Mangga,Fruits,Prutas,60,0.8,0.4,15.0,1.6,10,0.2,36.0,100,1/2 cup sliced,,FNRI_Manual
+"Papaya, ripe",Papaya,Fruits,Prutas,43,0.5,0.3,11.0,1.7,20,0.3,62.0,100,1/2 cup cubed,,FNRI_Manual
+Bibingka,Bibingka,Sweets and Desserts,Kakanin,285,5.2,10.5,42.8,1.2,125,0.8,0.5,100,1 piece,,FNRI_Manual
+
