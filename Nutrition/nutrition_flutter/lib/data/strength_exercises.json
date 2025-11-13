@@ -1,0 +1,1532 @@
+[
+  {
+    "id": "2",
+    "name": "Air Squats",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 5.25,
+    "instructions": [
+      "Stand with feet shoulder-width apart. 2. Lower hips back and down as if sitting. 3. Keep chest up and knees behind toes. 4. Push through heels to return to start."
+    ],
+    "tags": [
+      "bodyweight"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "3",
+    "name": "Arnold Press",
+    "category": "Strength",
+    "bodyPart": "Shoulders",
+    "target": "Deltoids",
+    "equipment": "Dumbbells",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Sit with dumbbells at shoulder height, palms facing you. 2. Press up while rotating palms forward. 3. Extend arms fully overhead. 4. Reverse motion to return."
+    ],
+    "tags": [
+      "shoulders"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "4",
+    "name": "Back Extensions",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Erector Spinae",
+    "equipment": "Bench",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie face down on extension bench. 2. Cross arms over chest. 3. Lower torso down slowly. 4. Raise back up to neutral spine position."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "6",
+    "name": "Barbell Back Squat",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Barbell",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Position barbell on upper back. 2. Stand with feet shoulder-width apart. 3. Lower down keeping chest up. 4. Drive through heels to stand."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "7",
+    "name": "Barbell Bench Press",
+    "category": "Strength",
+    "bodyPart": "Chest",
+    "target": "Pectorals",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Lie on bench with feet flat. 2. Grip barbell slightly wider than shoulders. 3. Lower bar to chest. 4. Press up to full extension."
+    ],
+    "tags": [
+      "chest"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "8",
+    "name": "Barbell Curl",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Biceps",
+    "equipment": "Barbell",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Stand holding barbell with underhand grip. 2. Keep elbows close to sides. 3. Curl bar up to shoulders. 4. Lower with control."
+    ],
+    "tags": [
+      "arms"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "9",
+    "name": "Barbell Deadlift",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Erector Spinae",
+    "equipment": "Barbell",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Stand with feet hip-width, bar over midfoot. 2. Grip bar outside legs. 3. Lift by extending hips and knees. 4. Lower with control."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "10",
+    "name": "Barbell Row",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Latissimus Dorsi",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Bend forward at hips with flat back. 2. Grip barbell with hands shoulder-width. 3. Pull bar to lower chest. 4. Lower with control."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "13",
+    "name": "Bench Dips",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Triceps",
+    "equipment": "Bench",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Place hands on bench behind you. 2. Extend legs forward. 3. Lower body by bending elbows. 4. Push back up to start."
+    ],
+    "tags": [
+      "arms"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "14",
+    "name": "Bicycle Crunches",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Obliques",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie on back with hands behind head. 2. Bring opposite elbow to opposite knee. 3. Extend other leg straight. 4. Alternate sides in pedaling motion."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "18",
+    "name": "Cable Chest Fly",
+    "category": "Strength",
+    "bodyPart": "Chest",
+    "target": "Pectorals",
+    "equipment": "Cable Machine",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Stand between cable towers. 2. Hold handles with arms extended. 3. Bring hands together in arc motion. 4. Return with control."
+    ],
+    "tags": [
+      "chest"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "19",
+    "name": "Cable Tricep Pushdown",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Triceps",
+    "equipment": "Cable Machine",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Face cable machine with high pulley. 2. Grip bar with overhand grip. 3. Push bar down by extending elbows. 4. Return with control."
+    ],
+    "tags": [
+      "arms"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "20",
+    "name": "Calf Raises",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Calves",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 2.8,
+    "instructions": [
+      "Stand with feet hip-width apart. 2. Rise up on toes as high as possible. 3. Hold briefly. 4. Lower with control."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "22",
+    "name": "Chair Pose (Yoga)",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Stand with feet together. 2. Bend knees and lower hips as if sitting. 3. Raise arms overhead. 4. Hold position maintaining balance."
+    ],
+    "tags": [
+      "yoga"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "23",
+    "name": "Chest Press Machine",
+    "category": "Strength",
+    "bodyPart": "Chest",
+    "target": "Pectorals",
+    "equipment": "Machine",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Sit with back against pad. 2. Grip handles at chest level. 3. Push handles forward to full extension. 4. Return with control."
+    ],
+    "tags": [
+      "chest"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "24",
+    "name": "Chin-Ups",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Latissimus Dorsi",
+    "equipment": "Pull-up Bar",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Hang from bar with underhand grip. 2. Pull body up until chin over bar. 3. Lower with control. 4. Repeat."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "25",
+    "name": "Clean and Press",
+    "category": "Strength",
+    "bodyPart": "Full Body",
+    "target": "Full Body",
+    "equipment": "Barbell",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Deadlift barbell to hips. 2. Pull bar explosively to shoulders. 3. Dip and drive bar overhead. 4. Lower to start position."
+    ],
+    "tags": [
+      "full-body"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "27",
+    "name": "Close-Grip Bench Press",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Triceps",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Lie on bench with hands closer than shoulder-width. 2. Lower bar to lower chest. 3. Press up focusing on triceps. 4. Maintain elbow position."
+    ],
+    "tags": [
+      "triceps"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "28",
+    "name": "Concentration Curl",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Biceps",
+    "equipment": "Dumbbell",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Sit with elbow braced against inner thigh. 2. Curl dumbbell up to shoulder. 3. Squeeze bicep at top. 4. Lower with control."
+    ],
+    "tags": [
+      "biceps"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "30",
+    "name": "Crossover Crunch",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Obliques",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie on back with hands behind head. 2. Bring right elbow to left knee. 3. Return to start. 4. Alternate sides."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "34",
+    "name": "Decline Bench Press",
+    "category": "Strength",
+    "bodyPart": "Chest",
+    "target": "Pectorals",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Lie on decline bench. 2. Grip barbell slightly wider than shoulders. 3. Lower to lower chest. 4. Press up to extension."
+    ],
+    "tags": [
+      "chest"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "35",
+    "name": "Diamond Push-Ups",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Triceps",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Start in plank with hands forming diamond shape. 2. Lower chest to hands. 3. Keep elbows close to body. 4. Push back up."
+    ],
+    "tags": [
+      "triceps"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "36",
+    "name": "Dumbbell Bench Press",
+    "category": "Strength",
+    "bodyPart": "Chest",
+    "target": "Pectorals",
+    "equipment": "Dumbbells",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Lie on bench with dumbbells at chest. 2. Press dumbbells up until arms extended. 3. Lower with control. 4. Keep movement smooth."
+    ],
+    "tags": [
+      "chest"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "37",
+    "name": "Dumbbell Flyes",
+    "category": "Strength",
+    "bodyPart": "Chest",
+    "target": "Pectorals",
+    "equipment": "Dumbbells",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Lie on bench with dumbbells above chest. 2. Lower arms in wide arc. 3. Feel stretch in chest. 4. Bring back to start."
+    ],
+    "tags": [
+      "chest"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "38",
+    "name": "Dumbbell Lunges",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Dumbbells",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hold dumbbells at sides. 2. Step forward into lunge. 3. Lower back knee toward ground. 4. Push back to start."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "39",
+    "name": "Dumbbell Shoulder Press",
+    "category": "Strength",
+    "bodyPart": "Shoulders",
+    "target": "Deltoids",
+    "equipment": "Dumbbells",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Sit with dumbbells at shoulders. 2. Press up to full extension. 3. Lower with control. 4. Keep core engaged."
+    ],
+    "tags": [
+      "shoulders"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "41",
+    "name": "Face Pulls",
+    "category": "Strength",
+    "bodyPart": "Shoulders",
+    "target": "Rear Deltoids",
+    "equipment": "Cable Machine",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Face cable machine at upper height. 2. Pull rope toward face. 3. Separate hands at end. 4. Return with control."
+    ],
+    "tags": [
+      "shoulders"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "42",
+    "name": "Farmer's Walk",
+    "category": "Strength",
+    "bodyPart": "Full Body",
+    "target": "Grip",
+    "equipment": "Dumbbells",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hold heavy dumbbells at sides. 2. Walk forward with upright posture. 3. Keep core tight. 4. Take controlled steps."
+    ],
+    "tags": [
+      "full-body"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "43",
+    "name": "Flutter Kicks",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Hip Flexors",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie on back with legs extended. 2. Lift legs slightly off ground. 3. Alternate kicking legs up and down. 4. Keep lower back pressed down."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "45",
+    "name": "Front Raises",
+    "category": "Strength",
+    "bodyPart": "Shoulders",
+    "target": "Anterior Deltoids",
+    "equipment": "Dumbbells",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hold dumbbells in front of thighs. 2. Raise arms forward to shoulder height. 3. Keep slight bend in elbows. 4. Lower with control."
+    ],
+    "tags": [
+      "shoulders"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "46",
+    "name": "Front Squats",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Barbell",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Rest barbell on front shoulders. 2. Cross arms to secure bar. 3. Squat down keeping chest up. 4. Drive through heels to stand."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "47",
+    "name": "Goblet Squats",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Dumbbell",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hold dumbbell at chest with both hands. 2. Squat down keeping elbows inside knees. 3. Keep chest up. 4. Stand back up."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "49",
+    "name": "Good Mornings",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Hamstrings",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Place barbell on upper back. 2. Hinge forward at hips. 3. Keep back flat and legs mostly straight. 4. Return to standing."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "50",
+    "name": "Hack Squats",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Machine",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Position shoulders under pads. 2. Place feet on platform. 3. Lower body by bending knees. 4. Push up through heels."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "51",
+    "name": "Hammer Curls",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Biceps",
+    "equipment": "Dumbbells",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hold dumbbells with neutral grip. 2. Curl up keeping palms facing each other. 3. Squeeze at top. 4. Lower with control."
+    ],
+    "tags": [
+      "biceps"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "52",
+    "name": "Handstand Push-Ups",
+    "category": "Strength",
+    "bodyPart": "Shoulders",
+    "target": "Deltoids",
+    "equipment": "None",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Kick up into handstand against wall. 2. Lower head toward ground. 3. Press back up to full extension. 4. Maintain balance."
+    ],
+    "tags": [
+      "shoulders"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "53",
+    "name": "Hanging Leg Raises",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Hip Flexors",
+    "equipment": "Pull-up Bar",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Hang from bar with straight arms. 2. Raise legs to horizontal. 3. Lower with control. 4. Avoid swinging."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "56",
+    "name": "Hip Thrusts",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Glutes",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Sit with upper back on bench. 2. Place barbell over hips. 3. Drive hips up to full extension. 4. Lower with control."
+    ],
+    "tags": [
+      "glutes"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "58",
+    "name": "Incline Bench Press",
+    "category": "Strength",
+    "bodyPart": "Chest",
+    "target": "Pectorals",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Lie on incline bench. 2. Grip barbell slightly wider than shoulders. 3. Lower to upper chest. 4. Press up to extension."
+    ],
+    "tags": [
+      "chest"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "59",
+    "name": "Incline Dumbbell Curl",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Biceps",
+    "equipment": "Dumbbells",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Sit on incline bench with arms hanging. 2. Curl dumbbells up. 3. Squeeze biceps at top. 4. Lower to full extension."
+    ],
+    "tags": [
+      "biceps"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "61",
+    "name": "Inverted Rows",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Latissimus Dorsi",
+    "equipment": "Bar",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hang under bar with body straight. 2. Pull chest to bar. 3. Keep body rigid. 4. Lower with control."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "62",
+    "name": "Jackknife Sit-Ups",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Rectus Abdominis",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie flat with arms overhead. 2. Simultaneously lift legs and torso. 3. Touch hands to feet. 4. Lower with control."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "67",
+    "name": "Kettlebell Deadlift",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Hamstrings",
+    "equipment": "Kettlebell",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Stand with kettlebell between feet. 2. Hinge at hips to grip handle. 3. Stand up by extending hips. 4. Lower with control."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "70",
+    "name": "Knee Push-Ups",
+    "category": "Strength",
+    "bodyPart": "Chest",
+    "target": "Pectorals",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Start in plank on knees. 2. Lower chest to ground. 3. Keep body straight from knees to head. 4. Push back up."
+    ],
+    "tags": [
+      "chest"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "71",
+    "name": "Lat Pulldown",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Latissimus Dorsi",
+    "equipment": "Cable Machine",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Sit at machine with thighs secured. 2. Grip bar wider than shoulders. 3. Pull bar down to upper chest. 4. Return with control."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "72",
+    "name": "Lateral Raises",
+    "category": "Strength",
+    "bodyPart": "Shoulders",
+    "target": "Lateral Deltoids",
+    "equipment": "Dumbbells",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hold dumbbells at sides. 2. Raise arms out to sides to shoulder height. 3. Keep slight bend in elbows. 4. Lower with control."
+    ],
+    "tags": [
+      "shoulders"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "73",
+    "name": "Leg Curls",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Hamstrings",
+    "equipment": "Machine",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Lie face down on machine. 2. Place ankles under pad. 3. Curl legs toward glutes. 4. Lower with control."
+    ],
+    "tags": [
+      "hamstrings"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "74",
+    "name": "Leg Extensions",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Machine",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Sit at machine with back against pad. 2. Place ankles under pad. 3. Extend legs to straight. 4. Lower with control."
+    ],
+    "tags": [
+      "quadriceps"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "75",
+    "name": "Leg Press",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Machine",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Sit with feet on platform. 2. Release safety. 3. Lower platform by bending knees. 4. Push back to extension."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "76",
+    "name": "Leg Raises",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Hip Flexors",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie on back with legs straight. 2. Raise legs to 90 degrees. 3. Keep lower back pressed down. 4. Lower with control."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "77",
+    "name": "Lunges",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Stand tall. 2. Step forward into lunge. 3. Lower back knee toward ground. 4. Push back to start."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "80",
+    "name": "Nordic Curls",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Hamstrings",
+    "equipment": "None",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Kneel with ankles secured. 2. Slowly lower torso forward. 3. Control descent with hamstrings. 4. Push back up."
+    ],
+    "tags": [
+      "hamstrings"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "81",
+    "name": "Oblique Crunches",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Obliques",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie on back with knees bent. 2. Crunch up and toward one side. 3. Squeeze oblique. 4. Alternate sides."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "82",
+    "name": "Overhead Press",
+    "category": "Strength",
+    "bodyPart": "Shoulders",
+    "target": "Deltoids",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Stand with barbell at shoulders. 2. Press bar overhead to full extension. 3. Keep core tight. 4. Lower to shoulders."
+    ],
+    "tags": [
+      "shoulders"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "83",
+    "name": "Overhead Squat",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Barbell",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hold barbell overhead with wide grip. 2. Squat down keeping bar over midfoot. 3. Maintain upright torso. 4. Stand back up."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "84",
+    "name": "Plank",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Rectus Abdominis",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Start in forearm position. 2. Keep body straight from head to heels. 3. Engage core. 4. Hold position."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "85",
+    "name": "Power Cleans",
+    "category": "Strength",
+    "bodyPart": "Full Body",
+    "target": "Full Body",
+    "equipment": "Barbell",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Deadlift barbell to knees. 2. Explosively pull bar up. 3. Drop under and catch at shoulders. 4. Stand to complete."
+    ],
+    "tags": [
+      "full-body"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "86",
+    "name": "Preacher Curls",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Biceps",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Rest arms on preacher bench. 2. Grip barbell with underhand grip. 3. Curl up to shoulders. 4. Lower to full extension."
+    ],
+    "tags": [
+      "biceps"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "87",
+    "name": "Pull-Ups",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Latissimus Dorsi",
+    "equipment": "Pull-up Bar",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Hang from bar with overhand grip. 2. Pull body up until chin over bar. 3. Lower with control. 4. Repeat."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "88",
+    "name": "Push-Ups",
+    "category": "Strength",
+    "bodyPart": "Chest",
+    "target": "Pectorals",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Start in plank position. 2. Lower chest to ground. 3. Keep body straight. 4. Push back up to start."
+    ],
+    "tags": [
+      "chest"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "89",
+    "name": "Quadruped Hip Extensions",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Glutes",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Start on hands and knees. 2. Extend one leg back and up. 3. Squeeze glute at top. 4. Lower and repeat."
+    ],
+    "tags": [
+      "glutes"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "91",
+    "name": "Reverse Crunches",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Rectus Abdominis",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie on back with knees bent. 2. Lift hips off ground toward chest. 3. Keep knees bent throughout. 4. Lower with control."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "92",
+    "name": "Reverse Flyes",
+    "category": "Strength",
+    "bodyPart": "Shoulders",
+    "target": "Rear Deltoids",
+    "equipment": "Dumbbells",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Bend forward at hips. 2. Hold dumbbells hanging down. 3. Raise arms out to sides. 4. Lower with control."
+    ],
+    "tags": [
+      "shoulders"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "93",
+    "name": "Reverse Lunges",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Stand tall. 2. Step back into lunge. 3. Lower back knee toward ground. 4. Push back to start."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "94",
+    "name": "Romanian Deadlift",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Hamstrings",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hold barbell at hips. 2. Hinge forward keeping legs mostly straight. 3. Lower bar to shins. 4. Return to standing."
+    ],
+    "tags": [
+      "hamstrings"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "95",
+    "name": "Rope Climbing",
+    "category": "Strength",
+    "bodyPart": "Full Body",
+    "target": "Latissimus Dorsi",
+    "equipment": "Rope",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Grip rope with both hands. 2. Use legs to clamp rope. 3. Pull body up hand over hand. 4. Climb to desired height."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "99",
+    "name": "Russian Twists",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Obliques",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Sit with knees bent, feet off ground. 2. Lean back slightly. 3. Rotate torso side to side. 4. Touch ground beside hips."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "101",
+    "name": "Shoulder Shrugs",
+    "category": "Strength",
+    "bodyPart": "Shoulders",
+    "target": "Trapezius",
+    "equipment": "Dumbbells",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hold dumbbells at sides. 2. Raise shoulders toward ears. 3. Hold briefly at top. 4. Lower with control."
+    ],
+    "tags": [
+      "shoulders"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "102",
+    "name": "Side Plank",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Obliques",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie on side with elbow under shoulder. 2. Lift hips off ground. 3. Keep body straight. 4. Hold position."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "103",
+    "name": "Single-Leg Deadlift",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Hamstrings",
+    "equipment": "Dumbbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Stand on one leg holding dumbbell. 2. Hinge forward extending free leg back. 3. Keep back flat. 4. Return to standing."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "104",
+    "name": "Sit-Ups",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Rectus Abdominis",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie on back with knees bent. 2. Place hands behind head. 3. Curl up to sitting position. 4. Lower with control."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "107",
+    "name": "Skull Crushers",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Triceps",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Lie on bench holding barbell. 2. Lower bar to forehead by bending elbows. 3. Keep upper arms stationary. 4. Extend back up."
+    ],
+    "tags": [
+      "triceps"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "108",
+    "name": "Sled Push",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Sled",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Grip sled handles. 2. Lean forward with arms extended. 3. Drive legs powerfully. 4. Push sled forward."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "111",
+    "name": "Split Squats",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "None",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Stand in split stance. 2. Lower back knee toward ground. 3. Keep front knee behind toes. 4. Push back up."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "115",
+    "name": "Standing Calf Raises",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Calves",
+    "equipment": "Machine",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Stand under shoulder pads. 2. Rise up on toes maximally. 3. Hold briefly. 4. Lower slowly."
+    ],
+    "tags": [
+      "calves"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "116",
+    "name": "Step-Ups",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "Bench",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Place one foot on bench. 2. Push through heel to step up. 3. Bring other foot to bench. 4. Step down and repeat."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "117",
+    "name": "Sumo Deadlift",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Adductors",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Stand with wide stance. 2. Grip bar with hands inside legs. 3. Lift by extending hips. 4. Lower with control."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "118",
+    "name": "Sumo Squats",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Adductors",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Stand with wide stance, toes out. 2. Lower hips keeping knees over toes. 3. Keep torso upright. 4. Rise back up."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "119",
+    "name": "Superman Exercise",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Erector Spinae",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie face down with arms extended. 2. Lift arms and legs off ground. 3. Hold position. 4. Lower with control."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "122",
+    "name": "T-Bar Rows",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Latissimus Dorsi",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Straddle barbell with chest supported. 2. Grip handles. 3. Pull bar to chest. 4. Lower with control."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "124",
+    "name": "Thruster",
+    "category": "Strength",
+    "bodyPart": "Full Body",
+    "target": "Full Body",
+    "equipment": "Barbell",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Hold barbell at shoulders. 2. Squat down. 3. Drive up and press bar overhead. 4. Lower to shoulders."
+    ],
+    "tags": [
+      "full-body"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "126",
+    "name": "Tricep Dips",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Triceps",
+    "equipment": "Parallel Bars",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Grip parallel bars. 2. Lower body by bending elbows. 3. Keep elbows back. 4. Push back up."
+    ],
+    "tags": [
+      "triceps"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "127",
+    "name": "Turkish Get-Up",
+    "category": "Strength",
+    "bodyPart": "Full Body",
+    "target": "Full Body",
+    "equipment": "Kettlebell",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Lie with kettlebell overhead. 2. Stand up while keeping bell overhead. 3. Reverse motion to lie back down. 4. Maintain control throughout."
+    ],
+    "tags": [
+      "full-body"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "128",
+    "name": "Upright Rows",
+    "category": "Strength",
+    "bodyPart": "Shoulders",
+    "target": "Deltoids",
+    "equipment": "Barbell",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Hold barbell at thighs. 2. Pull bar up to chin level. 3. Keep elbows high. 4. Lower with control."
+    ],
+    "tags": [
+      "shoulders"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "129",
+    "name": "V-Ups",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Rectus Abdominis",
+    "equipment": "None",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie flat with arms overhead. 2. Simultaneously lift legs and torso forming V. 3. Touch hands to feet. 4. Lower with control."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "134",
+    "name": "Wall Sit",
+    "category": "Strength",
+    "bodyPart": "Legs",
+    "target": "Quadriceps",
+    "equipment": "None",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lean back against wall. 2. Lower into seated position. 3. Keep knees at 90 degrees. 4. Hold position."
+    ],
+    "tags": [
+      "legs"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "136",
+    "name": "Weighted Crunches",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Rectus Abdominis",
+    "equipment": "Weight Plate",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 3.5,
+    "instructions": [
+      "Lie on back holding weight on chest. 2. Crunch up keeping weight secure. 3. Squeeze abs at top. 4. Lower with control."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "137",
+    "name": "Wide-Grip Pull-Ups",
+    "category": "Strength",
+    "bodyPart": "Back",
+    "target": "Latissimus Dorsi",
+    "equipment": "Pull-up Bar",
+    "difficulty": "Advanced",
+    "estimatedCaloriesPerMinute": 8.75,
+    "instructions": [
+      "Hang from bar with wide overhand grip. 2. Pull body up to bar. 3. Focus on lat engagement. 4. Lower with control."
+    ],
+    "tags": [
+      "back"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "138",
+    "name": "Wood Choppers",
+    "category": "Strength",
+    "bodyPart": "Core",
+    "target": "Obliques",
+    "equipment": "Cable Machine",
+    "difficulty": "Intermediate",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Stand sideways to cable machine. 2. Pull cable from high to low across body. 3. Rotate torso. 4. Control return."
+    ],
+    "tags": [
+      "core"
+    ],
+    "gifUrl": ""
+  },
+  {
+    "id": "139",
+    "name": "Wrist Curls",
+    "category": "Strength",
+    "bodyPart": "Arms",
+    "target": "Forearms",
+    "equipment": "Dumbbells",
+    "difficulty": "Beginner",
+    "estimatedCaloriesPerMinute": 6.13,
+    "instructions": [
+      "Rest forearms on bench with wrists hanging. 2. Curl weights up using wrists. 3. Squeeze forearms. 4. Lower with control."
+    ],
+    "tags": [
+      "forearms"
+    ],
+    "gifUrl": ""
+  }
+]
