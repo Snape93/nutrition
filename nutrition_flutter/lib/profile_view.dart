@@ -32,8 +32,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   bool _isProfileLoading = true;
   List<double> _recentWeights = [];
   List<DateTime> _recentDates = [];
-  int _selectedRangeDays = 14; // 7, 14, 30
-  double _bandWidthKg = 1.0; // adjustable maintenance band width
+  final int _selectedRangeDays = 14; // 7, 14, 30
+  final double _bandWidthKg = 1.0; // adjustable maintenance band width
 
   final List<String> _goalOptions = [
     'lose_weight',
@@ -112,7 +112,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         limit: 30,
       );
       // Expecting list of maps with 'date' and 'weight'
-      logs.sort((a, b) => DateTime.parse(a['date']).compareTo(DateTime.parse(b['date'])));
+      logs.sort(
+        (a, b) =>
+            DateTime.parse(a['date']).compareTo(DateTime.parse(b['date'])),
+      );
       final weights = <double>[];
       final dates = <DateTime>[];
       for (final log in logs) {
@@ -140,7 +143,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     });
     if (!mounted) return;
     try {
-      final backendUser = await UserDatabase().getUserData(widget.usernameOrEmail);
+      final backendUser = await UserDatabase().getUserData(
+        widget.usernameOrEmail,
+      );
       if (!mounted) return;
 
       if (backendUser != null) {
@@ -161,7 +166,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         setState(() {
           userData = mapped;
           userSex = mapped['sex'] as String?;
-          _weightController.text = (mapped['weight_kg'] ?? mapped['weight'])?.toString() ?? '';
+          _weightController.text =
+              (mapped['weight_kg'] ?? mapped['weight'])?.toString() ?? '';
           _targetWeightController.text =
               mapped['target_weight']?.toString() ?? '';
           _selectedGoal = mapped['goal']?.toString();
@@ -260,19 +266,25 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       // Only require target weight for lose_weight goal
       if (_selectedGoal == 'lose_weight') {
         if (_targetWeightController.text.trim().isEmpty) {
-          _showSnackBar('Please enter a target weight for Lose Weight goal', isError: true);
+          _showSnackBar(
+            'Please enter a target weight for Lose Weight goal',
+            isError: true,
+          );
           return;
         }
-        final targetWeight = double.tryParse(_targetWeightController.text.trim());
+        final targetWeight = double.tryParse(
+          _targetWeightController.text.trim(),
+        );
         if (targetWeight == null || targetWeight <= 0) {
           _showSnackBar('Please enter a valid target weight', isError: true);
           return;
         }
       }
 
-      final targetWeight = _selectedGoal == 'lose_weight'
-          ? double.tryParse(_targetWeightController.text.trim())
-          : null;
+      final targetWeight =
+          _selectedGoal == 'lose_weight'
+              ? double.tryParse(_targetWeightController.text.trim())
+              : null;
 
       // Update backend
       try {
@@ -323,7 +335,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       final data = userData ?? {};
       final age = data['age'] as int?;
       if (age == null) {
-        debugPrint('Warning: Age not found in user data for calorie calculation');
+        debugPrint(
+          'Warning: Age not found in user data for calorie calculation',
+        );
         return; // Cannot calculate without age
       }
       final sex = data['sex'] as String? ?? 'male';
@@ -333,85 +347,77 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       final goal = data['goal'] as String? ?? 'maintain_weight';
 
       if (weight > 0 && height > 0) {
-          // Try backend API first
-          try {
-            final response = await http.post(
-              Uri.parse('${config.apiBase}/calculate/daily_goal'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({
-                'age': age,
-                'sex': sex,
-                'weight': weight,
-                'height': height,
-                'activity_level': activityLevel,
-                'goal': _goalBackendMapping[goal] ?? goal,
-              }),
-            );
-
-            if (response.statusCode == 200) {
-              final result = jsonDecode(response.body);
-              final dailyCalorieGoal = result['daily_calorie_goal'] as int?;
-
-              if (dailyCalorieGoal != null) {
-                // Update in-memory data so UI can reflect it
-                userData = {
-                  ...data,
-                  'daily_calorie_goal': dailyCalorieGoal,
-                };
-                debugPrint(
-                  'Updated daily calorie goal via backend to: $dailyCalorieGoal',
-                );
-                return;
-              }
-            }
-          } catch (e) {
-            debugPrint('Backend calorie calculation failed: $e');
-          }
-
-          // Fallback to local calculation
-          // Calculate BMR using Mifflin-St Jeor Equation
-          double bmr;
-          if (sex.toLowerCase() == 'female') {
-            bmr = 10 * weight + 6.25 * height - 5 * age - 161;
-          } else {
-            bmr = 10 * weight + 6.25 * height - 5 * age + 5;
-          }
-
-          // Activity multipliers
-          final activityMultipliers = {
-            'sedentary': 1.2,
-            'lightly active': 1.375,
-            'lightly_active': 1.375,
-            'active': 1.55,
-            'moderately active': 1.55,
-            'moderately_active': 1.55,
-            'very active': 1.725,
-            'very_active': 1.725,
-          };
-
-          final multiplier =
-              activityMultipliers[activityLevel.toLowerCase()] ?? 1.55;
-          double tdee = bmr * multiplier;
-
-          // Goal adjustments
-          if (goal.toLowerCase() == 'lose_weight') {
-            tdee -= 300;
-          } else if (goal.toLowerCase() == 'gain_muscle') {
-            tdee += 200;
-          } else if (goal.toLowerCase() == 'improve_health') {
-            // For improve health, maintain current weight with slight optimization
-            tdee += 50;
-          }
-          // maintain_weight keeps tdee as is (no adjustment)
-
-          final dailyCalorieGoal = tdee.round();
-          userData = {
-            ...data,
-            'daily_calorie_goal': dailyCalorieGoal,
-          };
-          debugPrint(
-            'Updated daily calorie goal locally to: $dailyCalorieGoal',
+        // Try backend API first
+        try {
+          final response = await http.post(
+            Uri.parse('${config.apiBase}/calculate/daily_goal'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'age': age,
+              'sex': sex,
+              'weight': weight,
+              'height': height,
+              'activity_level': activityLevel,
+              'goal': _goalBackendMapping[goal] ?? goal,
+            }),
           );
+
+          if (response.statusCode == 200) {
+            final result = jsonDecode(response.body);
+            final dailyCalorieGoal = result['daily_calorie_goal'] as int?;
+
+            if (dailyCalorieGoal != null) {
+              // Update in-memory data so UI can reflect it
+              userData = {...data, 'daily_calorie_goal': dailyCalorieGoal};
+              debugPrint(
+                'Updated daily calorie goal via backend to: $dailyCalorieGoal',
+              );
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('Backend calorie calculation failed: $e');
+        }
+
+        // Fallback to local calculation
+        // Calculate BMR using Mifflin-St Jeor Equation
+        double bmr;
+        if (sex.toLowerCase() == 'female') {
+          bmr = 10 * weight + 6.25 * height - 5 * age - 161;
+        } else {
+          bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+        }
+
+        // Activity multipliers
+        final activityMultipliers = {
+          'sedentary': 1.2,
+          'lightly active': 1.375,
+          'lightly_active': 1.375,
+          'active': 1.55,
+          'moderately active': 1.55,
+          'moderately_active': 1.55,
+          'very active': 1.725,
+          'very_active': 1.725,
+        };
+
+        final multiplier =
+            activityMultipliers[activityLevel.toLowerCase()] ?? 1.55;
+        double tdee = bmr * multiplier;
+
+        // Goal adjustments
+        if (goal.toLowerCase() == 'lose_weight') {
+          tdee -= 300;
+        } else if (goal.toLowerCase() == 'gain_muscle') {
+          tdee += 200;
+        } else if (goal.toLowerCase() == 'improve_health') {
+          // For improve health, maintain current weight with slight optimization
+          tdee += 50;
+        }
+        // maintain_weight keeps tdee as is (no adjustment)
+
+        final dailyCalorieGoal = tdee.round();
+        userData = {...data, 'daily_calorie_goal': dailyCalorieGoal};
+        debugPrint('Updated daily calorie goal locally to: $dailyCalorieGoal');
       }
     } catch (e) {
       debugPrint('Error updating calorie goal: $e');
@@ -439,9 +445,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     final goal = (userData?['goal'] ?? '').toString();
 
     // For "maintain_weight", use current weight as target if no target set
-    final effectiveTarget = (goal == 'maintain_weight' && targetWeight == 0)
-        ? currentWeight
-        : targetWeight;
+    final effectiveTarget =
+        (goal == 'maintain_weight' && targetWeight == 0)
+            ? currentWeight
+            : targetWeight;
 
     // For "lose_weight", require both current and target
     // For other goals, only require current weight
@@ -592,7 +599,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                   width: (MediaQuery.of(context).size.width - 80) * progress,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [primaryColor, primaryColor.withValues(alpha: 0.7)],
+                      colors: [
+                        primaryColor,
+                        primaryColor.withValues(alpha: 0.7),
+                      ],
                     ),
                     borderRadius: BorderRadius.circular(5),
                   ),
@@ -622,54 +632,73 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           ],
           if (_recentWeights.length >= 2) ...[
             SizedBox(height: 10),
-            Container(
+            SizedBox(
               height: 65,
               width: double.infinity,
               child: CustomPaint(
                 painter: _SparklinePainter(
                   values: _getValuesForSelectedRange(_recentWeights),
                   target: effectiveTarget > 0 ? effectiveTarget : null,
-                  bandLow: (userData?['goal'] == 'maintain_weight' && effectiveTarget > 0)
-                      ? effectiveTarget - _bandWidthKg
-                      : null,
-                  bandHigh: (userData?['goal'] == 'maintain_weight' && effectiveTarget > 0)
-                      ? effectiveTarget + _bandWidthKg
-                      : null,
+                  bandLow:
+                      (userData?['goal'] == 'maintain_weight' &&
+                              effectiveTarget > 0)
+                          ? effectiveTarget - _bandWidthKg
+                          : null,
+                  bandHigh:
+                      (userData?['goal'] == 'maintain_weight' &&
+                              effectiveTarget > 0)
+                          ? effectiveTarget + _bandWidthKg
+                          : null,
                   color: primaryColor,
                 ),
               ),
             ),
             SizedBox(height: 4),
-            Builder(builder: (context) {
-              final rate = _computeWeeklyRateKg();
-              final goalText = (userData?['goal'] ?? '').toString();
-              final currentW = double.tryParse(userData?['weight_kg']?.toString() ?? '0') ?? 0;
-              final targetW = double.tryParse(userData?['target_weight']?.toString() ?? '0') ?? 0;
-              final effectiveT = (goalText == 'maintain_weight' && targetW == 0) ? currentW : targetW;
-              String text = '';
-              if (rate != null) {
-                if (goalText == 'gain_muscle') {
-                  final sign = rate >= 0 ? '+' : '';
-                  text = '$sign${rate.toStringAsFixed(2)} kg/week';
-                } else if (goalText == 'maintain_weight') {
-                  final (vals, _) = _getSeriesForSelectedRange();
-                  final maintTarget = effectiveT > 0 ? effectiveT : currentW;
-                  final low = maintTarget - _bandWidthKg;
-                  final high = maintTarget + _bandWidthKg;
-                  final within = vals.where((v) => v >= low && v <= high).length;
-                  text = '$within/${vals.length} within ±${_bandWidthKg.toStringAsFixed(1)}kg';
-                } else if (goalText == 'improve_health') {
-                  text = 'Stable trend';
-                } else {
-                  final sign = rate >= 0 ? '+' : '';
-                  text = '$sign${rate.toStringAsFixed(2)} kg/week';
+            Builder(
+              builder: (context) {
+                final rate = _computeWeeklyRateKg();
+                final goalText = (userData?['goal'] ?? '').toString();
+                final currentW =
+                    double.tryParse(
+                      userData?['weight_kg']?.toString() ?? '0',
+                    ) ??
+                    0;
+                final targetW =
+                    double.tryParse(
+                      userData?['target_weight']?.toString() ?? '0',
+                    ) ??
+                    0;
+                final effectiveT =
+                    (goalText == 'maintain_weight' && targetW == 0)
+                        ? currentW
+                        : targetW;
+                String text = '';
+                if (rate != null) {
+                  if (goalText == 'gain_muscle') {
+                    final sign = rate >= 0 ? '+' : '';
+                    text = '$sign${rate.toStringAsFixed(2)} kg/week';
+                  } else if (goalText == 'maintain_weight') {
+                    final (vals, _) = _getSeriesForSelectedRange();
+                    final maintTarget = effectiveT > 0 ? effectiveT : currentW;
+                    final low = maintTarget - _bandWidthKg;
+                    final high = maintTarget + _bandWidthKg;
+                    final within =
+                        vals.where((v) => v >= low && v <= high).length;
+                    text =
+                        '$within/${vals.length} within ±${_bandWidthKg.toStringAsFixed(1)}kg';
+                  } else if (goalText == 'improve_health') {
+                    text = 'Stable trend';
+                  } else {
+                    final sign = rate >= 0 ? '+' : '';
+                    text = '$sign${rate.toStringAsFixed(2)} kg/week';
+                  }
                 }
-              }
-              return Text(
-                text,
-                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-              );
-            }),
+                return Text(
+                  text,
+                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                );
+              },
+            ),
           ],
           SizedBox(height: 10),
           Container(
@@ -940,8 +969,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         weightValue != null ? '${weightValue.toString()} kg' : 'Not set';
     final goalKey = data['goal']?.toString();
     final targetWeight = data['target_weight'];
-    final targetText =
-        targetWeight != null ? 'Target: $targetWeight kg' : '';
+    final targetText = targetWeight != null ? 'Target: $targetWeight kg' : '';
     final goalText =
         (_goalDisplayNames[goalKey] ?? 'Not set') +
         (targetText.isNotEmpty ? '\n$targetText' : '');
@@ -1085,7 +1113,13 @@ class _SparklinePainter extends CustomPainter {
   final double? bandLow;
   final double? bandHigh;
   final Color color;
-  _SparklinePainter({required this.values, required this.color, this.target, this.bandLow, this.bandHigh});
+  _SparklinePainter({
+    required this.values,
+    required this.color,
+    this.target,
+    this.bandLow,
+    this.bandHigh,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1106,11 +1140,12 @@ class _SparklinePainter extends CustomPainter {
       }
     }
 
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..isAntiAlias = true;
+    final paint =
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0
+          ..isAntiAlias = true;
     canvas.drawPath(path, paint);
 
     // Draw maintenance band if provided
@@ -1120,9 +1155,10 @@ class _SparklinePainter extends CustomPainter {
       final yHigh = size.height - highNorm * size.height;
       final yLow = size.height - lowNorm * size.height;
       final rect = Rect.fromLTRB(0, yHigh, size.width, yLow);
-      final bandPaint = Paint()
-        ..color = color.withOpacity(0.08)
-        ..style = PaintingStyle.fill;
+      final bandPaint =
+          Paint()
+            ..color = color.withOpacity(0.08)
+            ..style = PaintingStyle.fill;
       canvas.drawRect(rect, bandPaint);
     }
 
@@ -1130,30 +1166,37 @@ class _SparklinePainter extends CustomPainter {
     if (target != null) {
       final norm = (target! - minV) / range;
       final y = size.height - norm * size.height;
-      final targetPaint = Paint()
-        ..color = color.withOpacity(0.5)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5;
+      final targetPaint =
+          Paint()
+            ..color = color.withOpacity(0.5)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), targetPaint);
     }
 
     // Optional fade fill under line
-    final fillPath = Path.from(path)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-    final fillPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [color.withOpacity(0.25), color.withOpacity(0.0)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..style = PaintingStyle.fill;
+    final fillPath =
+        Path.from(path)
+          ..lineTo(size.width, size.height)
+          ..lineTo(0, size.height)
+          ..close();
+    final fillPaint =
+        Paint()
+          ..shader = LinearGradient(
+            colors: [color.withOpacity(0.25), color.withOpacity(0.0)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+          ..style = PaintingStyle.fill;
     canvas.drawPath(fillPath, fillPaint);
   }
 
   @override
   bool shouldRepaint(covariant _SparklinePainter oldDelegate) {
-    return oldDelegate.values != values || oldDelegate.color != color || oldDelegate.target != target || oldDelegate.bandLow != bandLow || oldDelegate.bandHigh != bandHigh;
+    return oldDelegate.values != values ||
+        oldDelegate.color != color ||
+        oldDelegate.target != target ||
+        oldDelegate.bandLow != bandLow ||
+        oldDelegate.bandHigh != bandHigh;
   }
 }

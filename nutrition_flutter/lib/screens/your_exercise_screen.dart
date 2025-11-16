@@ -223,7 +223,8 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
     final reps = int.tryParse(_repsController.text.trim());
     final sets = int.tryParse(_setsController.text.trim());
 
-    final effectiveCalories = _estimateCalories(duration, _intensity);
+    // Calculate personalized calories based on user's weight
+    final effectiveCalories = await _estimateCaloriesPersonalized(duration, _intensity, _category);
 
     // Save locally; allow test injection override
     final saver =
@@ -457,17 +458,61 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
     });
   }
 
-  int _estimateCalories(int? durationMin, String intensity) {
-    if (durationMin == null || durationMin <= 0) return 0;
-    // Simple heuristic for preview only
-    final perMin = switch (intensity) {
-      'Low' => 3,
-      'Medium' => 6,
-      'High' => 9,
-      _ => 5,
+  // Derive MET value from intensity and category
+  double _getMetFromIntensity(String intensity, String category) {
+    // Base MET values by intensity (standard MET ranges)
+    final baseMet = switch (intensity) {
+      'Low' => 3.0,      // Light intensity (e.g., walking, stretching)
+      'Medium' => 6.0,   // Moderate intensity (e.g., jogging, cycling)
+      'High' => 9.0,     // Vigorous intensity (e.g., running, HIIT)
+      _ => 5.0,          // Default moderate
     };
-    return perMin * durationMin;
+    
+    // Adjust based on category
+    final categoryLower = category.toLowerCase();
+    if (categoryLower.contains('cardio') || categoryLower.contains('dance') || categoryLower.contains('sports')) {
+      // Cardio exercises typically have higher MET
+      return baseMet * 1.1; // Slightly higher for cardio
+    } else if (categoryLower.contains('strength')) {
+      // Strength exercises typically have moderate MET
+      return baseMet * 0.9; // Slightly lower for strength
+    }
+    
+    return baseMet;
   }
+
+  // Calculate personalized calories using MET formula
+  Future<int> _estimateCaloriesPersonalized(int? durationMin, String intensity, String category) async {
+    if (durationMin == null || durationMin <= 0) return 0;
+    
+    try {
+      // Get user's weight
+      final userData = await UserDatabase().getUserData(widget.usernameOrEmail);
+      final weightKg = (userData?['weight_kg'] as num?)?.toDouble() ?? 70.0; // Default to 70kg
+      
+      // Get MET value from intensity
+      final metValue = _getMetFromIntensity(intensity, category);
+      
+      // Calculate: (MET × Weight) / 60 = calories per minute
+      final caloriesPerMin = (metValue * weightKg) / 60.0;
+      
+      // Total calories = calories per minute × duration
+      final totalCalories = (caloriesPerMin * durationMin).round();
+      
+      return totalCalories;
+    } catch (e) {
+      // Fallback to simple calculation if user data fetch fails
+      debugPrint('Error getting user weight, using fallback: $e');
+      final perMin = switch (intensity) {
+        'Low' => 3,
+        'Medium' => 6,
+        'High' => 9,
+        _ => 5,
+      };
+      return perMin * durationMin;
+    }
+  }
+
 
   Widget _buildHistoryTab() {
     final content = loggedExercises.isEmpty

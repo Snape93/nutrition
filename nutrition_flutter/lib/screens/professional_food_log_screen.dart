@@ -35,8 +35,8 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
     text: '1',
   );
 
-  final List<FoodItem> _selectedFoods = [];
-  final Map<String, Map<String, dynamic>> _nutritionInfoMap = {};
+  FoodItem? _selectedFood; // Single selection only
+  Map<String, dynamic>? _nutritionInfo; // Nutrition info for selected food
   String? _selectedMeal; // Must be selected first before using other features
   List<FoodItem> _recommendedFoods = [];
   List<FoodItem> _searchSuggestions = [];
@@ -105,64 +105,79 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
   Future<void> fetchRecommendedFoods() async {
     final user = widget.usernameOrEmail;
     final mealType = _selectedMeal?.toLowerCase() ?? '';
-    
-    final queryParams = <String, String>{
-      'user': user,
-      'meal_type': mealType,
-    };
-    
-    final uri = Uri.parse('$apiBase/foods/recommend').replace(queryParameters: queryParams);
-    
+
+    final queryParams = <String, String>{'user': user, 'meal_type': mealType};
+
+    final uri = Uri.parse(
+      '$apiBase/foods/recommend',
+    ).replace(queryParameters: queryParams);
+
     debugPrint('DEBUG: [Professional Food Recommendations] Starting request');
     debugPrint('DEBUG: [Professional Food Recommendations] User: $user');
-    debugPrint('DEBUG: [Professional Food Recommendations] Meal Type: $mealType');
+    debugPrint(
+      'DEBUG: [Professional Food Recommendations] Meal Type: $mealType',
+    );
     debugPrint('DEBUG: [Professional Food Recommendations] API URL: $uri');
-    
+
     try {
-      final response = await _safeGet(
-        uri,
-        timeoutSeconds: 6,
-        retries: 1,
-      );
+      final response = await _safeGet(uri, timeoutSeconds: 6, retries: 1);
 
       if (!mounted) return;
 
       if (response != null) {
-        debugPrint('DEBUG: [Professional Food Recommendations] Response status: ${response.statusCode}');
-        debugPrint('DEBUG: [Professional Food Recommendations] Response body length: ${response.body.length}');
-        
+        debugPrint(
+          'DEBUG: [Professional Food Recommendations] Response status: ${response.statusCode}',
+        );
+        debugPrint(
+          'DEBUG: [Professional Food Recommendations] Response body length: ${response.body.length}',
+        );
+
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          debugPrint('DEBUG: [Professional Food Recommendations] Parsed response data: $data');
+          debugPrint(
+            'DEBUG: [Professional Food Recommendations] Parsed response data: $data',
+          );
           final recommended = data['recommended'] as List? ?? [];
-          debugPrint('DEBUG: [Professional Food Recommendations] Found ${recommended.length} recommendations');
-          
+          debugPrint(
+            'DEBUG: [Professional Food Recommendations] Found ${recommended.length} recommendations',
+          );
+
           if (recommended.isNotEmpty) {
-            debugPrint('DEBUG: [Professional Food Recommendations] First item: ${recommended[0]}');
+            debugPrint(
+              'DEBUG: [Professional Food Recommendations] First item: ${recommended[0]}',
+            );
           }
-          
+
           if (!mounted) return;
           setState(() {
             _recommendedFoods =
-                recommended
-                    .map((json) => FoodItem.fromJson(json))
-                    .toList();
+                recommended.map((json) => FoodItem.fromJson(json)).toList();
           });
-          debugPrint('DEBUG: [Professional Food Recommendations] Successfully loaded ${_recommendedFoods.length} food items');
+          debugPrint(
+            'DEBUG: [Professional Food Recommendations] Successfully loaded ${_recommendedFoods.length} food items',
+          );
         } else {
-          debugPrint('DEBUG: [Professional Food Recommendations] Request failed with status ${response.statusCode}');
-          debugPrint('DEBUG: [Professional Food Recommendations] Response body: ${response.body}');
+          debugPrint(
+            'DEBUG: [Professional Food Recommendations] Request failed with status ${response.statusCode}',
+          );
+          debugPrint(
+            'DEBUG: [Professional Food Recommendations] Response body: ${response.body}',
+          );
           if (!mounted) return;
           setState(() => _recommendedFoods = []);
         }
       } else {
-        debugPrint('DEBUG: [Professional Food Recommendations] Response is null (likely timeout or connection error)');
+        debugPrint(
+          'DEBUG: [Professional Food Recommendations] Response is null (likely timeout or connection error)',
+        );
         if (!mounted) return;
         setState(() => _recommendedFoods = []);
       }
     } catch (e, stackTrace) {
       debugPrint('DEBUG: [Professional Food Recommendations] Error: $e');
-      debugPrint('DEBUG: [Professional Food Recommendations] Stack trace: $stackTrace');
+      debugPrint(
+        'DEBUG: [Professional Food Recommendations] Stack trace: $stackTrace',
+      );
       if (!mounted) return;
       setState(() => _recommendedFoods = []);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -231,16 +246,15 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
         final food = FoodItem.fromJson(data['food']);
         if (!mounted) return;
         setState(() {
-          if (!_selectedFoods.any((f) => f.foodName == food.foodName)) {
-            _selectedFoods.add(food);
-            _nutritionInfoMap[food.foodName] = {
-              'name': food.foodName,
-              'calories': food.calories,
-              'protein': food.protein,
-              'carbs': food.carbs,
-              'fat': food.fat,
-            };
-          }
+          // Replace any existing selection with new food
+          _selectedFood = food;
+          _nutritionInfo = {
+            'name': food.foodName,
+            'calories': food.calories,
+            'protein': food.protein,
+            'carbs': food.carbs,
+            'fat': food.fat,
+          };
           _searchController.clear();
           _searchSuggestions = [];
         });
@@ -282,7 +296,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
   }
 
   Future<void> _addFoodLog() async {
-    if (_selectedFoods.isEmpty) return;
+    if (_selectedFood == null) return;
 
     // Show loading state
     if (!mounted) return;
@@ -293,32 +307,34 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
 
     final user = widget.usernameOrEmail;
     final now = DateTime.now();
+    final info = _nutritionInfo ?? {};
 
-    final List<Map<String, dynamic>> foodLogs =
-        _selectedFoods.map((food) {
-          final info = _nutritionInfoMap[food.foodName] ?? {};
-          double servingValue = double.tryParse(_servingController.text) ?? 100.0;
-          double grams = _convertToGrams(servingValue, _selectedServingUnit);
-          double quantity = double.tryParse(_quantityController.text) ?? 1;
-          double factor = (grams / 100.0) * quantity;
+    // Calculate nutrition values
+    double servingValue = double.tryParse(_servingController.text) ?? 100.0;
+    double grams = _convertToGrams(servingValue, _selectedServingUnit);
+    double quantity = double.tryParse(_quantityController.text) ?? 1;
+    double factor = (grams / 100.0) * quantity;
 
-          return {
-            'food_name': food.foodName,
-            'calories': (info['calories'] ?? 0) * factor,
-            'protein': (info['protein'] ?? 0) * factor,
-            'carbs': (info['carbs'] ?? 0) * factor,
-            'fat': (info['fat'] ?? 0) * factor,
-            'serving_size': '${_servingController.text.isNotEmpty ? _servingController.text : "100"}${_selectedServingUnit}',
-            'quantity': quantity,
-            'meal_type': _selectedMeal,
-            'timestamp': now.toIso8601String(),
-          };
-        }).toList();
+    final foodLog = {
+      'food_name': _selectedFood!.foodName,
+      'calories': ((info['calories'] ?? 0) as num).toDouble() * factor,
+      'protein': ((info['protein'] ?? 0) as num).toDouble() * factor,
+      'carbs': ((info['carbs'] ?? 0) as num).toDouble() * factor,
+      'fat': ((info['fat'] ?? 0) as num).toDouble() * factor,
+      'serving_size':
+          '${_servingController.text.isNotEmpty ? _servingController.text : "100"}$_selectedServingUnit',
+      'quantity': quantity,
+      'meal_type': _selectedMeal,
+      'timestamp': now.toIso8601String(),
+    };
 
     final response = await _safePost(
       Uri.parse('$apiBase/log/food'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'user': user, 'foods': foodLogs}),
+      body: jsonEncode({
+        'user': user,
+        'foods': [foodLog],
+      }),
       timeoutSeconds: 8,
     );
 
@@ -329,20 +345,28 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
       // No need to call saveFoodLog() again as it would create duplicate entries
 
       if (!mounted) return;
+
+      // Calculate total calories for display before resetting
+      double totalCalories = (foodLog['calories'] as num).toDouble();
+
+      // Reset form completely (including meal type)
       setState(() {
         _isLoggingFood = false;
-        _selectedFoods.clear();
-        _nutritionInfoMap.clear();
+        _selectedFood = null;
+        _nutritionInfo = null;
+        _selectedMeal = null; // Clear meal type
+        _servingController.clear();
+        _quantityController.text = '1';
+        _searchController.clear();
+        _searchSuggestions = [];
+        _selectedServingUnit = 'g'; // Reset to default
       });
 
+      // Refresh recommendations (will be empty since meal is null)
+      fetchRecommendedFoods();
+
       if (mounted) {
-        // Calculate total calories for display
-        double totalCalories = foodLogs.fold<double>(
-          0,
-          (sum, log) => sum + ((log['calories'] as num?)?.toDouble() ?? 0),
-        );
-        
-        _showFoodLogSuccessDialog(totalCalories, foodLogs.length);
+        _showFoodLogSuccessDialog(totalCalories, 1);
       }
     } else {
       if (!mounted) return;
@@ -441,7 +465,9 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                 left: AppDesignSystem.spaceMD,
                 right: AppDesignSystem.spaceMD,
                 top: AppDesignSystem.spaceMD,
-                bottom: MediaQuery.of(context).padding.bottom + AppDesignSystem.spaceMD,
+                bottom:
+                    MediaQuery.of(context).padding.bottom +
+                    AppDesignSystem.spaceMD,
               ),
               decoration: BoxDecoration(
                 color: _backgroundColor,
@@ -482,7 +508,9 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                         height: 60,
                         child: CircularProgressIndicator(
                           strokeWidth: 4,
-                          valueColor: AlwaysStoppedAnimation<Color>(_primaryColor),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _primaryColor,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -564,25 +592,16 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
   }
 
   Widget _buildSelectedFoodsChips() {
-    if (_selectedFoods.isEmpty) return const SizedBox.shrink();
+    if (_selectedFood == null) return const SizedBox.shrink();
 
-    return Wrap(
-      spacing: AppDesignSystem.spaceSM,
-      runSpacing: AppDesignSystem.spaceXS,
-      children:
-          _selectedFoods
-              .map(
-                (food) => Chip(
-                  label: Text(food.foodName),
-                  onDeleted: () {
-                    setState(() {
-                      _nutritionInfoMap.remove(food.foodName);
-                      _selectedFoods.remove(food);
-                    });
-                  },
-                ),
-              )
-              .toList(),
+    return Chip(
+      label: Text(_selectedFood!.foodName),
+      onDeleted: () {
+        setState(() {
+          _selectedFood = null;
+          _nutritionInfo = null;
+        });
+      },
     );
   }
 
@@ -598,41 +617,41 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
         primaryColor: _primaryColor,
       ).copyWith(
         labelStyle: TextStyle(color: _primaryColor),
-        hintStyle: TextStyle(
-          color: isEnabled ? null : Colors.grey[400],
-        ),
+        hintStyle: TextStyle(color: isEnabled ? null : Colors.grey[400]),
       ),
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
       ],
       onChanged: isEnabled ? fetchSearchSuggestions : null,
-      onSubmitted: isEnabled ? (value) {
-        if (value.isNotEmpty) {
-          setState(() {
-            _selectedFoods.add(
-              FoodItem(
-                foodName: value,
-                category: '',
-                servingSize: '',
-                calories: 0,
-                protein: 0,
-                carbs: 0,
-                fat: 0,
-                fiber: 0,
-                sodium: 0,
-                imageUrl: null,
-              ),
-            );
-            _nutritionInfoMap[value] = {
-              'name': value,
-              'calories': 0,
-              'protein': 0,
-              'carbs': 0,
-              'fat': 0,
-            };
-          });
-        }
-      } : null,
+      onSubmitted:
+          isEnabled
+              ? (value) {
+                if (value.isNotEmpty) {
+                  setState(() {
+                    // Replace any existing selection
+                    _selectedFood = FoodItem(
+                      foodName: value,
+                      category: '',
+                      servingSize: '',
+                      calories: 0,
+                      protein: 0,
+                      carbs: 0,
+                      fat: 0,
+                      fiber: 0,
+                      sodium: 0,
+                      imageUrl: null,
+                    );
+                    _nutritionInfo = {
+                      'name': value,
+                      'calories': 0,
+                      'protein': 0,
+                      'carbs': 0,
+                      'fat': 0,
+                    };
+                  });
+                }
+              }
+              : null,
     );
   }
 
@@ -701,7 +720,10 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                             food.foodName,
                             style: AppDesignSystem.bodySmall,
                           ),
-                          onPressed: _selectedMeal != null ? () => fetchAndSelectFood(food.foodName) : null,
+                          onPressed:
+                              _selectedMeal != null
+                                  ? () => fetchAndSelectFood(food.foodName)
+                                  : null,
                           backgroundColor: AppDesignSystem.outline.withValues(
                             alpha: 0.1,
                           ),
@@ -729,9 +751,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                   labelText: 'Meal *',
                   hintText: 'Select meal type',
                   primaryColor: _primaryColor,
-                ).copyWith(
-                  labelStyle: TextStyle(color: _primaryColor),
-                ),
+                ).copyWith(labelStyle: TextStyle(color: _primaryColor)),
                 items:
                     ['Breakfast', 'Lunch', 'Dinner', 'Snack']
                         .map(
@@ -747,9 +767,9 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                 onChanged: (value) {
                   setState(() {
                     _selectedMeal = value;
-                    // Clear selected foods when meal changes
-                    _selectedFoods.clear();
-                    _nutritionInfoMap.clear();
+                    // Clear selected food when meal changes
+                    _selectedFood = null;
+                    _nutritionInfo = null;
                     _servingController.clear();
                     _quantityController.text = '1';
                     _searchController.clear();
@@ -800,17 +820,17 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                 child: TextField(
                   controller: _servingController,
                   enabled: _selectedMeal != null,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    DecimalInputFormatter(maxDecimalPlaces: 2),
-                  ],
-                decoration: AppDesignSystem.inputDecoration(
-                  labelText: 'Serving Size',
-                  primaryColor: _primaryColor,
-                ).copyWith(
-                  labelStyle: TextStyle(color: _primaryColor),
-                  suffixIcon: _buildUnitSelector(),
-                ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [DecimalInputFormatter(maxDecimalPlaces: 2)],
+                  decoration: AppDesignSystem.inputDecoration(
+                    labelText: 'Serving Size',
+                    primaryColor: _primaryColor,
+                  ).copyWith(
+                    labelStyle: TextStyle(color: _primaryColor),
+                    suffixIcon: _buildUnitSelector(),
+                  ),
                 ),
               ),
             ],
@@ -824,16 +844,14 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                 child: TextField(
                   controller: _quantityController,
                   enabled: _selectedMeal != null,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    DecimalInputFormatter(maxDecimalPlaces: 2),
-                  ],
-                decoration: AppDesignSystem.inputDecoration(
-                  labelText: 'Quantity',
-                  primaryColor: _primaryColor,
-                ).copyWith(
-                  labelStyle: TextStyle(color: _primaryColor),
-                ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [DecimalInputFormatter(maxDecimalPlaces: 2)],
+                  decoration: AppDesignSystem.inputDecoration(
+                    labelText: 'Quantity',
+                    primaryColor: _primaryColor,
+                  ).copyWith(labelStyle: TextStyle(color: _primaryColor)),
                 ),
               ),
             ],
@@ -847,7 +865,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
     if (_selectedMeal == null) {
       return const SizedBox.shrink(); // Don't show recommendations until meal is selected
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -865,7 +883,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
   }
 
   Widget _buildRecommendedFoodCard(FoodItem food) {
-    final isSelected = _selectedFoods.any((f) => f.foodName == food.foodName);
+    final isSelected = _selectedFood?.foodName == food.foodName;
 
     return Card(
       margin: const EdgeInsets.only(bottom: AppDesignSystem.spaceMD),
@@ -892,23 +910,28 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
           color: isSelected ? _primaryColor : AppDesignSystem.onSurfaceVariant,
         ),
         enabled: _selectedMeal != null,
-        onTap: _selectedMeal != null ? () {
-          setState(() {
-            if (isSelected) {
-              _selectedFoods.removeWhere((f) => f.foodName == food.foodName);
-              _nutritionInfoMap.remove(food.foodName);
-            } else {
-              _selectedFoods.add(food);
-              _nutritionInfoMap[food.foodName] = {
-                'name': food.foodName,
-                'calories': food.calories,
-                'protein': food.protein,
-                'carbs': food.carbs,
-                'fat': food.fat,
-              };
-            }
-          });
-        } : null,
+        onTap:
+            _selectedMeal != null
+                ? () {
+                  setState(() {
+                    if (isSelected) {
+                      // Deselect if already selected
+                      _selectedFood = null;
+                      _nutritionInfo = null;
+                    } else {
+                      // Replace any existing selection with new food
+                      _selectedFood = food;
+                      _nutritionInfo = {
+                        'name': food.foodName,
+                        'calories': food.calories,
+                        'protein': food.protein,
+                        'carbs': food.carbs,
+                        'fat': food.fat,
+                      };
+                    }
+                  });
+                }
+                : null,
       ),
     );
   }
@@ -948,7 +971,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _selectedFoods.isNotEmpty ? _addFoodLog : null,
+        onPressed: _selectedFood != null ? _addFoodLog : null,
         icon:
             _showSuccess
                 ? const Icon(Icons.check, color: Colors.white)
@@ -957,9 +980,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
           _showSuccess ? 'Logged!' : 'Add to Log',
           style: AppDesignSystem.titleMedium.copyWith(color: Colors.white),
         ),
-        style: AppDesignSystem.primaryButtonStyle(
-          primaryColor: _primaryColor,
-        ),
+        style: AppDesignSystem.primaryButtonStyle(primaryColor: _primaryColor),
       ),
     );
   }
@@ -969,9 +990,9 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
     const commonUnits = ['g', 'oz', 'cup', 'ml', 'piece'];
     // Extra units shown when "More..." is clicked
     const extraUnits = ['tbsp', 'tsp', 'lb', 'kg', 'serving'];
-    
+
     final isEnabled = _selectedMeal != null;
-    
+
     return PopupMenuButton<String>(
       key: _unitSelectorKey,
       enabled: isEnabled,
@@ -999,7 +1020,9 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
           // Re-open the menu immediately to show the new items
           Future.delayed(const Duration(milliseconds: 100), () {
             if (context.mounted && _unitSelectorKey.currentContext != null) {
-              final button = _unitSelectorKey.currentContext!.findRenderObject() as RenderBox?;
+              final button =
+                  _unitSelectorKey.currentContext!.findRenderObject()
+                      as RenderBox?;
               if (button != null) {
                 final screenSize = MediaQuery.of(context).size;
                 final buttonPosition = button.localToGlobal(Offset.zero);
@@ -1021,23 +1044,33 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                     });
                     // Re-open menu with common units
                     Future.delayed(const Duration(milliseconds: 100), () {
-                      if (context.mounted && _unitSelectorKey.currentContext != null) {
-                        final button = _unitSelectorKey.currentContext!.findRenderObject() as RenderBox?;
+                      if (context.mounted &&
+                          _unitSelectorKey.currentContext != null) {
+                        final button =
+                            _unitSelectorKey.currentContext!.findRenderObject()
+                                as RenderBox?;
                         if (button != null) {
                           final screenSize = MediaQuery.of(context).size;
-                          final buttonPosition = button.localToGlobal(Offset.zero);
+                          final buttonPosition = button.localToGlobal(
+                            Offset.zero,
+                          );
                           final newPosition = RelativeRect.fromLTRB(
                             buttonPosition.dx,
                             buttonPosition.dy + button.size.height,
-                            screenSize.width - buttonPosition.dx - button.size.width,
-                            screenSize.height - buttonPosition.dy - button.size.height,
+                            screenSize.width -
+                                buttonPosition.dx -
+                                button.size.width,
+                            screenSize.height -
+                                buttonPosition.dy -
+                                button.size.height,
                           );
                           showMenu<String>(
                             context: context,
                             position: newPosition,
                             items: _buildCommonUnitsMenuItems(),
                           ).then((selectedValue) {
-                            if (selectedValue != null && selectedValue != '__more__') {
+                            if (selectedValue != null &&
+                                selectedValue != '__more__') {
                               setState(() {
                                 _selectedServingUnit = selectedValue;
                                 _showMoreUnits = false;
@@ -1065,7 +1098,9 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
           // Re-open the menu to show common units
           Future.delayed(const Duration(milliseconds: 100), () {
             if (context.mounted && _unitSelectorKey.currentContext != null) {
-              final button = _unitSelectorKey.currentContext!.findRenderObject() as RenderBox?;
+              final button =
+                  _unitSelectorKey.currentContext!.findRenderObject()
+                      as RenderBox?;
               if (button != null) {
                 final screenSize = MediaQuery.of(context).size;
                 final buttonPosition = button.localToGlobal(Offset.zero);
@@ -1100,7 +1135,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
       },
       itemBuilder: (BuildContext context) {
         final items = <PopupMenuEntry<String>>[];
-        
+
         if (_showMoreUnits) {
           // Show extra units with back option
           items.add(
@@ -1122,7 +1157,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
             ),
           );
           items.add(const PopupMenuDivider());
-          
+
           // Add extra units
           for (final unit in extraUnits) {
             items.add(
@@ -1136,8 +1171,14 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                     Text(
                       unit,
                       style: TextStyle(
-                        fontWeight: _selectedServingUnit == unit ? FontWeight.bold : FontWeight.normal,
-                        color: _selectedServingUnit == unit ? _primaryColor : Colors.black87,
+                        fontWeight:
+                            _selectedServingUnit == unit
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                        color:
+                            _selectedServingUnit == unit
+                                ? _primaryColor
+                                : Colors.black87,
                       ),
                     ),
                   ],
@@ -1159,8 +1200,14 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                     Text(
                       unit,
                       style: TextStyle(
-                        fontWeight: _selectedServingUnit == unit ? FontWeight.bold : FontWeight.normal,
-                        color: _selectedServingUnit == unit ? _primaryColor : Colors.black87,
+                        fontWeight:
+                            _selectedServingUnit == unit
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                        color:
+                            _selectedServingUnit == unit
+                                ? _primaryColor
+                                : Colors.black87,
                       ),
                     ),
                   ],
@@ -1168,7 +1215,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
               ),
             );
           }
-          
+
           // Add divider and "More..." option
           items.add(const PopupMenuDivider());
           items.add(
@@ -1178,10 +1225,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                 children: [
                   const Text(
                     'More...',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black87,
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.black87),
                   ),
                   const Spacer(),
                   Icon(Icons.chevron_right, color: Colors.grey[600], size: 18),
@@ -1190,7 +1234,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
             ),
           );
         }
-        
+
         return items;
       },
     );
@@ -1199,7 +1243,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
   List<PopupMenuEntry<String>> _buildCommonUnitsMenuItems() {
     const commonUnits = ['g', 'oz', 'cup', 'ml', 'piece'];
     final items = <PopupMenuEntry<String>>[];
-    
+
     for (final unit in commonUnits) {
       items.add(
         PopupMenuItem<String>(
@@ -1212,8 +1256,14 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
               Text(
                 unit,
                 style: TextStyle(
-                  fontWeight: _selectedServingUnit == unit ? FontWeight.bold : FontWeight.normal,
-                  color: _selectedServingUnit == unit ? _primaryColor : Colors.black87,
+                  fontWeight:
+                      _selectedServingUnit == unit
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                  color:
+                      _selectedServingUnit == unit
+                          ? _primaryColor
+                          : Colors.black87,
                 ),
               ),
             ],
@@ -1221,7 +1271,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
         ),
       );
     }
-    
+
     items.add(const PopupMenuDivider());
     items.add(
       PopupMenuItem<String>(
@@ -1230,10 +1280,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
           children: [
             const Text(
               'More...',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.black87,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.black87),
             ),
             const Spacer(),
             Icon(Icons.chevron_right, color: Colors.grey[600], size: 18),
@@ -1241,14 +1288,14 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
         ),
       ),
     );
-    
+
     return items;
   }
 
   List<PopupMenuEntry<String>> _buildMoreUnitsMenuItems() {
     const extraUnits = ['tbsp', 'tsp', 'lb', 'kg', 'serving'];
     final items = <PopupMenuEntry<String>>[];
-    
+
     items.add(
       PopupMenuItem<String>(
         value: '__back__',
@@ -1268,7 +1315,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
       ),
     );
     items.add(const PopupMenuDivider());
-    
+
     for (final unit in extraUnits) {
       items.add(
         PopupMenuItem<String>(
@@ -1281,8 +1328,14 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
               Text(
                 unit,
                 style: TextStyle(
-                  fontWeight: _selectedServingUnit == unit ? FontWeight.bold : FontWeight.normal,
-                  color: _selectedServingUnit == unit ? _primaryColor : Colors.black87,
+                  fontWeight:
+                      _selectedServingUnit == unit
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                  color:
+                      _selectedServingUnit == unit
+                          ? _primaryColor
+                          : Colors.black87,
                 ),
               ),
             ],
@@ -1290,7 +1343,7 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
         ),
       );
     }
-    
+
     return items;
   }
 
@@ -1328,140 +1381,138 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
       context: context,
       barrierColor: Colors.black54,
       barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: Container(
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: _primaryColor.withValues(alpha: 0.3),
-                blurRadius: 20,
-                spreadRadius: 5,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Success icon with animation
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check_circle,
-                  color: _primaryColor,
-                  size: 50,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Title
-              Text(
-                'Meal Logged Successfully!',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: _primaryColor,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              // Calories info
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: _backgroundColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
+      builder:
+          (context) => Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
                     color: _primaryColor.withValues(alpha: 0.3),
-                    width: 2,
+                    blurRadius: 20,
+                    spreadRadius: 5,
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.local_fire_department,
-                      color: _primaryColor,
-                      size: 28,
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Success icon with animation
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: _primaryColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
                     ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Icon(
+                      Icons.check_circle,
+                      color: _primaryColor,
+                      size: 50,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Title
+                  Text(
+                    'Meal Logged Successfully!',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: _primaryColor,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  // Calories info
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _backgroundColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _primaryColor.withValues(alpha: 0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          '${totalCalories.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: _primaryColor,
-                          ),
+                        Icon(
+                          Icons.local_fire_department,
+                          color: _primaryColor,
+                          size: 28,
                         ),
-                        Text(
-                          'calories logged',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              totalCalories.toStringAsFixed(0),
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: _primaryColor,
+                              ),
+                            ),
+                            Text(
+                              'calories logged',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Food count info
-              Text(
-                foodCount == 1
-                    ? '1 food item added to your log'
-                    : '$foodCount food items added to your log',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[700],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              // Close button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Close dialog
-                    Navigator.pop(context, true); // Return to previous screen
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  ),
+                  const SizedBox(height: 24),
+                  // Food count info
+                  Text(
+                    foodCount == 1
+                        ? '1 food item added to your log'
+                        : '$foodCount food items added to your log',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  // Close button - just closes dialog, stays on screen
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close dialog only
+                        // Stay on screen - form is already reset
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Done',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                  child: const Text(
-                    'Done',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 }

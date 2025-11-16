@@ -5,6 +5,9 @@ import '../services/streak_service.dart';
 import '../models/graph_models.dart';
 import '../models/streak_model.dart';
 import '../widgets/streak_card.dart';
+import '../widgets/bar_graph_widget.dart';
+import '../widgets/custom_date_range_picker.dart';
+import '../widgets/bar_graph_statistics.dart';
 import '../design_system/app_design_system.dart';
 import '../my_app.dart'; // For routeObserver
 
@@ -65,8 +68,19 @@ class ProgressScreen extends StatefulWidget {
 }
 
 class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
-  int _selectedTimeRange = 0; // 0: Daily, 1: Weekly, 2: Monthly
-  final List<String> _timeRanges = ['Daily', 'Weekly', 'Monthly'];
+  int _selectedTimeRange = 0; // 0: Daily, 1: Weekly, 2: Monthly, 3: Custom
+  final List<String> _timeRanges = ['Daily', 'Weekly', 'Monthly', 'Custom'];
+  
+  // Custom date range state
+  DateTime? _customStartDate;
+  DateTime? _customEndDate;
+  DateTime? _userStartDate;
+  DateTime? _maxEndDate; // Yesterday
+  bool _isLoadingStartDate = false;
+  
+  // Bar graph data
+  List<GraphDataPoint> _barGraphData = [];
+  bool _isLoadingBarGraph = false;
 
   // Weight tracking data
   double currentWeight = 0.0;
@@ -118,10 +132,37 @@ class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
+    _maxEndDate = DateTime.now().subtract(const Duration(days: 1)); // Yesterday
     _loadWeightData();
     _loadCalorieGoal();
+    _loadUserStartDate();
     _loadDataForTimeRange();
     _loadStreakData();
+  }
+  
+  Future<void> _loadUserStartDate() async {
+    setState(() {
+      _isLoadingStartDate = true;
+    });
+    
+    try {
+      final startDate = await ProgressDataService.getUserStartDate(
+        usernameOrEmail: widget.usernameOrEmail,
+      );
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _userStartDate = startDate;
+        _isLoadingStartDate = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading user start date: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoadingStartDate = false;
+      });
+    }
   }
 
   @override
@@ -225,6 +266,19 @@ class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
   void _selectTimeRange(int index) {
     setState(() {
       _selectedTimeRange = index;
+      // Reset custom dates when switching away from Custom
+      if (index != 3) {
+        _customStartDate = null;
+        _customEndDate = null;
+      }
+    });
+    _loadDataForTimeRange();
+  }
+  
+  void _onCustomDateRangeSelected(DateTime start, DateTime end) {
+    setState(() {
+      _customStartDate = start;
+      _customEndDate = end;
     });
     _loadDataForTimeRange();
   }
@@ -233,6 +287,8 @@ class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
   Future<void> _loadDataForTimeRange() async {
     try {
       TimeRange timeRange;
+      DateTime? customStart;
+      DateTime? customEnd;
       
       switch (_selectedTimeRange) {
         case 0: // Daily
@@ -244,14 +300,32 @@ class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
         case 2: // Monthly
           timeRange = TimeRange.monthly;
           break;
+        case 3: // Custom
+          timeRange = TimeRange.custom;
+          customStart = _customStartDate;
+          customEnd = _customEndDate;
+          if (customStart == null || customEnd == null) {
+            // Don't load data if custom dates not selected
+            return;
+          }
+          break;
         default:
           timeRange = TimeRange.daily;
       }
       
+      setState(() {
+        _isLoadingBarGraph = true;
+      });
+      
       final progressData = await ProgressDataService.getProgressData(
         usernameOrEmail: widget.usernameOrEmail,
         timeRange: timeRange,
+        customStartDate: customStart,
+        customEndDate: customEnd,
       );
+      
+      // Load bar graph data
+      await _loadBarGraphData(timeRange, customStart, customEnd);
       
       if (!mounted) return;
       
@@ -261,10 +335,8 @@ class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
       // Update calories metric
       final caloriesIdx = updatedMetrics.indexWhere((m) => m.id == 'calories');
       if (caloriesIdx != -1) {
-        // Only show goal for daily view, hide for weekly/monthly
-        final goalValue = _selectedTimeRange == 0 
-            ? progressData.calories.goal 
-            : 0.0;
+        // Show goal for all views now that weekly/monthly show averages (daily-equivalent values)
+        final goalValue = progressData.calories.goal;
         updatedMetrics[caloriesIdx] = updatedMetrics[caloriesIdx].copyWith(
           currentValue: progressData.calories.current,
           goalValue: goalValue,
@@ -300,22 +372,135 @@ class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
       
       setState(() {
         _availableMetrics = updatedMetrics;
+        _isLoadingBarGraph = false;
       });
     } catch (e) {
       debugPrint('Error loading progress data: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoadingBarGraph = false;
+      });
+    }
+  }
+  
+  Future<void> _loadBarGraphData(
+    TimeRange timeRange,
+    DateTime? customStart,
+    DateTime? customEnd,
+  ) async {
+    try {
+      // Calculate date range based on time range
+      DateTime startDate;
+      DateTime endDate;
+      final yesterday = DateTime.now().subtract(const Duration(days: 1));
+      
+      switch (timeRange) {
+        case TimeRange.daily:
+          // Last 7 days from yesterday
+          endDate = yesterday;
+          startDate = endDate.subtract(const Duration(days: 6));
+          // But respect user's start date if they started < 7 days ago
+          if (_userStartDate != null && _userStartDate!.isAfter(startDate)) {
+            startDate = _userStartDate!;
+          }
+          break;
+        case TimeRange.weekly:
+          // Last 4-5 weeks from last week
+          endDate = yesterday;
+          startDate = endDate.subtract(const Duration(days: 28));
+          if (_userStartDate != null && _userStartDate!.isAfter(startDate)) {
+            startDate = _userStartDate!;
+          }
+          break;
+        case TimeRange.monthly:
+          // Last 12 months from last month
+          endDate = yesterday;
+          startDate = DateTime(endDate.year - 1, endDate.month, 1);
+          if (_userStartDate != null && _userStartDate!.isAfter(startDate)) {
+            startDate = _userStartDate!;
+          }
+          break;
+        case TimeRange.custom:
+          if (customStart == null || customEnd == null) {
+            return;
+          }
+          startDate = customStart;
+          endDate = customEnd;
+          break;
+      }
+      
+      // Fetch raw data from backend
+      final backendData = await ProgressDataService.fetchRawBackendData(
+        widget.usernameOrEmail,
+        DateRange(startDate, endDate),
+      );
+      
+      final rawCaloriesData = backendData['calories'] as List<dynamic>? ?? [];
+      final caloriesList = rawCaloriesData.map((e) => e as Map<String, dynamic>).toList();
+      
+      // Aggregate based on time range
+      List<GraphDataPoint> aggregatedData;
+      switch (timeRange) {
+        case TimeRange.daily:
+          aggregatedData = ProgressDataService.aggregateDailyDataForBarGraph(
+            caloriesList,
+            startDate,
+            endDate,
+          );
+          break;
+        case TimeRange.weekly:
+          aggregatedData = ProgressDataService.aggregateWeeklyDataForBarGraph(
+            caloriesList,
+            startDate,
+            endDate,
+          );
+          break;
+        case TimeRange.monthly:
+          aggregatedData = ProgressDataService.aggregateMonthlyDataForBarGraph(
+            caloriesList,
+            startDate,
+            endDate,
+          );
+          break;
+        case TimeRange.custom:
+          aggregatedData = ProgressDataService.aggregateCustomDataForBarGraph(
+            caloriesList,
+            startDate,
+            endDate,
+          );
+          break;
+      }
+      
+      if (!mounted) return;
+      setState(() {
+        _barGraphData = aggregatedData;
+      });
+    } catch (e) {
+      debugPrint('Error loading bar graph data: $e');
     }
   }
 
   String _getTimeRangeText() {
+    // Use natural language for better UX
     switch (_selectedTimeRange) {
       case 0: // Daily
-        return 'Today';
+        return 'Last 7 days';
       case 1: // Weekly
-        return 'This Week';
+        return 'Last 4 weeks';
       case 2: // Monthly
-        return 'This Month';
+        return 'Last 12 months';
+      case 3: // Custom
+        if (_customStartDate != null && _customEndDate != null) {
+          // Format custom date range
+          final start = _customStartDate!;
+          final end = _customEndDate!;
+          final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return '${months[start.month - 1]} ${start.day}, ${start.year} - ${months[end.month - 1]} ${end.day}, ${end.year}';
+        }
+        return 'Select date range';
       default:
-        return 'Today';
+        return 'Last 7 days';
     }
   }
 
@@ -437,16 +622,39 @@ class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
                   SizedBox(height: 20),
 
                   // Time range tabs
-                  _buildTimeRangeTabs(),
-                  SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.center,
+                    widthFactor: 1.0,
+                    child: _buildTimeRangeTabs(),
+                  ),
+                  SizedBox(height: AppDesignSystem.spaceMD),
+
+                  // Custom date range picker (only when Custom is selected)
+                  if (_selectedTimeRange == 3)
+                    CustomDateRangePicker(
+                      startDate: _customStartDate,
+                      endDate: _customEndDate,
+                      minDate: _userStartDate,
+                      maxDate: _maxEndDate,
+                      onDateRangeSelected: _onCustomDateRangeSelected,
+                      primaryColor: _primaryColor,
+                    ),
+
+                  // Bar graph card
+                  if (_selectedTimeRange != 3 || (_customStartDate != null && _customEndDate != null))
+                    _buildBarGraphCard(),
+                  
+                  SizedBox(height: AppDesignSystem.spaceMD),
 
                   // Weight tracking card
                   _buildWeightCard(),
                   SizedBox(height: AppDesignSystem.spaceMD),
 
-                  // Streak card
-                  _buildStreakCard(),
-                  SizedBox(height: AppDesignSystem.spaceMD),
+                  // Streak card - only show for Daily view
+                  if (_selectedTimeRange == 0) ...[
+                    _buildStreakCard(),
+                    SizedBox(height: AppDesignSystem.spaceMD),
+                  ],
 
                   // Additional space to prevent overflow
                   SizedBox(height: 100),
@@ -537,6 +745,7 @@ class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
 
   Widget _buildTimeRangeTabs() {
     return Container(
+      constraints: BoxConstraints(maxWidth: 400),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -548,38 +757,244 @@ class _ProgressScreenState extends State<ProgressScreen> with RouteAware {
           ),
         ],
       ),
+      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
-        children:
-            _timeRanges.asMap().entries.map((entry) {
-              int index = entry.key;
-              String label = entry.value;
-              bool isSelected = _selectedTimeRange == index;
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: _timeRanges.asMap().entries.map((entry) {
+          int index = entry.key;
+          String label = entry.value;
+          bool isSelected = _selectedTimeRange == index;
 
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => _selectTimeRange(index),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isSelected ? _primaryColor : Colors.grey[600],
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 14,
-                      ),
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 2),
+              child: GestureDetector(
+                onTap: () => _selectTimeRange(index),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 12,
+                  ),
+                  margin: EdgeInsets.symmetric(vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected ? _primaryColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: isSelected
+                        ? null
+                        : Border.all(
+                            color: AppDesignSystem.outline,
+                            width: 1,
+                          ),
+                  ),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey[600],
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontSize: 14,
                     ),
                   ),
                 ),
-              );
-            }).toList(),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
+  }
+  
+  Widget _buildBarGraphCard() {
+    final selectedMetric = _availableMetrics.isNotEmpty
+        ? _availableMetrics[_selectedMetricIndex]
+        : null;
+    final goalValue = selectedMetric?.goalValue ?? 0.0;
+    
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(AppDesignSystem.spaceMD),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppDesignSystem.radiusLG),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Title
+          Text(
+            'Calories',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: AppDesignSystem.onSurface,
+            ),
+          ),
+          SizedBox(height: AppDesignSystem.spaceSM),
+          Text(
+            _getTimeRangeText(),
+            style: TextStyle(
+              fontSize: 12,
+              color: AppDesignSystem.onSurfaceVariant,
+            ),
+          ),
+          SizedBox(height: AppDesignSystem.spaceMD),
+          
+          // Summary statistics
+          if (_barGraphData.isNotEmpty) ...[
+            _buildSummaryStats(goalValue),
+            SizedBox(height: AppDesignSystem.spaceMD),
+          ],
+          
+          // Bar graph
+          BarGraphWidget(
+            data: _barGraphData,
+            goalValue: goalValue > 0 ? goalValue : null,
+            unit: 'cal',
+            primaryColor: _primaryColor,
+            userGender: widget.userSex,
+            isLoading: _isLoadingBarGraph,
+          ),
+          
+          // Statistics cards
+          if (_barGraphData.isNotEmpty) ...[
+            SizedBox(height: AppDesignSystem.spaceMD),
+            BarGraphStatistics(
+              data: _barGraphData,
+              unit: 'cal',
+              primaryColor: _primaryColor,
+              goalValue: goalValue > 0 ? goalValue : null,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryStats(double? goalValue) {
+    if (_barGraphData.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // Calculate statistics
+    final values = _barGraphData.map((point) => point.value).toList();
+    final average = values.fold(0.0, (sum, value) => sum + value) / values.length;
+    final current = values.last; // Most recent value
+    
+    // Cap goal value at reasonable maximum (5,000) to prevent unrealistic change values
+    // Goals above 5,000 are likely errors (weekly totals, etc.)
+    final cappedGoal = goalValue != null && goalValue > 0 && goalValue <= 5000 
+        ? goalValue 
+        : null;
+    
+    final change = cappedGoal != null
+        ? current - cappedGoal 
+        : (values.length > 1 ? current - values[values.length - 2] : 0.0);
+    
+    return Row(
+      children: [
+        Expanded(
+          child: _buildSummaryCard(
+            value: average,
+            label: 'AVERAGE',
+            unit: 'cal',
+            color: _primaryColor,
+          ),
+        ),
+        SizedBox(width: AppDesignSystem.spaceSM),
+        Expanded(
+          child: _buildSummaryCard(
+            value: current,
+            label: 'CURRENT',
+            unit: 'cal',
+            color: _primaryColor,
+          ),
+        ),
+        SizedBox(width: AppDesignSystem.spaceSM),
+        Expanded(
+          child: _buildSummaryCard(
+            value: change,
+            label: 'CHANGE',
+            unit: 'cal',
+            color: change >= 0 ? AppDesignSystem.success : AppDesignSystem.error,
+            showSign: true,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildSummaryCard({
+    required double value,
+    required String label,
+    required String unit,
+    required Color color,
+    bool showSign = false,
+  }) {
+    final formattedValue = _formatSummaryValue(value, showSign);
+    
+    return Container(
+      padding: EdgeInsets.all(AppDesignSystem.spaceSM),
+      decoration: BoxDecoration(
+        color: AppDesignSystem.surface,
+        borderRadius: BorderRadius.circular(AppDesignSystem.radiusMD),
+        border: Border.all(
+          color: AppDesignSystem.outline.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            formattedValue,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: AppDesignSystem.onSurfaceVariant,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  String _formatSummaryValue(double value, bool showSign) {
+    final intValue = value.toInt();
+    final absValue = value.abs();
+    
+    if (absValue >= 1000) {
+      final thousands = absValue / 1000;
+      final formatted = thousands >= 10 
+          ? thousands.toStringAsFixed(0)
+          : thousands.toStringAsFixed(1);
+      final sign = showSign ? (value >= 0 ? '+' : '-') : '';
+      return '$sign${formatted}K';
+    } else {
+      final sign = showSign ? (value >= 0 ? '+' : '-') : '';
+      return '$sign$intValue';
+    }
   }
 
   Widget _buildWeightCard() {

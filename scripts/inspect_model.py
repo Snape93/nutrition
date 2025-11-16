@@ -2,7 +2,7 @@
 import sys
 from pprint import pprint
 
-path = r'Nutrition/model/best_regression_model.joblib'
+path = r'model/best_regression_model.joblib'
 try:
     model = joblib.load(path)
 except Exception as e:

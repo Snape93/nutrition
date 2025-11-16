@@ -9,6 +9,7 @@ import '../config.dart' as config;
 import '../utils/user_profile_helper.dart';
 import '../utils/unit_converter.dart';
 import '../utils/input_formatters.dart';
+import '../design_system/app_design_system.dart';
 
 class EnhancedOnboardingPhysical extends StatefulWidget {
   final String usernameOrEmail;
@@ -273,11 +274,6 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
   @override
   Widget build(BuildContext context) {
     final theme = SexSpecificTheme.getThemeFromString(_selectedGender);
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenHeight < 700;
-    final isVerySmallScreen = screenHeight < 600;
-    final isNarrowScreen = screenWidth < 360;
 
     return SexSpecificBackground(
       gender: _selectedGender,
@@ -305,27 +301,25 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
                   // Content
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: EdgeInsets.symmetric(
-                        horizontal:
-                            isNarrowScreen ? 8 : (isSmallScreen ? 12 : 16),
-                        vertical:
-                            isVerySmallScreen ? 8 : (isSmallScreen ? 12 : 16),
+                      padding: AppDesignSystem.getResponsivePaddingExact(
+                        context,
+                        xs: 8, // < 360px (matches isNarrowScreen ? 8)
+                        sm: 12, // 360-600px (matches isSmallScreen ? 12)
+                        md: 16, // 600-900px (matches default 16)
                       ),
                       child: Form(
                         key: _formKey,
                         child: Column(
                           children: [
                             // Header
-                            _buildHeader(
-                              theme,
-                              isSmallScreen,
-                              isVerySmallScreen,
-                            ),
+                            _buildHeader(context, theme),
                             SizedBox(
-                              height:
-                                  isVerySmallScreen
-                                      ? 16
-                                      : (isSmallScreen ? 20 : 24),
+                              height: AppDesignSystem.getResponsiveSpacingExact(
+                                context,
+                                xs: 16, // < 600px (matches isVerySmallScreen ? 16)
+                                sm: 20, // 600-700px (matches isSmallScreen ? 20)
+                                md: 24, // > 700px (matches default 24)
+                              ),
                             ),
 
                             // Gender selection (REMOVE from step 2)
@@ -342,17 +336,15 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
                             // ),
 
                             // Physical info form
-                            _buildPhysicalInfoForm(
-                              theme,
-                              isSmallScreen,
-                              isVerySmallScreen,
-                            ),
+                            _buildPhysicalInfoForm(context, theme),
 
                             SizedBox(
-                              height:
-                                  isVerySmallScreen
-                                      ? 16
-                                      : (isSmallScreen ? 20 : 24),
+                              height: AppDesignSystem.getResponsiveSpacingExact(
+                                context,
+                                xs: 16, // < 600px
+                                sm: 20, // 600-700px
+                                md: 24, // > 700px
+                              ),
                             ),
 
                             // Real-time calorie insights - more compact
@@ -369,9 +361,12 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
                               ),
                               SizedBox(
                                 height:
-                                    isVerySmallScreen
-                                        ? 16
-                                        : (isSmallScreen ? 20 : 24),
+                                    AppDesignSystem.getResponsiveSpacingExact(
+                                      context,
+                                      xs: 16, // < 600px
+                                      sm: 20, // 600-700px
+                                      md: 24, // > 700px
+                                    ),
                               ),
                             ],
 
@@ -379,10 +374,12 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
                             _buildNavigationButton(theme),
 
                             SizedBox(
-                              height:
-                                  isVerySmallScreen
-                                      ? 16
-                                      : (isSmallScreen ? 24 : 32),
+                              height: AppDesignSystem.getResponsiveSpacingExact(
+                                context,
+                                xs: 16, // < 600px
+                                sm: 24, // 600-700px
+                                md: 32, // > 700px
+                              ),
                             ),
                           ],
                         ),
@@ -423,14 +420,13 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
     return hasHeight && hasWeight && hasTargetOk;
   }
 
-  Widget _buildHeader(
-    SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
-  ) {
+  Widget _buildHeader(BuildContext context, SexSpecificTheme theme) {
     return Container(
-      padding: EdgeInsets.all(
-        isVerySmallScreen ? 12 : (isSmallScreen ? 16 : 20),
+      padding: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 12, // < 600px (matches isVerySmallScreen ? 12)
+        sm: 16, // 600-700px (matches isSmallScreen ? 16)
+        md: 20, // > 700px (matches default 20)
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.9),
@@ -448,27 +444,56 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
           Text(
             _selectedGender == 'female' ? '✨' : '🎯',
             style: TextStyle(
-              fontSize: isVerySmallScreen ? 36 : (isSmallScreen ? 42 : 48),
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 36, // < 600px
+                sm: 42, // 600-700px
+                md: 48, // > 700px
+              ),
             ),
           ),
-          SizedBox(height: isVerySmallScreen ? 8 : (isSmallScreen ? 10 : 12)),
+          SizedBox(
+            height: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 8, // < 600px
+              sm: 10, // 600-700px
+              md: 12, // > 700px
+            ),
+          ),
           Text(
             'Tell us about yourself',
             style: TextStyle(
-              fontSize: isVerySmallScreen ? 22 : (isSmallScreen ? 25 : 28),
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 22, // < 600px
+                sm: 25, // 600-700px
+                md: 28, // > 700px
+              ),
               fontWeight: FontWeight.bold,
               color: theme.primaryColor,
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: isVerySmallScreen ? 4 : (isSmallScreen ? 6 : 8)),
+          SizedBox(
+            height: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 4, // < 600px
+              sm: 6, // 600-700px
+              md: 8, // > 700px
+            ),
+          ),
           Text(
             SexSpecificMessaging.getEncouragementMessage(
               _selectedGender,
               'physical_info',
             ),
             style: TextStyle(
-              fontSize: isVerySmallScreen ? 12 : (isSmallScreen ? 14 : 16),
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 12, // < 600px
+                sm: 14, // 600-700px
+                md: 16, // > 700px
+              ),
               color: Colors.grey[600],
             ),
             textAlign: TextAlign.center,
@@ -484,11 +509,7 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
 
   // _buildGenderCard removed (not used in this step)
 
-  Widget _buildPhysicalInfoForm(
-    SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
-  ) {
+  Widget _buildPhysicalInfoForm(BuildContext context, SexSpecificTheme theme) {
     return SexSpecificCard(
       gender: _selectedGender,
       child: Column(
@@ -497,31 +518,58 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
           Text(
             'Basic Information',
             style: TextStyle(
-              fontSize: isVerySmallScreen ? 18 : (isSmallScreen ? 19 : 20),
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 18, // < 600px
+                sm: 19, // 600-700px
+                md: 20, // > 700px
+              ),
               fontWeight: FontWeight.bold,
               color: theme.primaryColor,
             ),
           ),
-          SizedBox(height: isVerySmallScreen ? 12 : (isSmallScreen ? 14 : 16)),
+          SizedBox(
+            height: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 12, // < 600px
+              sm: 14, // 600-700px
+              md: 16, // > 700px
+            ),
+          ),
 
           // Height and Weight inputs
-          _buildHeightWeightInputs(theme, isSmallScreen, isVerySmallScreen),
+          _buildHeightWeightInputs(context, theme),
 
           // Target Weight input (only show if goal is lose_weight)
           if (_selectedGoal == 'lose_weight') ...[
             SizedBox(
-              height: isVerySmallScreen ? 12 : (isSmallScreen ? 14 : 16),
+              height: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 12, // < 600px
+                sm: 14, // 600-700px
+                md: 16, // > 700px
+              ),
             ),
-            _buildTargetWeightInput(theme, isSmallScreen, isVerySmallScreen),
+            _buildTargetWeightInput(context, theme),
           ],
 
           // Health tips based on gender
           if (_selectedGender != null) ...[
             SizedBox(
-              height: isVerySmallScreen ? 12 : (isSmallScreen ? 14 : 16),
+              height: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 12, // < 600px
+                sm: 14, // 600-700px
+                md: 16, // > 700px
+              ),
             ),
             Container(
-              padding: EdgeInsets.all(isVerySmallScreen ? 10 : 12),
+              padding: AppDesignSystem.getResponsivePaddingExact(
+                context,
+                xs: 10, // < 600px
+                sm: 12, // 600-700px
+                md: 12, // > 700px
+              ),
               decoration: BoxDecoration(
                 color: theme.primaryColor.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(8),
@@ -543,22 +591,35 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
                       Text(
                         'Did you know?',
                         style: TextStyle(
-                          fontSize:
-                              isVerySmallScreen
-                                  ? 12
-                                  : (isSmallScreen ? 13 : 14),
+                          fontSize: AppDesignSystem.getResponsiveFontSize(
+                            context,
+                            xs: 12, // < 600px
+                            sm: 13, // 600-700px
+                            md: 14, // > 700px
+                          ),
                           fontWeight: FontWeight.bold,
                           color: theme.primaryColor,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: isVerySmallScreen ? 3 : 4),
+                  SizedBox(
+                    height: AppDesignSystem.getResponsiveSpacingExact(
+                      context,
+                      xs: 3, // < 600px
+                      sm: 4, // 600-700px
+                      md: 4, // > 700px
+                    ),
+                  ),
                   Text(
                     SexSpecificMessaging.getHealthTips(_selectedGender).first,
                     style: TextStyle(
-                      fontSize:
-                          isVerySmallScreen ? 10 : (isSmallScreen ? 11 : 12),
+                      fontSize: AppDesignSystem.getResponsiveFontSize(
+                        context,
+                        xs: 10, // < 600px
+                        sm: 11, // 600-700px
+                        md: 12, // > 700px
+                      ),
                       color: Colors.grey[700],
                     ),
                     maxLines: 2,
@@ -575,90 +636,187 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
 
   // Build height and weight inputs with unit support
   Widget _buildHeightWeightInputs(
+    BuildContext context,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
+    final screenWidth = AppDesignSystem.getScreenWidth(context);
+    final isCompactLayout = screenWidth < 340;
+    final interItemSpacing = AppDesignSystem.getResponsiveSpacingExact(
+      context,
+      xs: 10,
+      sm: 12,
+      md: 16,
+    );
+
+    final heightWidget =
+        _heightUnit == 'cm'
+            ? _buildHeightCmInput(context, theme)
+            : _buildHeightFtInInput(context, theme, isCompact: isCompactLayout);
+
+    if (isCompactLayout) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          heightWidget,
+          SizedBox(height: interItemSpacing),
+          _buildWeightInput(context, theme),
+        ],
+      );
+    }
+
     return Row(
       children: [
-        Expanded(
-          child:
-              _heightUnit == 'cm'
-                  ? _buildHeightCmInput(theme, isSmallScreen, isVerySmallScreen)
-                  : _buildHeightFtInInput(
-                    theme,
-                    isSmallScreen,
-                    isVerySmallScreen,
-                  ),
+        Expanded(child: heightWidget),
+        SizedBox(
+          width: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 12,
+            sm: 16,
+            md: 16,
+          ),
         ),
-        SizedBox(width: isVerySmallScreen ? 12 : 16),
-        Expanded(
-          child: _buildWeightInput(theme, isSmallScreen, isVerySmallScreen),
-        ),
+        Expanded(child: _buildWeightInput(context, theme)),
       ],
     );
   }
 
   // Build height input in cm
-  Widget _buildHeightCmInput(
-    SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
-  ) {
+  Widget _buildHeightCmInput(BuildContext context, SexSpecificTheme theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Height',
           style: TextStyle(
-            fontSize: isVerySmallScreen ? 14 : (isSmallScreen ? 15 : 16),
+            fontSize: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 14, // < 600px
+              sm: 15, // 600-700px
+              md: 16, // > 700px
+            ),
             fontWeight: FontWeight.w600,
             color: theme.primaryColor,
           ),
         ),
-        SizedBox(height: isVerySmallScreen ? 6 : 8),
-        TextFormField(
-          key: ValueKey('height_cm_${_heightUnit}'),
-          initialValue: _height?.toString() ?? '',
+        SizedBox(
+          height: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 6, // < 600px
+            sm: 8, // 600-700px
+            md: 8, // > 700px
+          ),
+        ),
+        ConstrainedBox(
+          constraints: AppDesignSystem.getNumericInputConstraints(context),
+          child: TextFormField(
+            key: ValueKey('height_cm_$_heightUnit'),
+            initialValue: _height?.toString() ?? '',
+            onChanged: (value) {
+              setState(() {
+                _height = double.tryParse(value);
+              });
+            },
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [DecimalInputFormatter(maxDecimalPlaces: 1)],
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Enter height';
+              }
+              final n = double.tryParse(value);
+              if (n == null || n < 50 || n > 250) {
+                return 'Valid height (50-250 cm)';
+              }
+              return null;
+            },
+            onSaved: (value) {
+              _height = double.tryParse(value ?? '');
+            },
+            style: TextStyle(
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 14, // < 600px
+                sm: 16, // 600-700px
+                md: 16, // > 700px
+              ),
+              color: Colors.black87,
+            ),
+            decoration: InputDecoration(
+              suffixIcon: _buildUnitSelectorInField(
+                options: ['cm', 'ft'],
+                selected: _heightUnit,
+                onChanged: (value) {
+                  setState(() {
+                    final oldHeightUnit = _heightUnit;
+                    _heightUnit = value;
+                    _updateDisplayValuesForUnitChange(
+                      oldHeightUnit: oldHeightUnit,
+                    );
+                  });
+                },
+                theme: theme,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: theme.primaryColor, width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.red),
+              ),
+              contentPadding: AppDesignSystem.getNumericInputPadding(context),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Build height input in ft/in
+  Widget _buildHeightFtInInput(
+    BuildContext context,
+    SexSpecificTheme theme, {
+    bool isCompact = false,
+  }) {
+    Widget buildFeetField({double? width}) {
+      final field = ConstrainedBox(
+        constraints: AppDesignSystem.getNumericInputConstraints(context),
+        child: TextFormField(
+          key: ValueKey('height_feet_$_heightUnit'),
+          initialValue: _heightFeet?.toString() ?? '',
           onChanged: (value) {
             setState(() {
-              _height = double.tryParse(value);
+              _heightFeet = int.tryParse(value);
             });
           },
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [DecimalInputFormatter(maxDecimalPlaces: 1)],
+          keyboardType: TextInputType.number,
+          inputFormatters: [FeetInputFormatter()],
           validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Enter height';
+            if (_heightUnit == 'ft' && (value == null || value.isEmpty)) {
+              return 'Enter feet';
             }
-            final n = double.tryParse(value);
-            if (n == null || n < 50 || n > 250) {
-              return 'Valid height (50-250 cm)';
+            final n = int.tryParse(value ?? '');
+            if (n != null && (n < 1 || n > 8)) {
+              return '1-8 ft';
             }
             return null;
           },
           onSaved: (value) {
-            _height = double.tryParse(value ?? '');
+            _heightFeet = int.tryParse(value ?? '');
           },
           style: TextStyle(
-            fontSize: isVerySmallScreen ? 14 : 16,
+            fontSize: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 14,
+              sm: 16,
+              md: 16,
+            ),
             color: Colors.black87,
           ),
           decoration: InputDecoration(
-            suffixIcon: _buildUnitSelectorInField(
-              options: ['cm', 'ft'],
-              selected: _heightUnit,
-              onChanged: (value) {
-                setState(() {
-                  final oldHeightUnit = _heightUnit;
-                  _heightUnit = value;
-                  _updateDisplayValuesForUnitChange(
-                    oldHeightUnit: oldHeightUnit,
-                  );
-                });
-              },
-              theme: theme,
-            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -671,139 +829,115 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.red),
             ),
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: isVerySmallScreen ? 12 : 16,
-              vertical: isVerySmallScreen ? 10 : 12,
-            ),
-            isDense: isVerySmallScreen,
+            contentPadding: AppDesignSystem.getNumericInputPadding(context),
           ),
         ),
-      ],
-    );
-  }
+      );
 
-  // Build height input in ft/in
-  Widget _buildHeightFtInInput(
-    SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
-  ) {
+      if (width != null) {
+        return SizedBox(width: width, child: field);
+      }
+      return Expanded(child: field);
+    }
+
+    Widget buildInchesField({double? width}) {
+      final field = ConstrainedBox(
+        constraints: AppDesignSystem.getNumericInputConstraints(context),
+        child: TextFormField(
+          key: ValueKey('height_inches_$_heightUnit'),
+          initialValue: _heightInches?.toString() ?? '',
+          onChanged: (value) {
+            setState(() {
+              _heightInches = double.tryParse(value);
+            });
+          },
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [InchesInputFormatter(maxDecimalPlaces: 2)],
+          validator: (value) {
+            if (_heightUnit == 'ft' && (value == null || value.isEmpty)) {
+              return 'Enter inches';
+            }
+            final n = double.tryParse(value ?? '');
+            if (n != null && (n < 0 || n >= 12)) {
+              return '0-11.99 in';
+            }
+            return null;
+          },
+          onSaved: (value) {
+            _heightInches = double.tryParse(value ?? '');
+          },
+          style: TextStyle(
+            fontSize: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 14,
+              sm: 16,
+              md: 16,
+            ),
+            color: Colors.black87,
+          ),
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: theme.primaryColor, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.red),
+            ),
+            contentPadding: AppDesignSystem.getNumericInputPadding(context),
+          ),
+        ),
+      );
+
+      if (width != null) {
+        return SizedBox(width: width, child: field);
+      }
+      return Expanded(child: field);
+    }
+
+    final horizontalSpacing = AppDesignSystem.getResponsiveSpacingExact(
+      context,
+      xs: isCompact ? 4 : 8,
+      sm: isCompact ? 6 : 10,
+      md: isCompact ? 8 : 12,
+    );
+
+    final compactFieldWidth = isCompact ? 72.0 : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Height',
           style: TextStyle(
-            fontSize: isVerySmallScreen ? 14 : (isSmallScreen ? 15 : 16),
+            fontSize: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 14,
+              sm: 15,
+              md: 16,
+            ),
             fontWeight: FontWeight.w600,
             color: theme.primaryColor,
           ),
         ),
-        SizedBox(height: isVerySmallScreen ? 6 : 8),
+        SizedBox(
+          height: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 6,
+            sm: 8,
+            md: 8,
+          ),
+        ),
         Row(
           children: [
-            Expanded(
-              child: TextFormField(
-                key: ValueKey('height_feet_${_heightUnit}'),
-                initialValue: _heightFeet?.toString() ?? '',
-                onChanged: (value) {
-                  setState(() {
-                    _heightFeet = int.tryParse(value);
-                  });
-                },
-                keyboardType: TextInputType.number,
-                inputFormatters: [FeetInputFormatter()],
-                validator: (value) {
-                  if (_heightUnit == 'ft' && (value == null || value.isEmpty)) {
-                    return 'Enter feet';
-                  }
-                  final n = int.tryParse(value ?? '');
-                  if (n != null && (n < 1 || n > 8)) {
-                    return '1-8 ft';
-                  }
-                  return null;
-                },
-                onSaved: (value) {
-                  _heightFeet = int.tryParse(value ?? '');
-                },
-                style: TextStyle(
-                  fontSize: isVerySmallScreen ? 14 : 16,
-                  color: Colors.black87,
-                ),
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: theme.primaryColor, width: 2),
-                  ),
-                  errorBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.red),
-                  ),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: isVerySmallScreen ? 12 : 16,
-                    vertical: isVerySmallScreen ? 10 : 12,
-                  ),
-                  isDense: isVerySmallScreen,
-                ),
-              ),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: TextFormField(
-                key: ValueKey('height_inches_${_heightUnit}'),
-                initialValue: _heightInches?.toString() ?? '',
-                onChanged: (value) {
-                  setState(() {
-                    _heightInches = double.tryParse(value);
-                  });
-                },
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: [InchesInputFormatter(maxDecimalPlaces: 2)],
-                validator: (value) {
-                  if (_heightUnit == 'ft' && (value == null || value.isEmpty)) {
-                    return 'Enter inches';
-                  }
-                  final n = double.tryParse(value ?? '');
-                  if (n != null && (n < 0 || n >= 12)) {
-                    return '0-11.99 in';
-                  }
-                  return null;
-                },
-                onSaved: (value) {
-                  _heightInches = double.tryParse(value ?? '');
-                },
-                style: TextStyle(
-                  fontSize: isVerySmallScreen ? 14 : 16,
-                  color: Colors.black87,
-                ),
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[300]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: theme.primaryColor, width: 2),
-                  ),
-                  errorBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.red),
-                  ),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: isVerySmallScreen ? 12 : 16,
-                    vertical: isVerySmallScreen ? 10 : 12,
-                  ),
-                  isDense: isVerySmallScreen,
-                ),
-              ),
-            ),
-            SizedBox(width: 8),
+            buildFeetField(width: compactFieldWidth),
+            SizedBox(width: horizontalSpacing),
+            buildInchesField(width: compactFieldWidth),
+            SizedBox(width: horizontalSpacing),
             _buildUnitSelectorInField(
               options: ['cm', 'ft'],
               selected: _heightUnit,
@@ -825,92 +959,103 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
   }
 
   // Build weight input
-  Widget _buildWeightInput(
-    SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
-  ) {
+  Widget _buildWeightInput(BuildContext context, SexSpecificTheme theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Weight',
           style: TextStyle(
-            fontSize: isVerySmallScreen ? 14 : (isSmallScreen ? 15 : 16),
+            fontSize: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 14, // < 600px
+              sm: 15, // 600-700px
+              md: 16, // > 700px
+            ),
             fontWeight: FontWeight.w600,
             color: theme.primaryColor,
           ),
         ),
-        SizedBox(height: isVerySmallScreen ? 6 : 8),
-        TextFormField(
-          key: ValueKey('weight_${_weightUnit}'),
-          initialValue: _weightDisplay?.toString() ?? '',
-          onChanged: (value) {
-            setState(() {
-              _weightDisplay = double.tryParse(value);
-            });
-          },
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [DecimalInputFormatter(maxDecimalPlaces: 1)],
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Enter weight';
-            }
-            final n = double.tryParse(value);
-            if (n == null) {
-              return 'Enter numbers only';
-            }
-            if (_weightUnit == 'kg') {
-              if (n < 20 || n > 300) {
-                return 'Valid weight (20-300 kg)';
-              }
-            } else {
-              // lbs
-              if (n < 44 || n > 661) {
-                return 'Valid weight (44-661 lbs)';
-              }
-            }
-            return null;
-          },
-          onSaved: (value) {
-            _weightDisplay = double.tryParse(value ?? '');
-          },
-          style: TextStyle(
-            fontSize: isVerySmallScreen ? 14 : 16,
-            color: Colors.black87,
+        SizedBox(
+          height: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 6, // < 600px
+            sm: 8, // 600-700px
+            md: 8, // > 700px
           ),
-          decoration: InputDecoration(
-            suffixIcon: _buildUnitSelectorInField(
-              options: ['kg', 'lbs'],
-              selected: _weightUnit,
-              onChanged: (value) {
-                setState(() {
-                  final oldWeightUnit = _weightUnit;
-                  _weightUnit = value;
-                  _updateDisplayValuesForUnitChange(
-                    oldWeightUnit: oldWeightUnit,
-                  );
-                });
-              },
-              theme: theme,
+        ),
+        ConstrainedBox(
+          constraints: AppDesignSystem.getNumericInputConstraints(context),
+          child: TextFormField(
+            key: ValueKey('weight_$_weightUnit'),
+            initialValue: _weightDisplay?.toString() ?? '',
+            onChanged: (value) {
+              setState(() {
+                _weightDisplay = double.tryParse(value);
+              });
+            },
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [DecimalInputFormatter(maxDecimalPlaces: 1)],
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Enter weight';
+              }
+              final n = double.tryParse(value);
+              if (n == null) {
+                return 'Enter numbers only';
+              }
+              if (_weightUnit == 'kg') {
+                if (n < 20 || n > 300) {
+                  return 'Valid weight (20-300 kg)';
+                }
+              } else {
+                if (n < 44 || n > 661) {
+                  return 'Valid weight (44-661 lbs)';
+                }
+              }
+              return null;
+            },
+            onSaved: (value) {
+              _weightDisplay = double.tryParse(value ?? '');
+            },
+            style: TextStyle(
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 14,
+                sm: 16,
+                md: 16,
+              ),
+              color: Colors.black87,
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+            decoration: InputDecoration(
+              suffixIcon: _buildUnitSelectorInField(
+                options: ['kg', 'lbs'],
+                selected: _weightUnit,
+                onChanged: (value) {
+                  setState(() {
+                    final oldWeightUnit = _weightUnit;
+                    _weightUnit = value;
+                    _updateDisplayValuesForUnitChange(
+                      oldWeightUnit: oldWeightUnit,
+                    );
+                  });
+                },
+                theme: theme,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: theme.primaryColor, width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.red),
+              ),
+              contentPadding: AppDesignSystem.getNumericInputPadding(context),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: theme.primaryColor, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.red),
-            ),
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: isVerySmallScreen ? 12 : 16,
-              vertical: isVerySmallScreen ? 10 : 12,
-            ),
-            isDense: isVerySmallScreen,
           ),
         ),
       ],
@@ -918,98 +1063,110 @@ class _EnhancedOnboardingPhysicalState extends State<EnhancedOnboardingPhysical>
   }
 
   // Build target weight input (uses same unit as weight)
-  Widget _buildTargetWeightInput(
-    SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
-  ) {
+  Widget _buildTargetWeightInput(BuildContext context, SexSpecificTheme theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Target Weight',
           style: TextStyle(
-            fontSize: isVerySmallScreen ? 14 : (isSmallScreen ? 15 : 16),
+            fontSize: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 14, // < 600px
+              sm: 15, // 600-700px
+              md: 16, // > 700px
+            ),
             fontWeight: FontWeight.w600,
             color: theme.primaryColor,
           ),
         ),
-        SizedBox(height: isVerySmallScreen ? 6 : 8),
-        TextFormField(
-          key: ValueKey('target_weight_${_weightUnit}'),
-          initialValue: _targetWeightDisplay?.toString() ?? '',
-          onChanged: (value) {
-            setState(() {
-              _targetWeightDisplay = double.tryParse(value);
-            });
-          },
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [DecimalInputFormatter(maxDecimalPlaces: 1)],
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Enter target weight';
-            }
-            final n = double.tryParse(value);
-            if (n == null) {
-              return 'Enter numbers only';
-            }
-            if (_weightUnit == 'kg') {
-              if (n < 20 || n > 300) {
-                return 'Valid weight (20-300 kg)';
-              }
-            } else {
-              // lbs
-              if (n < 44 || n > 661) {
-                return 'Valid weight (44-661 lbs)';
-              }
-            }
-            // Check if target is less than current weight for lose_weight goal
-            if (_weightDisplay != null) {
-              if (n >= _weightDisplay!) {
-                return 'Target must be less than current weight';
-              }
-            }
-            return null;
-          },
-          onSaved: (value) {
-            _targetWeightDisplay = double.tryParse(value ?? '');
-          },
-          style: TextStyle(
-            fontSize: isVerySmallScreen ? 14 : 16,
-            color: Colors.black87,
+        SizedBox(
+          height: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 6, // < 600px
+            sm: 8, // 600-700px
+            md: 8, // > 700px
           ),
-          decoration: InputDecoration(
-            suffixIcon: _buildUnitSelectorInField(
-              options: ['kg', 'lbs'],
-              selected: _weightUnit,
-              onChanged: (value) {
-                setState(() {
-                  final oldWeightUnit = _weightUnit;
-                  _weightUnit = value;
-                  _updateDisplayValuesForUnitChange(
-                    oldWeightUnit: oldWeightUnit,
-                  );
-                });
-              },
-              theme: theme,
+        ),
+        ConstrainedBox(
+          constraints: AppDesignSystem.getNumericInputConstraints(context),
+          child: TextFormField(
+            key: ValueKey('target_weight_$_weightUnit'),
+            initialValue: _targetWeightDisplay?.toString() ?? '',
+            onChanged: (value) {
+              setState(() {
+                _targetWeightDisplay = double.tryParse(value);
+              });
+            },
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [DecimalInputFormatter(maxDecimalPlaces: 1)],
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Enter target weight';
+              }
+              final n = double.tryParse(value);
+              if (n == null) {
+                return 'Enter numbers only';
+              }
+              if (_weightUnit == 'kg') {
+                if (n < 20 || n > 300) {
+                  return 'Valid weight (20-300 kg)';
+                }
+              } else {
+                // lbs
+                if (n < 44 || n > 661) {
+                  return 'Valid weight (44-661 lbs)';
+                }
+              }
+              // Check if target is less than current weight for lose_weight goal
+              if (_weightDisplay != null) {
+                if (n >= _weightDisplay!) {
+                  return 'Target must be less than current weight';
+                }
+              }
+              return null;
+            },
+            onSaved: (value) {
+              _targetWeightDisplay = double.tryParse(value ?? '');
+            },
+            style: TextStyle(
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 14, // < 600px
+                sm: 16, // 600-700px
+                md: 16, // > 700px
+              ),
+              color: Colors.black87,
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+            decoration: InputDecoration(
+              suffixIcon: _buildUnitSelectorInField(
+                options: ['kg', 'lbs'],
+                selected: _weightUnit,
+                onChanged: (value) {
+                  setState(() {
+                    final oldWeightUnit = _weightUnit;
+                    _weightUnit = value;
+                    _updateDisplayValuesForUnitChange(
+                      oldWeightUnit: oldWeightUnit,
+                    );
+                  });
+                },
+                theme: theme,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: theme.primaryColor, width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.red),
+              ),
+              contentPadding: AppDesignSystem.getNumericInputPadding(context),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: theme.primaryColor, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.red),
-            ),
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: isVerySmallScreen ? 12 : 16,
-              vertical: isVerySmallScreen ? 10 : 12,
-            ),
-            isDense: isVerySmallScreen,
           ),
         ),
       ],

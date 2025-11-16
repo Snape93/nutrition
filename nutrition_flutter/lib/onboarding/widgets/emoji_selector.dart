@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../design_system/app_design_system.dart';
 
 class EmojiOption {
   final String emoji;
@@ -119,17 +120,29 @@ class _EmojiSelectorState extends State<EmojiSelector>
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isSmallScreen = screenHeight < 700;
+    final sectionSpacing = AppDesignSystem.getResponsiveSpacingExact(
+      context,
+      xs: 8,
+      sm: 12,
+      md: 16,
+    );
+    final gridSpacing = AppDesignSystem.getResponsiveSpacingExact(
+      context,
+      xs: 8,
+      sm: 10,
+      md: 12,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title section
         Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: isSmallScreen ? 4 : 8,
+          padding: AppDesignSystem.getResponsivePaddingExact(
+            context,
+            xs: 8,
+            sm: 10,
+            md: 12,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,17 +150,34 @@ class _EmojiSelectorState extends State<EmojiSelector>
               Text(
                 widget.title,
                 style: TextStyle(
-                  fontSize: isSmallScreen ? 18 : 22,
+                  fontSize: AppDesignSystem.getResponsiveFontSize(
+                    context,
+                    xs: 18,
+                    sm: 20,
+                    md: 22,
+                  ),
                   fontWeight: FontWeight.bold,
                   color: widget.primaryColor,
                 ),
               ),
               if (widget.subtitle != null) ...[
-                SizedBox(height: isSmallScreen ? 2 : 4),
+                SizedBox(
+                  height: AppDesignSystem.getResponsiveSpacingExact(
+                    context,
+                    xs: 2,
+                    sm: 3,
+                    md: 4,
+                  ),
+                ),
                 Text(
                   widget.subtitle!,
                   style: TextStyle(
-                    fontSize: isSmallScreen ? 14 : 16,
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 12,
+                      sm: 14,
+                      md: 16,
+                    ),
                     color: Colors.grey[600],
                   ),
                 ),
@@ -156,19 +186,24 @@ class _EmojiSelectorState extends State<EmojiSelector>
           ),
         ),
 
-        SizedBox(height: isSmallScreen ? 8 : 16),
+        SizedBox(height: sectionSpacing),
 
         // Emoji grid - more compact
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: AppDesignSystem.getResponsivePaddingExact(
+            context,
+            xs: 8,
+            sm: 12,
+            md: 16,
+          ),
           child: GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: widget.options.length > 4 ? 3 : 2,
-              crossAxisSpacing: isSmallScreen ? 8 : 12,
-              mainAxisSpacing: isSmallScreen ? 8 : 12,
-              childAspectRatio: isSmallScreen ? 1.1 : 1.1,
+              crossAxisSpacing: gridSpacing,
+              mainAxisSpacing: gridSpacing,
+              childAspectRatio: 1.1,
             ),
             itemCount: widget.options.length,
             itemBuilder: (context, index) {
@@ -185,7 +220,6 @@ class _EmojiSelectorState extends State<EmojiSelector>
                       isSelected: isSelected,
                       onTap: () => _onTap(option.value),
                       primaryColor: widget.primaryColor,
-                      isSmallScreen: isSmallScreen,
                     ),
                   );
                 },
@@ -196,23 +230,24 @@ class _EmojiSelectorState extends State<EmojiSelector>
 
         // Selected description
         if (widget.selectedValue != null && !widget.allowMultipleSelection) ...[
-          SizedBox(height: isSmallScreen ? 8 : 16),
+          SizedBox(height: sectionSpacing),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
-            child: _buildSelectedDescription(isSmallScreen),
+            child: _buildSelectedDescription(context),
           ),
         ],
 
         if (widget.allowMultipleSelection &&
             (widget.selectedValues?.isNotEmpty ?? false)) ...[
-          SizedBox(height: isSmallScreen ? 8 : 16),
-          _buildMultipleSelectionSummary(isSmallScreen),
+          SizedBox(height: sectionSpacing),
+          _buildMultipleSelectionSummary(context),
         ],
       ],
     );
   }
 
-  Widget _buildSelectedDescription(bool isSmallScreen) {
+  Widget _buildSelectedDescription(BuildContext context) {
+    final isSmallScreen = AppDesignSystem.getScreenHeight(context) < 700;
     final selectedOption = widget.options.firstWhere(
       (option) => option.value == widget.selectedValue,
       orElse: () => widget.options.first,
@@ -220,8 +255,18 @@ class _EmojiSelectorState extends State<EmojiSelector>
 
     return Container(
       key: ValueKey(selectedOption.value),
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+      margin: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 8,
+        sm: 10,
+        md: 16,
+      ),
+      padding: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 12,
+        sm: 14,
+        md: 16,
+      ),
       decoration: BoxDecoration(
         color: widget.primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
@@ -231,9 +276,23 @@ class _EmojiSelectorState extends State<EmojiSelector>
         children: [
           Text(
             selectedOption.emoji,
-            style: TextStyle(fontSize: isSmallScreen ? 20 : 24),
+            style: TextStyle(
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 20,
+                sm: 22,
+                md: 24,
+              ),
+            ),
           ),
-          SizedBox(width: isSmallScreen ? 8 : 12),
+          SizedBox(
+            width: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 8,
+              sm: 10,
+              md: 12,
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,16 +300,33 @@ class _EmojiSelectorState extends State<EmojiSelector>
                 Text(
                   selectedOption.label,
                   style: TextStyle(
-                    fontSize: isSmallScreen ? 14 : 16,
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 14,
+                      sm: 15,
+                      md: 16,
+                    ),
                     fontWeight: FontWeight.bold,
                     color: widget.primaryColor,
                   ),
                 ),
-                SizedBox(height: isSmallScreen ? 2 : 4),
+                SizedBox(
+                  height: AppDesignSystem.getResponsiveSpacingExact(
+                    context,
+                    xs: 2,
+                    sm: 3,
+                    md: 4,
+                  ),
+                ),
                 Text(
                   selectedOption.description,
                   style: TextStyle(
-                    fontSize: isSmallScreen ? 12 : 14,
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 12,
+                      sm: 13,
+                      md: 14,
+                    ),
                     color: Colors.grey[700],
                   ),
                   maxLines: isSmallScreen ? 2 : 3,
@@ -264,18 +340,26 @@ class _EmojiSelectorState extends State<EmojiSelector>
     );
   }
 
-  Widget _buildMultipleSelectionSummary(bool isSmallScreen) {
-    final selectedOptions =
-        widget.options
-            .where(
-              (option) =>
-                  widget.selectedValues?.contains(option.value) ?? false,
-            )
-            .toList();
+  Widget _buildMultipleSelectionSummary(BuildContext context) {
+    final selectedOptions = widget.options
+        .where((option) => widget.selectedValues?.contains(option.value) ?? false)
+        .toList();
+
+    if (selectedOptions.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+      margin: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 8,
+        sm: 10,
+        md: 16,
+      ),
+      padding: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 12,
+        sm: 14,
+        md: 16,
+      ),
       decoration: BoxDecoration(
         color: widget.primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
@@ -287,34 +371,69 @@ class _EmojiSelectorState extends State<EmojiSelector>
           Text(
             'Selected: ${selectedOptions.length} item${selectedOptions.length != 1 ? 's' : ''}',
             style: TextStyle(
-              fontSize: isSmallScreen ? 14 : 16,
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 14,
+                sm: 15,
+                md: 16,
+              ),
               fontWeight: FontWeight.bold,
               color: widget.primaryColor,
             ),
           ),
-          SizedBox(height: isSmallScreen ? 6 : 8),
+          SizedBox(
+            height: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 6,
+              sm: 6,
+              md: 8,
+            ),
+          ),
           Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children:
-                selectedOptions.map((option) {
-                  return Chip(
-                    avatar: Text(
-                      option.emoji,
-                      style: TextStyle(fontSize: isSmallScreen ? 12 : 14),
+            spacing: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 6,
+              sm: 6,
+              md: 8,
+            ),
+            runSpacing: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 4,
+              sm: 4,
+              md: 6,
+            ),
+            children: selectedOptions.map((option) {
+              return Chip(
+                avatar: Text(
+                  option.emoji,
+                  style: TextStyle(
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 12,
+                      sm: 13,
+                      md: 14,
                     ),
-                    label: Text(
-                      option.label,
-                      style: TextStyle(fontSize: isSmallScreen ? 11 : 12),
+                  ),
+                ),
+                label: Text(
+                  option.label,
+                  style: TextStyle(
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 11,
+                      sm: 12,
+                      md: 12,
                     ),
-                    backgroundColor: widget.primaryColor.withValues(alpha: 0.1),
-                    side: BorderSide(
-                      color: widget.primaryColor.withValues(alpha: 0.3),
-                    ),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
-                  );
-                }).toList(),
+                  ),
+                ),
+                backgroundColor: widget.primaryColor.withValues(alpha: 0.1),
+                side: BorderSide(
+                  color: widget.primaryColor.withValues(alpha: 0.3),
+                ),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -327,7 +446,6 @@ class EmojiOptionCard extends StatefulWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final Color primaryColor;
-  final bool isSmallScreen;
 
   const EmojiOptionCard({
     super.key,
@@ -335,7 +453,6 @@ class EmojiOptionCard extends StatefulWidget {
     required this.isSelected,
     required this.onTap,
     required this.primaryColor,
-    required this.isSmallScreen,
   });
 
   @override
@@ -383,6 +500,31 @@ class _EmojiOptionCardState extends State<EmojiOptionCard>
 
   @override
   Widget build(BuildContext context) {
+    final padding = AppDesignSystem.getResponsiveSpacingExact(
+      context,
+      xs: 6,
+      sm: 8,
+      md: 12,
+    );
+    final emojiContainerSize = AppDesignSystem.getResponsiveSpacingExact(
+      context,
+      xs: 36,
+      sm: 44,
+      md: 50,
+    );
+    final emojiFontSize = AppDesignSystem.getResponsiveFontSize(
+      context,
+      xs: 18,
+      sm: 22,
+      md: 26,
+    );
+    final labelFontSize = AppDesignSystem.getResponsiveFontSize(
+      context,
+      xs: 10,
+      sm: 12,
+      md: 14,
+    );
+
     return AnimatedBuilder(
       animation: _scaleAnimation,
       builder: (context, child) {
@@ -420,17 +562,16 @@ class _EmojiOptionCardState extends State<EmojiOptionCard>
                 ],
               ),
               child: Padding(
-                padding: EdgeInsets.all(widget.isSmallScreen ? 6 : 12),
+                padding: EdgeInsets.all(padding),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Emoji with animation
                     Flexible(
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        width: widget.isSmallScreen ? 36 : 50,
-                        height: widget.isSmallScreen ? 36 : 50,
+                        width: emojiContainerSize,
+                        height: emojiContainerSize,
                         decoration: BoxDecoration(
                           color:
                               widget.isSelected
@@ -444,21 +585,25 @@ class _EmojiOptionCardState extends State<EmojiOptionCard>
                             style: TextStyle(
                               fontSize:
                                   widget.isSelected
-                                      ? (widget.isSmallScreen ? 20 : 28)
-                                      : (widget.isSmallScreen ? 18 : 24),
+                                      ? emojiFontSize + 2
+                                      : emojiFontSize,
                             ),
                           ),
                         ),
                       ),
                     ),
-
-                    SizedBox(height: widget.isSmallScreen ? 2 : 6),
-
-                    // Label
+                    SizedBox(
+                      height: AppDesignSystem.getResponsiveSpacingExact(
+                        context,
+                        xs: 2,
+                        sm: 4,
+                        md: 6,
+                      ),
+                    ),
                     Text(
                       widget.option.label,
                       style: TextStyle(
-                        fontSize: widget.isSmallScreen ? 10 : 14,
+                        fontSize: labelFontSize,
                         fontWeight:
                             widget.isSelected
                                 ? FontWeight.bold
@@ -472,13 +617,28 @@ class _EmojiOptionCardState extends State<EmojiOptionCard>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-
-                    // Selection indicator
                     if (widget.isSelected) ...[
-                      SizedBox(height: widget.isSmallScreen ? 1 : 4),
+                      SizedBox(
+                        height: AppDesignSystem.getResponsiveSpacingExact(
+                          context,
+                          xs: 1,
+                          sm: 2,
+                          md: 4,
+                        ),
+                      ),
                       Container(
-                        width: widget.isSmallScreen ? 3 : 6,
-                        height: widget.isSmallScreen ? 3 : 6,
+                        width: AppDesignSystem.getResponsiveSpacingExact(
+                          context,
+                          xs: 3,
+                          sm: 4,
+                          md: 6,
+                        ),
+                        height: AppDesignSystem.getResponsiveSpacingExact(
+                          context,
+                          xs: 3,
+                          sm: 4,
+                          md: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: widget.primaryColor,
                           shape: BoxShape.circle,
@@ -703,3 +863,4 @@ class EmojiOptions {
     ];
   }
 }
+

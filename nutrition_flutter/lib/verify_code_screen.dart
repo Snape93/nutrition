@@ -468,7 +468,7 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           filled: true,
-                                          fillColor: Colors.grey[50],
+                                          fillColor: Colors.white,
                                         ),
                                       )
                                     : Text(
@@ -584,9 +584,11 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 8,
+                              color: Colors.black,
                             ),
                             decoration: InputDecoration(
                               labelText: 'Verification Code',
+                              labelStyle: const TextStyle(color: Colors.black),
                               hintText: '000000',
                               prefixIcon: const Icon(
                                 Icons.lock_outline,
@@ -596,7 +598,7 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               filled: true,
-                              fillColor: Colors.grey[50],
+                              fillColor: Colors.white,
                               counterText: '',
                             ),
                             onChanged: (value) {

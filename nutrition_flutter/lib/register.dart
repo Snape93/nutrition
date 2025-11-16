@@ -22,7 +22,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
-  final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _birthdayController = TextEditingController();
   final String _message = '';
   bool _isLoading = false;
@@ -45,11 +44,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (password.isEmpty) {
       return {'label': '', 'color': Colors.red};
     }
+    
+    // Always calculate strength for non-empty passwords
     final hasMinLength = password.length >= 8;
     final hasUpper = password.contains(RegExp(r'[A-Z]'));
     final hasLower = password.contains(RegExp(r'[a-z]'));
     final hasDigit = password.contains(RegExp(r'[0-9]'));
     final hasSpecial = password.contains(RegExp(r'[!@#\$&*~]'));
+    
+    // Core requirements: length, uppercase, number (special is optional)
+    final coreRequirementsMet = [
+      hasMinLength,
+      hasUpper,
+      hasDigit,
+    ].where((b) => b).length;
+    
     int score =
         [
           hasMinLength,
@@ -58,11 +67,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
           hasDigit,
           hasSpecial,
         ].where((b) => b).length;
-    if (score <= 2) {
+    
+    // Weak: less than 3 core requirements OR score <= 2
+    // Note: Special character is not required for medium strength
+    if (coreRequirementsMet < 3 || score <= 2) {
       return {'label': 'Weak', 'color': Colors.red};
-    } else if (score == 3 || score == 4) {
+    } 
+    // Medium: has length, uppercase, and number (score >= 3)
+    // Can be medium even without special character
+    else if (score == 3 || score == 4) {
       return {'label': 'Medium', 'color': Colors.orange};
-    } else {
+    } 
+    // Strong: all 5 requirements met (score == 5)
+    else {
       return {'label': 'Strong', 'color': Colors.green};
     }
   }
@@ -117,10 +134,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'username': _usernameController.text,
           'email': _emailController.text,
           'password': _passwordController.text,
-          'full_name':
-              _fullNameController.text.isEmpty
-                  ? null
-                  : _fullNameController.text,
           'age': age,
         };
 
@@ -328,7 +341,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _fullNameController.dispose();
     _birthdayController.dispose();
     super.dispose();
   }
@@ -380,6 +392,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 fontWeight: FontWeight.bold,
                                 color: const Color(0xFF388E3C),
                               ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Join us and start your healthy journey',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 24),
                             TextFormField(
@@ -479,9 +500,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 if (value.length < 8) {
                                   return 'Password must be at least 8 characters';
                                 }
+                                // Check password strength - reject only weak passwords
+                                final strength = _calculatePasswordStrength(value);
+                                if (strength['label'] == 'Weak') {
+                                  return 'Password is too weak. Please use at least 8 characters, 1 uppercase letter, and 1 number.';
+                                }
                                 return null;
                               },
-                              onChanged: _onPasswordChanged,
+                              onChanged: (value) {
+                                _onPasswordChanged(value);
+                                setState(() {}); // Force rebuild to update strength indicator
+                              },
                             ),
                             if (_passwordController.text.isNotEmpty)
                               Padding(
@@ -549,9 +578,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 filled: true,
-                                fillColor: const Color(
-                                  0xFFF0F8F4,
-                                ), // subtle greenish background
+                                fillColor: Colors.grey[50],
                               ),
                               obscureText: !_showConfirmPassword,
                               validator: (value) {
@@ -563,23 +590,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 }
                                 return null;
                               },
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              key: const Key('registerFullNameField'),
-                              controller: _fullNameController,
-                              decoration: InputDecoration(
-                                labelText: 'Full Name',
-                                prefixIcon: const Icon(
-                                  Icons.badge_outlined,
-                                  color: Color(0xFF4CAF50),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey[50],
-                              ),
                             ),
                             const SizedBox(height: 16),
                             TextFormField(

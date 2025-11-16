@@ -14,15 +14,18 @@ import 'screens/your_exercise_screen.dart';
 import 'connect_platforms.dart'; // Added import for ConnectPlatformsScreen
 import 'services/health_service.dart'; // Added import for HealthService
 import 'services/remaining_service.dart';
+import 'services/ai_coach_service.dart';
 import 'widgets/add_options_sheet.dart';
 import 'screens/custom_meals_screen.dart';
+import 'screens/ai_coach_chat_screen.dart';
 import 'services/progress_data_service.dart';
 import 'models/graph_models.dart';
 // Removed graph-related imports to prevent paused exceptions
 
 class HomePage extends StatefulWidget {
   final String usernameOrEmail;
-  const HomePage({super.key, required this.usernameOrEmail});
+  final String? initialUserSex; // Allow passing initial userSex to avoid green flash
+  const HomePage({super.key, required this.usernameOrEmail, this.initialUserSex});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -31,6 +34,8 @@ class HomePage extends StatefulWidget {
 const Color kUserIconGray = Color(0xFF5A5A5A); // extracted from the image
 
 class _HomePageState extends State<HomePage> with RouteAware {
+  static const bool _showManualHealthCard = false;
+  static const bool _showHealthIntegrationCard = false;
   int _selectedIndex = 0;
   String? userSex;
 
@@ -46,6 +51,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
   int waterIntake = 0; // in milliliters
   int dailyWaterGoal = 2000; // 2 liters default goal
 
+  // AI Coach loading states - prevent multiple popups
+  bool _isLoadingSummary = false;
+  bool _isLoadingWhatToEat = false;
+  String? _openModalType; // Track which modal is open: 'summary', 'whatToEat', or null
+
   // Removed graph system state to prevent paused exceptions
 
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
@@ -56,6 +66,10 @@ class _HomePageState extends State<HomePage> with RouteAware {
   @override
   void initState() {
     super.initState();
+    // Set initial userSex if provided to avoid green flash during transition
+    if (widget.initialUserSex != null) {
+      userSex = widget.initialUserSex;
+    }
     _loadAllData();
     _loadRecentFoods();
     _loadWeeklyCalories();
@@ -160,7 +174,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
     );
     if (!mounted) return;
     setState(() {
-      userSex = sex;
+      // Only update if we don't have initialUserSex or if database has a value
+      // This prevents overwriting the correct initial value
+      if (widget.initialUserSex == null || sex != null) {
+        userSex = sex ?? widget.initialUserSex;
+      }
     });
     debugPrint('DEBUG: Set userSex to: $userSex');
   }
@@ -226,8 +244,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
     // The old chart system has been replaced with the professional graph system
   }
 
-  Color get primaryColor => ThemeService.getPrimaryColor(userSex);
-  Color get backgroundColor => ThemeService.getBackgroundColor(userSex);
+  Color get primaryColor => ThemeService.getPrimaryColor(widget.initialUserSex ?? userSex);
+  Color get backgroundColor => ThemeService.getBackgroundColor(widget.initialUserSex ?? userSex);
 
   // Add this method to support pull-to-refresh
   Future<void> _refreshDashboard() async {
@@ -489,6 +507,17 @@ class _HomePageState extends State<HomePage> with RouteAware {
                               color: primaryColor,
                             ),
                           ),
+                          GestureDetector(
+                            onTap: () => _showCalorieHelpDialog(context),
+                            child: Container(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                Icons.help_outline,
+                                size: isVerySmallScreen ? 18 : 20,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       SizedBox(height: isVerySmallScreen ? 16 : 20),
@@ -578,274 +607,362 @@ class _HomePageState extends State<HomePage> with RouteAware {
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              // Personalized Tips Card
-              SizedBox(height: isVerySmallScreen ? 12 : 18),
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                color: Colors.lightGreen[100],
-                child: Padding(
-                  padding: EdgeInsets.all(isVerySmallScreen ? 12 : 16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.emoji_emotions,
-                        color: Colors.green[600],
-                        size: isVerySmallScreen ? 22 : 28,
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _motivationalMessage,
-                          style: TextStyle(
-                            fontSize: isVerySmallScreen ? 14 : 16,
-                            color: Colors.green[700],
-                            fontWeight: FontWeight.w500,
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Manual Health Data Input Card
-              SizedBox(height: isVerySmallScreen ? 12 : 18),
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                color: Colors.white,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(isVerySmallScreen ? 12 : 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildHealthDataButton(
-                                icon: Icons.directions_walk,
-                                label: 'Steps',
-                                value: '0',
-                                color: Colors.blue,
-                                isVerySmallScreen: isVerySmallScreen,
+                      // Visual Breakdown Table
+                      Builder(
+                        builder: (context) {
+                          final remaining =
+                              baseGoal - foodCalories + exerciseCalories;
+                          return Column(
+                            children: [
+                              SizedBox(height: isVerySmallScreen ? 16 : 20),
+                              Container(
+                                padding: EdgeInsets.all(
+                                  isVerySmallScreen ? 12 : 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.grey[200]!,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Daily Calorie Balance',
+                                      style: TextStyle(
+                                        fontSize: isVerySmallScreen ? 13 : 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey[800],
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      height: isVerySmallScreen ? 8 : 12,
+                                    ),
+                                    _buildBreakdownRow(
+                                      label: 'Target Goal',
+                                      value: '+$baseGoal',
+                                      color: primaryColor,
+                                      isVerySmallScreen: isVerySmallScreen,
+                                    ),
+                                    SizedBox(height: 4),
+                                    _buildBreakdownRow(
+                                      label: 'Food Consumed',
+                                      value: '-$foodCalories',
+                                      color: Colors.lightBlueAccent,
+                                      isVerySmallScreen: isVerySmallScreen,
+                                    ),
+                                    SizedBox(height: 4),
+                                    _buildBreakdownRow(
+                                      label: 'Exercise Burned',
+                                      value: '+$exerciseCalories',
+                                      color: Colors.orangeAccent,
+                                      isVerySmallScreen: isVerySmallScreen,
+                                    ),
+                                    Divider(
+                                      height: isVerySmallScreen ? 16 : 20,
+                                    ),
+                                    _buildBreakdownRow(
+                                      label: 'Remaining',
+                                      value: '${remaining.toInt()}',
+                                      color:
+                                          remaining >= 0
+                                              ? primaryColor
+                                              : Colors.grey,
+                                      isVerySmallScreen: isVerySmallScreen,
+                                      isBold: true,
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: _buildHealthDataButton(
-                                icon: Icons.favorite,
-                                label: 'Heart Rate',
-                                value: '0',
-                                color: Colors.red,
-                                isVerySmallScreen: isVerySmallScreen,
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildHealthDataButton(
-                                icon: Icons.bedtime,
-                                label: 'Sleep',
-                                value: '0h',
-                                color: Colors.purple,
-                                isVerySmallScreen: isVerySmallScreen,
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: _buildHealthDataButton(
-                                icon: Icons.water_drop,
-                                label: 'Water',
-                                value: '${waterIntake}ml',
-                                color: Colors.blue,
-                                isVerySmallScreen: isVerySmallScreen,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Replace the Connect Platforms card in the Home tab with an enhanced version
-              // Find the section in the Home tab (default) where the Connect Platforms card is built
-              // Replace it with the following:
-              // Modern Connect Platforms Preview Card
-              SizedBox(height: isVerySmallScreen ? 16 : 24),
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.white,
-                        primaryColor.withValues(alpha: 0.02),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(isVerySmallScreen ? 20 : 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: primaryColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Icon(
-                                Icons.link,
-                                color: primaryColor,
-                                size: 24,
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Health Platform Integration',
-                                    style: TextStyle(
-                                      fontSize: isVerySmallScreen ? 18 : 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[800],
+                              // Contextual message when exercise is logged
+                              if (exerciseCalories > 0) ...[
+                                SizedBox(height: isVerySmallScreen ? 12 : 16),
+                                Container(
+                                  padding: EdgeInsets.all(
+                                    isVerySmallScreen ? 10 : 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange[50],
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: Colors.orange[200]!,
+                                      width: 1,
                                     ),
                                   ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.lightbulb_outline,
+                                        size: isVerySmallScreen ? 16 : 18,
+                                        color: Colors.orange[700],
+                                      ),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          exerciseCalories >= baseGoal * 0.5
+                                              ? 'Amazing workout! You burned $exerciseCalories calories. You can eat $exerciseCalories more calories today to fuel your recovery and stay on track! 💪'
+                                              : 'Great workout! You burned $exerciseCalories calories. You can eat $exerciseCalories more calories today and still meet your goal! 💪',
+                                          style: TextStyle(
+                                            fontSize:
+                                                isVerySmallScreen ? 12 : 13,
+                                            color: Colors.orange[900],
+                                            height: 1.3,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // AI Coach preview card
+              SizedBox(height: isVerySmallScreen ? 12 : 18),
+              _buildAiCoachCard(
+                isVerySmallScreen: isVerySmallScreen,
+                isNarrowScreen: isNarrowScreen,
+              ),
+              if (_showManualHealthCard) ...[
+                SizedBox(height: isVerySmallScreen ? 12 : 18),
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  color: Colors.white,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(isVerySmallScreen ? 12 : 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildHealthDataButton(
+                                  icon: Icons.directions_walk,
+                                  label: 'Steps',
+                                  value: '0',
+                                  color: Colors.blue,
+                                  isVerySmallScreen: isVerySmallScreen,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: _buildHealthDataButton(
+                                  icon: Icons.favorite,
+                                  label: 'Heart Rate',
+                                  value: '0',
+                                  color: Colors.red,
+                                  isVerySmallScreen: isVerySmallScreen,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildHealthDataButton(
+                                  icon: Icons.bedtime,
+                                  label: 'Sleep',
+                                  value: '0h',
+                                  color: Colors.purple,
+                                  isVerySmallScreen: isVerySmallScreen,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: _buildHealthDataButton(
+                                  icon: Icons.water_drop,
+                                  label: 'Water',
+                                  value: '${waterIntake}ml',
+                                  color: Colors.blue,
+                                  isVerySmallScreen: isVerySmallScreen,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              if (_showHealthIntegrationCard) ...[
+                SizedBox(height: isVerySmallScreen ? 16 : 24),
+                Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white,
+                          primaryColor.withValues(alpha: 0.02),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(isVerySmallScreen ? 20 : 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Icon(
+                                  Icons.link,
+                                  color: primaryColor,
+                                  size: 24,
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Health Platform Integration',
+                                      style: TextStyle(
+                                        fontSize: isVerySmallScreen ? 18 : 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[800],
+                                      ),
+                                    ),
+                                    Text(
+                                      'Connect Google Fit or Health Connect',
+                                      style: TextStyle(
+                                        fontSize: isVerySmallScreen ? 12 : 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'FREE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: isVerySmallScreen ? 16 : 20),
+                          Text(
+                            'Seamlessly sync your health data from Google Fit or Health Connect to automatically track your fitness progress and maintain accurate calorie calculations.',
+                            style: TextStyle(
+                              fontSize: isVerySmallScreen ? 13 : 15,
+                              color: Colors.grey[700],
+                              height: 1.4,
+                            ),
+                          ),
+                          SizedBox(height: isVerySmallScreen ? 16 : 20),
+                          // Enhanced Platform Preview Row - Fixed Overflow
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _ModernPlatformPreview(
+                                  name: 'Health Connect',
+                                  icon: Icons.health_and_safety,
+                                  color: Color(0xFF4285F4),
+                                  recommended: true,
+                                ),
+                                SizedBox(width: 12),
+                                _ModernPlatformPreview(
+                                  name: 'Google Fit',
+                                  icon: Icons.fitness_center,
+                                  color: Color(0xFF0F9D58),
+                                  recommended: false,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: isVerySmallScreen ? 20 : 24),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                // Navigate to Connect Platforms Screen
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) =>
+                                            const ConnectPlatformsScreen(),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primaryColor,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.settings, size: 18),
+                                  SizedBox(width: 8),
                                   Text(
-                                    'Connect Google Fit or Health Connect',
+                                    'Manage Connections',
                                     style: TextStyle(
-                                      fontSize: isVerySmallScreen ? 12 : 14,
-                                      color: Colors.grey[600],
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                'FREE',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.orange,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: isVerySmallScreen ? 16 : 20),
-                        Text(
-                          'Seamlessly sync your health data from Google Fit or Health Connect to automatically track your fitness progress and maintain accurate calorie calculations.',
-                          style: TextStyle(
-                            fontSize: isVerySmallScreen ? 13 : 15,
-                            color: Colors.grey[700],
-                            height: 1.4,
                           ),
-                        ),
-                        SizedBox(height: isVerySmallScreen ? 16 : 20),
-                        // Enhanced Platform Preview Row - Fixed Overflow
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _ModernPlatformPreview(
-                                name: 'Health Connect',
-                                icon: Icons.health_and_safety,
-                                color: Color(0xFF4285F4),
-                                recommended: true,
-                              ),
-                              SizedBox(width: 12),
-                              _ModernPlatformPreview(
-                                name: 'Google Fit',
-                                icon: Icons.fitness_center,
-                                color: Color(0xFF0F9D58),
-                                recommended: false,
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: isVerySmallScreen ? 20 : 24),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Navigate to Connect Platforms Screen
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) =>
-                                          const ConnectPlatformsScreen(),
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.settings, size: 18),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Manage Connections',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -1056,17 +1173,875 @@ class _HomePageState extends State<HomePage> with RouteAware {
     );
   }
 
-  String get _motivationalMessage {
-    final percent = baseGoal > 0 ? foodCalories / baseGoal : 0;
-    if (percent < 0.3) {
-      return "Great start! Logging early helps you stay on track.";
-    } else if (percent < 0.7) {
-      return "You're halfway there! Keep it up!";
-    } else if (percent < 1.0) {
-      return "Almost done! Stay mindful of your choices.";
-    } else {
-      return "Awesome! You've reached your goal today.";
+
+  Future<void> _showAiDailySummary() async {
+    // Prevent multiple simultaneous requests
+    if (_isLoadingSummary || _openModalType == 'summary') {
+      return;
     }
+
+    setState(() {
+      _isLoadingSummary = true;
+      _openModalType = 'summary';
+    });
+
+    // Show loading modal immediately
+    if (!mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false, // Prevent dismissing during loading
+      enableDrag: false, // Prevent dragging during loading
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.psychology, color: primaryColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      "Today's AI summary",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      setState(() {
+                        _isLoadingSummary = false;
+                        _openModalType = null;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 40),
+              Center(
+                child: CircularProgressIndicator(
+                  color: primaryColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Generating your summary...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        );
+      },
+    );
+
+    try {
+      final data = await AiCoachService.getDailySummary(
+        usernameOrEmail: widget.usernameOrEmail,
+      );
+
+      // Close loading modal
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) {
+        setState(() {
+          _isLoadingSummary = false;
+          _openModalType = null;
+        });
+        return;
+      }
+
+      final summaryText = (data['summaryText'] ?? '') as String;
+      final tipsRaw = data['tips'] as List<dynamic>? ?? const [];
+      final tips = tipsRaw.map((e) => e.toString()).toList();
+
+      // Show results modal
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (context) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.psychology, color: primaryColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "Today's AI summary",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          _isLoadingSummary = false;
+                          _openModalType = null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  summaryText.isNotEmpty
+                      ? summaryText
+                      : 'This is a preview of the AI Coach summary.',
+                  style: const TextStyle(fontSize: 14, height: 1.4),
+                ),
+                if (tips.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Tips',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  ...tips.map(
+                    (tip) => Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '• ',
+                          style: TextStyle(fontSize: 14, height: 1.4),
+                        ),
+                        Expanded(
+                          child: Text(
+                            tip,
+                            style: const TextStyle(fontSize: 14, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ).then((_) {
+        // Reset state when modal is closed
+        if (mounted) {
+          setState(() {
+            _isLoadingSummary = false;
+            _openModalType = null;
+          });
+        }
+      });
+    } catch (e) {
+      // Close loading modal if still open
+      if (mounted && _openModalType == 'summary') {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) {
+        setState(() {
+          _isLoadingSummary = false;
+          _openModalType = null;
+        });
+        return;
+      }
+
+      // Show error modal
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (context) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.error_outline, color: Colors.red),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        "Error",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          _isLoadingSummary = false;
+                          _openModalType = null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Could not load AI summary. Please try again.',
+                  style: const TextStyle(fontSize: 14, height: 1.4),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      setState(() {
+                        _isLoadingSummary = false;
+                        _openModalType = null;
+                      });
+                      _showAiDailySummary(); // Retry
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Retry'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        },
+      ).then((_) {
+        // Reset state when modal is closed
+        if (mounted) {
+          setState(() {
+            _isLoadingSummary = false;
+            _openModalType = null;
+          });
+        }
+      });
+    }
+  }
+
+  Future<void> _showAiWhatToEatNext() async {
+    // Prevent multiple simultaneous requests
+    if (_isLoadingWhatToEat || _openModalType == 'whatToEat') {
+      return;
+    }
+
+    setState(() {
+      _isLoadingWhatToEat = true;
+      _openModalType = 'whatToEat';
+    });
+
+    // Show loading modal immediately
+    if (!mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false, // Prevent dismissing during loading
+      enableDrag: false, // Prevent dragging during loading
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.restaurant, color: primaryColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'What to eat next',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      setState(() {
+                        _isLoadingWhatToEat = false;
+                        _openModalType = null;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 40),
+              Center(
+                child: CircularProgressIndicator(
+                  color: primaryColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Finding meal suggestions...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        );
+      },
+    );
+
+    try {
+      final data = await AiCoachService.getWhatToEatNext(
+        usernameOrEmail: widget.usernameOrEmail,
+      );
+
+      // Close loading modal
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) {
+        setState(() {
+          _isLoadingWhatToEat = false;
+          _openModalType = null;
+        });
+        return;
+      }
+
+      final headline = (data['headline'] ?? 'Meal ideas coming soon') as String;
+      final suggestionsRaw = data['suggestions'] as List<dynamic>? ?? const [];
+      final suggestions = suggestionsRaw.map((e) => e.toString()).toList();
+      final explanation = (data['explanation'] ?? '') as String;
+      final nextMealType = (data['next_meal_type'] ?? '') as String;
+
+      // Show results modal
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (context) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.restaurant, color: primaryColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'What to eat next',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (nextMealType.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                nextMealType.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: primaryColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          _isLoadingWhatToEat = false;
+                          _openModalType = null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  headline,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+                if (suggestions.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ...suggestions.map(
+                    (s) => Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '• ',
+                          style: TextStyle(fontSize: 14, height: 1.4),
+                        ),
+                        Expanded(
+                          child: Text(
+                            s,
+                            style: const TextStyle(fontSize: 14, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (explanation.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    explanation,
+                    style: const TextStyle(fontSize: 14, height: 1.4),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ).then((_) {
+        // Reset state when modal is closed
+        if (mounted) {
+          setState(() {
+            _isLoadingWhatToEat = false;
+            _openModalType = null;
+          });
+        }
+      });
+    } catch (e) {
+      // Close loading modal if still open
+      if (mounted && _openModalType == 'whatToEat') {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) {
+        setState(() {
+          _isLoadingWhatToEat = false;
+          _openModalType = null;
+        });
+        return;
+      }
+
+      // Show error modal
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (context) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.error_outline, color: Colors.red),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        "Error",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          _isLoadingWhatToEat = false;
+                          _openModalType = null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Could not load AI meal ideas. Please try again.',
+                  style: const TextStyle(fontSize: 14, height: 1.4),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      setState(() {
+                        _isLoadingWhatToEat = false;
+                        _openModalType = null;
+                      });
+                      _showAiWhatToEatNext(); // Retry
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Retry'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        },
+      ).then((_) {
+        // Reset state when modal is closed
+        if (mounted) {
+          setState(() {
+            _isLoadingWhatToEat = false;
+            _openModalType = null;
+          });
+        }
+      });
+    }
+  }
+
+  String get _aiCoachPreviewMessage {
+    if (baseGoal <= 0) {
+      return "I can help you set a healthy calorie target for today.";
+    }
+
+    final remaining = baseGoal - foodCalories + exerciseCalories;
+    final percentUsed = baseGoal > 0 ? foodCalories / baseGoal : 0.0;
+
+    // Show exercise-specific message if significant exercise was logged
+    if (exerciseCalories > 0) {
+      if (exerciseCalories >= baseGoal * 0.5) {
+        return "I see you just logged $exerciseCalories calories of exercise! Amazing workout! This means you can eat $exerciseCalories more calories today and still stay on track. Your body needs fuel to recover!";
+      } else if (exerciseCalories >= 200) {
+        return "Great workout! You burned $exerciseCalories calories. This means you can eat $exerciseCalories more calories today and still meet your goal. Would you like suggestions for a post-workout snack?";
+      } else {
+        return "Nice workout! You burned $exerciseCalories calories. You can enjoy a small snack to refuel. I can suggest healthy options!";
+      }
+    }
+
+    // Regular messages based on food consumption
+    if (percentUsed < 0.3) {
+      return "You're just getting started. I can help you plan the rest of your meals today.";
+    } else if (percentUsed < 0.7) {
+      return "You're on track. Let's balance lunch and dinner so you stay within your goal.";
+    } else if (remaining >= 0) {
+      if (foodCalories >= baseGoal) {
+        return "You've met your calorie goal for today! If you exercise, you can eat more to fuel your recovery. I can help you plan!";
+      }
+      return "You're close to your goal. I can suggest lighter options for the rest of the day.";
+    } else {
+      return "You're slightly over today's target. I can help you adjust tomorrow's plan.";
+    }
+  }
+
+  Widget _buildAiCoachCard({
+    required bool isVerySmallScreen,
+    required bool isNarrowScreen,
+  }) {
+    final accentColor = primaryColor;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: accentColor.withValues(alpha: 0.12), width: 1),
+      ),
+      color: Colors.white,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          _showAiDailySummary();
+        },
+        child: Padding(
+          padding: EdgeInsets.all(isVerySmallScreen ? 12 : 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: isVerySmallScreen ? 32 : 36,
+                    height: isVerySmallScreen ? 32 : 36,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.psychology_outlined,
+                      color: accentColor,
+                      size: isVerySmallScreen ? 18 : 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI Coach',
+                          style: TextStyle(
+                            fontSize: isVerySmallScreen ? 15 : 16,
+                            fontWeight: FontWeight.w600,
+                            color: accentColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Personal tips based on today’s calories.',
+                          style: TextStyle(
+                            fontSize: isVerySmallScreen ? 11 : 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: Colors.grey[500],
+                    size: isVerySmallScreen ? 20 : 22,
+                  ),
+                ],
+              ),
+              SizedBox(height: isVerySmallScreen ? 8 : 10),
+              Text(
+                _aiCoachPreviewMessage,
+                style: TextStyle(
+                  fontSize: isVerySmallScreen ? 13 : 14,
+                  color: Colors.grey[800],
+                  height: 1.3,
+                ),
+              ),
+              SizedBox(height: isVerySmallScreen ? 10 : 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _buildAiCoachChip(
+                    label: 'Summarize today',
+                    icon: Icons.subject,
+                    isVerySmallScreen: isVerySmallScreen,
+                    accentColor: accentColor,
+                  ),
+                  _buildAiCoachChip(
+                    label: isNarrowScreen ? 'What to eat' : 'What to eat next',
+                    icon: Icons.restaurant_menu,
+                    isVerySmallScreen: isVerySmallScreen,
+                    accentColor: accentColor,
+                  ),
+                  _buildAiCoachChip(
+                    label: 'Ask Coach',
+                    icon: Icons.chat_bubble_outline,
+                    isVerySmallScreen: isVerySmallScreen,
+                    accentColor: accentColor,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAiCoachChip({
+    required String label,
+    required IconData icon,
+    required bool isVerySmallScreen,
+    required Color accentColor,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        if (label.startsWith('Summarize')) {
+          _showAiDailySummary();
+        } else if (label.startsWith('What to eat')) {
+          _showAiWhatToEatNext();
+        } else if (label == 'Ask Coach') {
+          // Get background color for transition
+          final backgroundColor = ThemeService.getBackgroundColor(userSex);
+          
+          Navigator.push(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  AiCoachChatScreen(
+                    usernameOrEmail: widget.usernameOrEmail,
+                    initialUserSex: userSex, // Pass userSex to avoid green flash
+                  ),
+              transitionDuration: const Duration(milliseconds: 300),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                // Use SlideTransition to cover old screen completely
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1.0, 0.0), // Slide from right
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeInOut,
+                  )),
+                  child: Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    color: backgroundColor, // Use correct background color, not green
+                    child: child,
+                  ),
+                );
+              },
+            ),
+          );
+        }
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isVerySmallScreen ? 10 : 12,
+          vertical: isVerySmallScreen ? 6 : 8,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accentColor.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: isVerySmallScreen ? 14 : 16, color: accentColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: isVerySmallScreen ? 11 : 12,
+                color: accentColor,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildHealthDataButton({
@@ -1090,6 +2065,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.only(
+              bottom: 80, // Account for bottom navigation bar
+              left: 16,
+              right: 16,
             ),
           ),
         );
@@ -1131,6 +2111,206 @@ class _HomePageState extends State<HomePage> with RouteAware {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBreakdownRow({
+    required String label,
+    required String value,
+    required Color color,
+    required bool isVerySmallScreen,
+    bool isBold = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: isVerySmallScreen ? 12 : 13,
+            color: Colors.grey[700],
+            fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isVerySmallScreen ? 12 : 13,
+            color: color,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showCalorieHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.help_outline, color: primaryColor),
+              SizedBox(width: 8),
+              Text(
+                'How Remaining Calories Work',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: primaryColor,
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Remaining calories show how much you can eat while staying on track with your goal.',
+                  style: TextStyle(fontSize: 14, height: 1.5),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Formula:',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 8),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Remaining = Target - Food + Exercise',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Example:',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 8),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildExampleRow('Target Goal', '+2277', primaryColor),
+                      SizedBox(height: 4),
+                      _buildExampleRow(
+                        'Food Consumed',
+                        '-2277',
+                        Colors.lightBlueAccent,
+                      ),
+                      SizedBox(height: 4),
+                      _buildExampleRow(
+                        'Exercise Burned',
+                        '+2277',
+                        Colors.orangeAccent,
+                      ),
+                      Divider(height: 16),
+                      _buildExampleRow(
+                        'Remaining',
+                        '2277',
+                        primaryColor,
+                        isBold: true,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[200]!),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline,
+                        size: 20,
+                        color: Colors.orange[700],
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Exercise burns calories, so you can eat more to maintain balance! 💪',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange[900],
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Got it',
+                style: TextStyle(
+                  color: primaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildExampleRow(
+    String label,
+    String value,
+    Color color, {
+    bool isBold = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey[700],
+            fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            color: color,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

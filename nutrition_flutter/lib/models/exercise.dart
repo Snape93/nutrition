@@ -9,6 +9,7 @@ class Exercise {
   final String? category;
   final String? difficulty;
   final double? estimatedCaloriesPerMinute;
+  final double? metValue; // MET (Metabolic Equivalent of Task) value
   final List<String>? tags;
 
   Exercise({
@@ -22,6 +23,7 @@ class Exercise {
     this.category,
     this.difficulty,
     this.estimatedCaloriesPerMinute,
+    this.metValue,
     this.tags,
   });
 

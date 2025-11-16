@@ -340,49 +340,73 @@ class NutritionModel:
                 "serving_size": serving_size
             }
         
-        # Use ML model for unknown foods
+        # Use ML model for unknown foods, but validate predictions
         if ingredients is None:
             ingredients = []
+        
+        # Try ML model first, but validate the prediction
+        ml_prediction = None
         try:
-            # Prepare features for ML model
-            features = self._prepare_features(
-                food_name, food_category, serving_size, preparation_method, ingredients
-            )
-            
-            # Make prediction
             if self.model is not None and hasattr(self.model, 'predict'):
-                prediction = self.model.predict([features])[0]
-                confidence = 0.85  # Default confidence for ML predictions
-            else:
-                # Fallback to rule-based prediction
-                prediction = self._rule_based_calorie_prediction(
+                # Prepare features for ML model
+                features = self._prepare_features(
+                    food_name, food_category, serving_size, preparation_method, ingredients
+                )
+                
+                # Make prediction
+                ml_prediction = self.model.predict([features])[0]
+                
+                # Validate ML prediction - check if it's reasonable
+                # If prediction is too high (>5000 kcal) or doesn't scale with serving size,
+                # it's likely the model isn't working correctly
+                rule_based_pred = self._rule_based_calorie_prediction(
                     food_name, food_category, serving_size
                 )
-                confidence = 0.70
-            
-            return {
-                "calories": round(prediction, 1),
-                "confidence": confidence,
-                "method": "ml_model",
-                "food_name": food_name,
-                "category": food_category,
-                "serving_size": serving_size
-            }
-            
+                
+                # If ML prediction is way off (more than 5x rule-based or >2000 kcal), use rule-based instead
+                # Also check if prediction doesn't scale with serving size (constant predictions indicate broken model)
+                if (ml_prediction > 2000 or 
+                    (rule_based_pred > 0 and ml_prediction > rule_based_pred * 5)):
+                    ml_prediction = None  # Reject ML prediction
+                    
         except Exception as e:
-            # Fallback to rule-based prediction
+            ml_prediction = None  # ML model failed
+        
+        # Use rule-based prediction if ML prediction is invalid or unavailable
+        if ml_prediction is None:
             prediction = self._rule_based_calorie_prediction(
                 food_name, food_category, serving_size
             )
             
+            # Adjust for preparation method
+            if preparation_method:
+                prediction = self._adjust_for_preparation(prediction, preparation_method)
+            
             return {
                 "calories": round(prediction, 1),
-                "confidence": 0.60,
+                "confidence": 0.70,
                 "method": "rule_based",
                 "food_name": food_name,
                 "category": food_category,
                 "serving_size": serving_size,
-                "note": f"ML model failed, using fallback: {str(e)}"
+                "note": "Using rule-based prediction (ML model prediction was invalid)"
+            }
+        else:
+            # ML prediction is valid, use it
+            # ml_prediction is in calories per 100g, so scale by serving_size
+            total_calories = (ml_prediction * serving_size) / 100
+            
+            # Adjust for preparation method
+            if preparation_method:
+                total_calories = self._adjust_for_preparation(total_calories, preparation_method)
+            
+            return {
+                "calories": round(total_calories, 1),
+                "confidence": 0.85,
+                "method": "ml_model",
+                "food_name": food_name,
+                "category": food_category,
+                "serving_size": serving_size
             }
     
     def predict_nutrition(self, food_name: str, food_category: str = "",

@@ -16,7 +16,15 @@ from config import config
 from werkzeug.security import generate_password_hash, check_password_hash
 import csv
 import random
-from email_service import send_verification_email, generate_verification_code
+from email_service import (
+    send_verification_email, 
+    generate_verification_code,
+    send_email_change_verification,
+    send_account_deletion_verification,
+    send_email_change_notification,
+    send_password_change_verification,
+    send_password_reset_verification
+)
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
@@ -29,6 +37,14 @@ except ImportError:
 
 # Load environment variables
 load_dotenv()
+
+# Optional Groq AI configuration (for AI Coach features)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GROQ_API_URL = os.environ.get(
+    "GROQ_API_URL",
+    "https://api.groq.com/openai/v1/chat/completions",
+)
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama3-8b-8192")
 
 # Ensure instance directory exists for SQLite databases
 try:
@@ -59,7 +75,22 @@ def category_aliases(requested: str):
  
 
 app = Flask(__name__)
-CORS(app)
+
+# CORS configuration - allow all origins for development, restrict for production
+# Mobile apps (Android/iOS) don't need CORS - only web browsers do
+allowed_origins = os.environ.get('ALLOWED_ORIGINS', '*').split(',')
+if allowed_origins == ['*']:
+    # Development: allow all origins
+    CORS(app)
+else:
+    # Production: allow specific origins only
+    CORS(app, resources={
+        r"/*": {
+            "origins": allowed_origins,
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+        }
+    })
 
 # Configure app based on environment
 config_name = os.environ.get('FLASK_ENV', 'development')
@@ -113,6 +144,53 @@ def _cleanup_expired_pending_registrations():
         if expired_count > 0:
             db.session.commit()
             print(f'[CLEANUP] Deleted {expired_count} expired pending registration(s)')
+    except Exception as e:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        # Don't log cleanup errors as they're not critical
+
+@app.before_request
+def _cleanup_expired_pending_operations():
+    """Clean up expired pending email changes, account deletions, and password changes"""
+    try:
+        # Clean up expired email changes
+        expired_email_changes = PendingEmailChange.query.filter(
+            PendingEmailChange.verification_expires_at < datetime.utcnow()
+        ).delete()
+        
+        # Clean up expired account deletions
+        expired_deletions = PendingAccountDeletion.query.filter(
+            PendingAccountDeletion.verification_expires_at < datetime.utcnow()
+        ).delete()
+        
+        # Clean up expired password changes (mark as expired first, then delete)
+        expired_pending = PendingPasswordChange.query.filter(
+            PendingPasswordChange.verification_expires_at < datetime.utcnow(),
+            PendingPasswordChange.status == 'pending'
+        ).all()
+        
+        expired_password_changes = len(expired_pending)
+        
+        # Mark as expired and delete
+        if expired_password_changes > 0:
+            for pending in expired_pending:
+                pending.status = 'expired'
+            db.session.commit()
+            # Delete expired records
+            PendingPasswordChange.query.filter(
+                PendingPasswordChange.status == 'expired'
+            ).delete()
+        
+        if expired_email_changes > 0 or expired_deletions > 0 or expired_password_changes > 0:
+            db.session.commit()
+            if expired_email_changes > 0:
+                print(f'[CLEANUP] Deleted {expired_email_changes} expired pending email change(s)')
+            if expired_deletions > 0:
+                print(f'[CLEANUP] Deleted {expired_deletions} expired pending account deletion(s)')
+            if expired_password_changes > 0:
+                print(f'[CLEANUP] Deleted {expired_password_changes} expired pending password change(s)')
     except Exception as e:
         try:
             db.session.rollback()
@@ -297,7 +375,8 @@ class Exercise(db.Model):
     instructions = db.Column(db.Text)  # JSON string of instructions
     category = db.Column(db.String(50))  # Cardio, Strength, etc.
     difficulty = db.Column(db.String(20))  # Beginner, Intermediate, Advanced
-    estimated_calories_per_minute = db.Column(db.Integer, default=5)
+    estimated_calories_per_minute = db.Column(db.Integer, default=5)  # Deprecated: kept for backward compatibility
+    met_value = db.Column(db.Float, default=None)  # MET (Metabolic Equivalent of Task) value for personalized calorie calculation
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class ExerciseSession(db.Model):
@@ -333,6 +412,29 @@ class Streak(db.Model):
     minimum_exercise_minutes = db.Column(db.Integer, default=15)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# --- Goal History Tracking ---
+class GoalHistory(db.Model):
+    """Model for tracking historical daily calorie goals"""
+    __tablename__ = 'goal_history'
+    id = db.Column(db.Integer, primary_key=True)
+    user = db.Column('user', db.String(80), nullable=False, index=True)  # 'user' is reserved in PostgreSQL
+    date = db.Column(db.Date, nullable=False, index=True)  # The date this goal was active
+    daily_calorie_goal = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Note: Composite index is created in database migration
+    # SQLAlchemy will handle quoting automatically when using column names
+    # The index 'ix_goal_history_user_date' already exists from migration
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user': self.user,
+            'date': self.date.isoformat() if self.date else None,
+            'daily_calorie_goal': self.daily_calorie_goal,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
 
 # --- User-submitted custom exercises ---
 class UserExerciseSubmission(db.Model):
@@ -370,6 +472,67 @@ class PendingRegistration(db.Model):
     registration_data = db.Column(db.Text, nullable=True)  # JSON string for all user data
     resend_count = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+class PendingEmailChange(db.Model):
+    """Temporary storage for pending email change requests"""
+    __tablename__ = 'pending_email_changes'
+    __table_args__ = (
+        db.Index('ix_pending_email_user', 'user_id'),
+        db.Index('ix_pending_email_expires', 'verification_expires_at'),
+        db.Index('ix_pending_email_new_email', 'new_email'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    username = db.Column(db.String(80), nullable=False)
+    old_email = db.Column(db.String(120), nullable=False)
+    new_email = db.Column(db.String(120), nullable=False)
+    verification_code = db.Column(db.String(10), nullable=False)
+    verification_expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    resend_count = db.Column(db.Integer, default=0, nullable=False)
+
+class PendingAccountDeletion(db.Model):
+    """Temporary storage for pending account deletion requests"""
+    __tablename__ = 'pending_account_deletions'
+    __table_args__ = (
+        db.Index('ix_pending_deletion_user', 'user_id'),
+        db.Index('ix_pending_deletion_expires', 'verification_expires_at'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    username = db.Column(db.String(80), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    verification_code = db.Column(db.String(10), nullable=False)
+    verification_expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    resend_count = db.Column(db.Integer, default=0, nullable=False)
+
+class PendingPasswordChange(db.Model):
+    """Temporary storage for pending password change/reset requests"""
+    __tablename__ = 'pending_password_changes'
+    __table_args__ = (
+        db.Index('ix_pending_password_user', 'user_id'),
+        db.Index('ix_pending_password_expires', 'verification_expires_at'),
+        db.Index('ix_pending_password_email', 'email'),
+        db.Index('ix_pending_password_ip', 'ip_address'),
+        db.Index('ix_pending_password_status', 'status'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    username = db.Column(db.String(80), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    verification_code = db.Column(db.String(10), nullable=False)
+    verification_expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    resend_count = db.Column(db.Integer, default=0, nullable=False)
+    request_count = db.Column(db.Integer, default=1, nullable=False)
+    failed_attempts = db.Column(db.Integer, default=0, nullable=False)
+    ip_address = db.Column(db.String(45), nullable=True, index=True)
+    new_password_hash = db.Column(db.String(255), nullable=False)
+    # Status tracking for security
+    status = db.Column(db.String(20), default='pending', nullable=False, index=True)  # pending, verified, cancelled, expired
+    verified_at = db.Column(db.DateTime, nullable=True)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -415,6 +578,167 @@ class User(db.Model):
     verification_expires_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
+# ===== Password Strength Validation Functions =====
+
+def validate_password_strength(password: str) -> dict:
+    """
+    Validate password strength and return result.
+    
+    Returns:
+        {
+            'strength': 'weak' | 'medium' | 'strong',
+            'score': int (0-5),
+            'requirements_met': list of strings,
+            'requirements_missing': list of strings,
+            'is_valid': bool (True if medium or strong)
+        }
+    """
+    if not password:
+        return {
+            'strength': 'weak',
+            'score': 0,
+            'requirements_met': [],
+            'requirements_missing': ['length', 'uppercase', 'number', 'special'],
+            'is_valid': False
+        }
+    
+    requirements_met = []
+    requirements_missing = []
+    score = 0
+    
+    # Check length (minimum 8 characters)
+    has_length = len(password) >= 8
+    if has_length:
+        requirements_met.append('length')
+        score += 1
+    else:
+        requirements_missing.append('length')
+    
+    # Check uppercase letter
+    has_upper = bool(re.search(r'[A-Z]', password))
+    if has_upper:
+        requirements_met.append('uppercase')
+        score += 1
+    else:
+        requirements_missing.append('uppercase')
+    
+    # Check lowercase letter
+    has_lower = bool(re.search(r'[a-z]', password))
+    if has_lower:
+        requirements_met.append('lowercase')
+        score += 1
+    else:
+        requirements_missing.append('lowercase')
+    
+    # Check number
+    has_digit = bool(re.search(r'[0-9]', password))
+    if has_digit:
+        requirements_met.append('number')
+        score += 1
+    else:
+        requirements_missing.append('number')
+    
+    # Check special character
+    has_special = bool(re.search(r'[!@#$%^&*()_+\-=\[\]{}|;:,.<>?~]', password))
+    if has_special:
+        requirements_met.append('special')
+        score += 1
+    else:
+        requirements_missing.append('special')
+    
+    # Determine strength
+    # Core requirements: length >= 8, uppercase, number
+    # Special character is optional - passwords without it can still be medium
+    core_requirements_met = sum([has_length, has_upper, has_digit])
+    
+    # Weak: less than 3 core requirements (length, uppercase, number) OR score <= 2
+    # Note: Special character is not required for medium strength
+    if core_requirements_met < 3 or score <= 2:
+        strength = 'weak'
+        is_valid = False
+    # Medium: has length, uppercase, and number (3 core requirements) AND score >= 3
+    # Can be medium even without special character
+    elif core_requirements_met >= 3 and score >= 3:
+        strength = 'medium'
+        is_valid = True
+    # Strong: all 5 requirements met (length, uppercase, lowercase, number, special) AND score == 5
+    else:  # score == 5
+        strength = 'strong'
+        is_valid = True
+    
+    return {
+        'strength': strength,
+        'score': score,
+        'requirements_met': requirements_met,
+        'requirements_missing': requirements_missing,
+        'is_valid': is_valid
+    }
+
+def check_common_passwords(password: str) -> bool:
+    """
+    Check if password is in common passwords list.
+    
+    Returns:
+        True if password is common (should be rejected), False otherwise
+    """
+    # Top 20 most common passwords (expandable)
+    common_passwords = [
+        'password', 'password123', 'Password123', 'PASSWORD123',
+        '12345678', '123456789', '1234567890',
+        'qwerty', 'qwerty123', 'Qwerty123',
+        'admin', 'admin123', 'Admin123',
+        'welcome', 'welcome123', 'Welcome123',
+        'letmein', 'monkey', 'dragon',
+        'sunshine', 'master', 'football'
+    ]
+    
+    password_lower = password.lower()
+    return password_lower in [p.lower() for p in common_passwords]
+
+def check_password_similarity(password: str, username: str = None, email: str = None) -> dict:
+    """
+    Check if password is too similar to username or email.
+    
+    Returns:
+        {
+            'is_similar': bool,
+            'reason': str (if similar)
+        }
+    """
+    password_lower = password.lower()
+    
+    if username:
+        username_lower = username.lower()
+        if username_lower in password_lower or password_lower in username_lower:
+            return {
+                'is_similar': True,
+                'reason': 'Password cannot contain your username'
+            }
+    
+    if email:
+        email_lower = email.lower()
+        # Extract email username (before @)
+        email_username = email_lower.split('@')[0] if '@' in email_lower else email_lower
+        if email_username and (email_username in password_lower or password_lower in email_username):
+            return {
+                'is_similar': True,
+                'reason': 'Password cannot contain your email address'
+            }
+    
+    return {
+        'is_similar': False,
+        'reason': None
+    }
+
+def get_client_ip() -> str:
+    """Get client IP address from request"""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    elif request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP')
+    else:
+        return request.remote_addr or 'unknown'
 
 def get_user_by_identifier(identifier: str):
     """Return a User matched by username or email (case-insensitive)."""
@@ -489,11 +813,20 @@ def _import_exercises_from_csv_path(csv_path: str) -> tuple[int, int]:
     if not os.path.exists(csv_path):
         return added, updated
     with open(csv_path, 'r', encoding='utf-8') as f:
+        # Read first line to check if it's blank
+        first_line = f.readline()
+        if not first_line.strip():
+            # Skip blank first line - file pointer is already at line 2
+            pass
+        else:
+            # Rewind to start if first line is not blank
+            f.seek(0)
         reader = csv.DictReader(f)
         required = {
             'id','name','category','body_part','target','equipment','difficulty','calories_per_minute','instructions','tags'
         }
         if not required.issubset(set([c.strip() for c in (reader.fieldnames or [])])):
+            print(f"[WARNING] CSV missing required fields. Found: {reader.fieldnames}")
             return added, updated
         for row in reader:
             try:
@@ -505,15 +838,54 @@ def _import_exercises_from_csv_path(csv_path: str) -> tuple[int, int]:
                     existing.equipment = row.get('equipment','')
                     existing.target = row.get('target','')
                     existing.gif_url = existing.gif_url or ''
-                    existing.instructions = json.dumps([s.strip() for s in row.get('instructions','').split(';') if s.strip()])
+                    # Parse instructions - CSV has numbered list format like "1. Step one. 2. Step two."
+                    instructions_text = row.get('instructions', '')
+                    # Split by numbered pattern (1., 2., etc.) or semicolon
+                    if instructions_text:
+                        # Try splitting by numbered list first
+                        import re
+                        parts = re.split(r'\d+\.\s+', instructions_text)
+                        parts = [p.strip() for p in parts if p.strip()]
+                        if len(parts) > 1:
+                            existing.instructions = json.dumps(parts)
+                        else:
+                            # Fallback to semicolon split
+                            existing.instructions = json.dumps([s.strip() for s in instructions_text.split(';') if s.strip()])
+                    else:
+                        existing.instructions = json.dumps([])
                     existing.category = row.get('category','')
                     existing.difficulty = row.get('difficulty','')
                     try:
-                        existing.estimated_calories_per_minute = int(float(row.get('calories_per_minute', '5')))
+                        cpm = int(float(row.get('calories_per_minute', '5')))
+                        existing.estimated_calories_per_minute = cpm
+                        # Derive MET from calories_per_minute (assuming 70kg person)
+                        if existing.met_value is None:
+                            existing.met_value = (float(cpm) * 60) / 70.0
                     except Exception:
                         existing.estimated_calories_per_minute = 5
+                        if existing.met_value is None:
+                            existing.met_value = (5.0 * 60) / 70.0
                     updated += 1
                 else:
+                    cpm = int(float(row.get('calories_per_minute', '5')))
+                    # Derive MET from calories_per_minute (assuming 70kg person)
+                    met_val = (float(cpm) * 60) / 70.0
+                    
+                    # Parse instructions - CSV has numbered list format like "1. Step one. 2. Step two."
+                    instructions_text = row.get('instructions', '')
+                    if instructions_text:
+                        # Try splitting by numbered list first
+                        import re
+                        parts = re.split(r'\d+\.\s+', instructions_text)
+                        parts = [p.strip() for p in parts if p.strip()]
+                        if len(parts) > 1:
+                            instructions_json = json.dumps(parts)
+                        else:
+                            # Fallback to semicolon split
+                            instructions_json = json.dumps([s.strip() for s in instructions_text.split(';') if s.strip()])
+                    else:
+                        instructions_json = json.dumps([])
+                    
                     ex = Exercise(
                         exercise_id=ext_id,
                         name=row.get('name',''),
@@ -521,16 +893,24 @@ def _import_exercises_from_csv_path(csv_path: str) -> tuple[int, int]:
                         equipment=row.get('equipment',''),
                         target=row.get('target',''),
                         gif_url='',
-                        instructions=json.dumps([s.strip() for s in row.get('instructions','').split(';') if s.strip()]),
+                        instructions=instructions_json,
                         category=row.get('category',''),
                         difficulty=row.get('difficulty',''),
-                        estimated_calories_per_minute=int(float(row.get('calories_per_minute', '5')))
+                        estimated_calories_per_minute=cpm,
+                        met_value=met_val
                     )
                     db.session.add(ex)
                     added += 1
-            except Exception:
+            except Exception as e:
+                # Log first few errors for debugging
+                if added + updated < 5:
+                    print(f"[WARNING] Error importing exercise {row.get('id', 'unknown')}: {e}")
                 continue
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        print(f"[ERROR] Failed to commit exercises: {e}")
+        db.session.rollback()
     return added, updated
 
 # Initialize the nutrition model
@@ -540,19 +920,58 @@ nutrition_model = NutritionModel()
 with app.app_context():
     db.create_all()
     print("[SUCCESS] Database tables initialized successfully")
+    
+    # Auto-import exercises from CSV if database is empty or has few exercises
+    exercise_count = Exercise.query.count()
+    if exercise_count < 50:  # If less than 50 exercises, import from CSV
+        print(f"[INFO] Found {exercise_count} exercises in database. Importing from CSV...")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        csv_paths = [
+            os.path.join(base_dir, 'data', 'exercises.csv'),
+            os.path.join(base_dir, 'exercises.csv'),
+        ]
+        for csv_path in csv_paths:
+            if os.path.exists(csv_path):
+                added, updated = _import_exercises_from_csv_path(csv_path)
+                print(f"[SUCCESS] Imported exercises from {csv_path}: {added} added, {updated} updated")
+                break
+        else:
+            print(f"[WARNING] Exercises CSV not found. Tried paths: {csv_paths}")
+    else:
+        print(f"[INFO] Database already has {exercise_count} exercises. Skipping import.")
 
 # Load Filipino food dataset at startup (robust path + encoding)
 try:
-    FOOD_CSV_PATH = os.path.join(os.path.dirname(__file__), 'Filipino_Food_Nutrition_Dataset.csv')
-    if os.path.exists(FOOD_CSV_PATH):
+    # Try multiple possible locations for the CSV file
+    base_dir = os.path.dirname(os.path.abspath(__file__))  # Root directory
+    possible_paths = [
+        os.path.join(base_dir, 'nutrition_flutter', 'lib', 'Filipino_Food_Nutrition_Dataset.csv'),  # nutrition_flutter/lib/ folder
+        os.path.join(base_dir, 'data', 'Filipino_Food_Nutrition_Dataset.csv'),  # data/ folder
+        os.path.join(base_dir, 'Filipino_Food_Nutrition_Dataset.csv'),  # Root directory
+        os.path.join(os.path.dirname(__file__), 'Filipino_Food_Nutrition_Dataset.csv'),  # Same dir as app.py
+    ]
+    
+    FOOD_CSV_PATH = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            FOOD_CSV_PATH = path
+            break
+    
+    if FOOD_CSV_PATH and os.path.exists(FOOD_CSV_PATH):
         food_df = pd.read_csv(FOOD_CSV_PATH, encoding='utf-8')
-        print('[SUCCESS] Loaded Filipino food dataset')
+        print(f'[SUCCESS] Loaded Filipino food dataset from {FOOD_CSV_PATH}')
+        print(f'[INFO] Dataset contains {len(food_df)} foods')
     else:
         # Minimal fallback DataFrame
-        print(f"[WARNING] Filipino food CSV not found at {FOOD_CSV_PATH}; using empty dataset")
+        print(f"[WARNING] Filipino food CSV not found. Tried paths:")
+        for path in possible_paths:
+            print(f"  - {path} (exists: {os.path.exists(path)})")
+        print(f"[WARNING] Using empty dataset - search will not work!")
         food_df = pd.DataFrame(columns=['Food Name','Calories','Protein (g)','Carbs (g)','Fat (g)','Fiber (g)','Sodium (mg)'])
 except Exception as e:
     print(f"[ERROR] Failed to load Filipino food dataset: {e}")
+    import traceback
+    traceback.print_exc()
     food_df = pd.DataFrame(columns=['Food Name','Calories','Protein (g)','Carbs (g)','Fat (g)','Fiber (g)','Sodium (mg)'])
 
 
@@ -684,6 +1103,55 @@ def normalize_measurements(weight: float, height: float) -> tuple[float, float]:
     except Exception:
         return float(weight), float(height)
 
+def get_exercise_met_value(exercise: Exercise) -> float:
+    """Get MET value for an exercise. If not set, derive from estimated_calories_per_minute (assuming 70kg person)."""
+    if exercise.met_value is not None and exercise.met_value > 0:
+        return float(exercise.met_value)
+    
+    # Fallback: derive MET from estimated_calories_per_minute (assuming 70kg person)
+    # Formula: calories_per_minute = (MET × weight_kg) / 60
+    # So: MET = (calories_per_minute × 60) / weight_kg
+    # Assuming 70kg person: MET = (calories_per_minute × 60) / 70
+    cpm = exercise.estimated_calories_per_minute or 5
+    derived_met = (float(cpm) * 60) / 70.0
+    return round(derived_met, 1)
+
+def calculate_calories_burned(met_value: float, weight_kg: float, duration_minutes: float) -> float:
+    """
+    Calculate calories burned using MET formula.
+    
+    Formula: Calories = MET × Weight (kg) × Duration (hours)
+    Or per minute: Calories per minute = (MET × Weight) / 60
+    
+    Args:
+        met_value: MET (Metabolic Equivalent of Task) value for the exercise
+        weight_kg: User's weight in kilograms
+        duration_minutes: Duration of exercise in minutes
+    
+    Returns:
+        Total calories burned
+    """
+    # Convert minutes to hours for the formula
+    duration_hours = duration_minutes / 60.0
+    calories = met_value * weight_kg * duration_hours
+    return round(calories, 2)
+
+def calculate_calories_per_minute(met_value: float, weight_kg: float) -> float:
+    """
+    Calculate calories burned per minute using MET formula.
+    
+    Formula: Calories per minute = (MET × Weight in kg) / 60
+    
+    Args:
+        met_value: MET (Metabolic Equivalent of Task) value for the exercise
+        weight_kg: User's weight in kilograms
+    
+    Returns:
+        Calories burned per minute
+    """
+    calories_per_min = (met_value * weight_kg) / 60.0
+    return round(calories_per_min, 2)
+
  
 
 @app.route('/exercises', methods=['GET'])
@@ -714,9 +1182,21 @@ def get_exercises():
 
         # No automatic seeding; return what exists
         
-        return jsonify({
-            'success': True,
-            'exercises': [{
+        # Get user's weight if provided for personalized calculations
+        user = request.args.get('user')
+        weight_kg = request.args.get('weight_kg')
+        
+        if user and not weight_kg:
+            user_obj = User.query.filter(
+                (User.username == user) | (User.email == user)
+            ).first()
+            if user_obj:
+                weight_kg = float(user_obj.weight_kg)
+        
+        exercises_list = []
+        for ex in exercises:
+            met_value = get_exercise_met_value(ex)
+            exercise_data = {
                 'id': ex.exercise_id,
                 'name': ex.name,
                 'body_part': ex.body_part,
@@ -726,12 +1206,59 @@ def get_exercises():
                 'instructions': json.loads(ex.instructions) if ex.instructions else [],
                 'category': normalize_category(ex.category or ''),
                 'difficulty': ex.difficulty,
-                'estimated_calories_per_minute': ex.estimated_calories_per_minute
-            } for ex in exercises]
+                'met_value': met_value,
+            }
+            
+            # Add personalized calories per minute if weight is provided
+            if weight_kg:
+                try:
+                    exercise_data['calories_per_minute'] = calculate_calories_per_minute(met_value, float(weight_kg))
+                except Exception:
+                    pass
+            
+            # Include deprecated field for backward compatibility
+            if ex.estimated_calories_per_minute:
+                exercise_data['estimated_calories_per_minute'] = ex.estimated_calories_per_minute
+            
+            exercises_list.append(exercise_data)
+        
+        return jsonify({
+            'success': True,
+            'exercises': exercises_list
         })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/exercises/import', methods=['POST'])
+def import_exercises():
+    """Import exercises from CSV file"""
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        csv_paths = [
+            os.path.join(base_dir, 'data', 'exercises.csv'),
+            os.path.join(base_dir, 'exercises.csv'),
+        ]
+        
+        for csv_path in csv_paths:
+            if os.path.exists(csv_path):
+                added, updated = _import_exercises_from_csv_path(csv_path)
+                return jsonify({
+                    'success': True,
+                    'message': f'Imported exercises from {csv_path}',
+                    'added': added,
+                    'updated': updated,
+                    'total': added + updated
+                }), 200
+        
+        return jsonify({
+            'success': False,
+            'error': 'Exercises CSV file not found',
+            'tried_paths': csv_paths
+        }), 404
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
  
 
@@ -749,20 +1276,24 @@ def get_exercise_categories():
 
 @app.route('/exercises/calculate', methods=['POST'])
 def calculate_exercise_calories():
-    """Calculate calories burned for an exercise based on duration.
+    """Calculate calories burned for an exercise based on duration and user's weight.
 
     Request JSON body supports:
       - exercise_id: preferred unique id (matches exercises.exercise_id)
       - name: alternative lookup by name if id not provided
       - duration_seconds: required, total active duration in seconds
+      - user: optional, username/email to get personalized weight-based calculation
+      - weight_kg: optional, weight in kg for calculation (if user not provided)
 
-    Returns: { success, exercise_id, name, minutes, calories_per_minute, calories }
+    Returns: { success, exercise_id, name, minutes, calories_per_minute, calories, met_value, weight_kg }
     """
     try:
         body = request.get_json(silent=True) or {}
         exercise_id = (body.get('exercise_id') or '').strip()
         name = (body.get('name') or '').strip()
         duration_seconds = body.get('duration_seconds')
+        user = body.get('user') or body.get('username') or body.get('usernameOrEmail')
+        weight_kg = body.get('weight_kg')
 
         if duration_seconds is None:
             return jsonify({'success': False, 'error': 'duration_seconds is required'}), 400
@@ -781,44 +1312,96 @@ def calculate_exercise_calories():
         if exercise is None:
             return jsonify({'success': False, 'error': 'Exercise not found by id or name'}), 404
 
+        # Get user's weight if user is provided
+        if user and not weight_kg:
+            user_obj = User.query.filter(
+                (User.username == user) | (User.email == user)
+            ).first()
+            if user_obj:
+                weight_kg = float(user_obj.weight_kg)
+        
+        # Default to 70kg if no weight provided (standard reference weight)
+        if not weight_kg:
+            weight_kg = 70.0
+
+        # Get MET value for the exercise
+        met_value = get_exercise_met_value(exercise)
+        
+        # Calculate personalized calories
         minutes = duration_seconds / 60.0
-        cpm = exercise.estimated_calories_per_minute or 5
-        calories = round(float(cpm) * minutes, 2)
+        calories_per_min = calculate_calories_per_minute(met_value, float(weight_kg))
+        total_calories = calculate_calories_burned(met_value, float(weight_kg), minutes)
 
         return jsonify({
             'success': True,
             'exercise_id': exercise.exercise_id,
             'name': exercise.name,
             'minutes': round(minutes, 3),
-            'calories_per_minute': cpm,
-            'calories': calories
+            'calories_per_minute': calories_per_min,
+            'calories': total_calories,
+            'met_value': met_value,
+            'weight_kg': float(weight_kg)
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/exercises/<exercise_id>', methods=['GET'])
 def get_exercise_details(exercise_id):
-    """Get detailed information about a specific exercise"""
+    """Get detailed information about a specific exercise with personalized calorie estimates.
+    
+    Query params:
+      - user: optional, username/email to get personalized weight-based calculation
+      - weight_kg: optional, weight in kg for calculation (if user not provided)
+    """
     try:
         exercise = Exercise.query.filter_by(exercise_id=exercise_id).first()
         
         if not exercise:
             return jsonify({'error': 'Exercise not found'}), 404
         
+        # Get user's weight if provided
+        user = request.args.get('user')
+        weight_kg = request.args.get('weight_kg')
+        
+        if user and not weight_kg:
+            user_obj = User.query.filter(
+                (User.username == user) | (User.email == user)
+            ).first()
+            if user_obj:
+                weight_kg = float(user_obj.weight_kg)
+        
+        # Get MET value
+        met_value = get_exercise_met_value(exercise)
+        
+        # Calculate personalized calories per minute if weight is provided
+        calories_per_minute = None
+        if weight_kg:
+            try:
+                calories_per_minute = calculate_calories_per_minute(met_value, float(weight_kg))
+            except Exception:
+                pass
+        
+        exercise_data = {
+            'id': exercise.exercise_id,
+            'name': exercise.name,
+            'body_part': exercise.body_part,
+            'equipment': exercise.equipment,
+            'target': exercise.target,
+            'gif_url': exercise.gif_url,
+            'instructions': json.loads(exercise.instructions) if exercise.instructions else [],
+            'category': exercise.category,
+            'difficulty': exercise.difficulty,
+            'met_value': met_value,
+            'calories_per_minute': calories_per_minute,  # Personalized if weight provided
+        }
+        
+        # Include deprecated field for backward compatibility
+        if exercise.estimated_calories_per_minute:
+            exercise_data['estimated_calories_per_minute'] = exercise.estimated_calories_per_minute
+        
         return jsonify({
             'success': True,
-            'exercise': {
-                'id': exercise.exercise_id,
-                'name': exercise.name,
-                'body_part': exercise.body_part,
-                'equipment': exercise.equipment,
-                'target': exercise.target,
-                'gif_url': exercise.gif_url,
-                'instructions': json.loads(exercise.instructions) if exercise.instructions else [],
-                'category': exercise.category,
-                'difficulty': exercise.difficulty,
-                'estimated_calories_per_minute': exercise.estimated_calories_per_minute
-            }
+            'exercise': exercise_data
         })
         
     except Exception as e:
@@ -843,10 +1426,49 @@ def log_exercise_session():
         calories_burned = data.get('calories_burned', 0)
         
         if not calories_burned:
-            # Estimate calories if not provided
+            # Estimate calories if not provided using MET formula
             exercise = Exercise.query.filter_by(exercise_id=data['exercise_id']).first()
             if exercise:
-                calories_burned = exercise.estimated_calories_per_minute * duration_minutes
+                # Get user's weight for personalized calculation
+                user_obj = User.query.filter(
+                    (User.username == data['user']) | (User.email == data['user'])
+                ).first()
+                weight_kg = float(user_obj.weight_kg) if user_obj else 70.0  # Default to 70kg
+                
+                # Calculate using MET formula
+                met_value = get_exercise_met_value(exercise)
+                calories_burned = calculate_calories_burned(met_value, weight_kg, duration_minutes)
+            else:
+                # Custom exercise (not in Exercise table) - derive MET from intensity if provided
+                # Check if it's a custom exercise (exercise_id starts with 'custom_')
+                if data.get('exercise_id', '').startswith('custom_'):
+                    # Try to get intensity from notes or use default
+                    # For custom exercises, we'll use the calories_burned if provided
+                    # Otherwise, use a default MET calculation
+                    user_obj = User.query.filter(
+                        (User.username == data['user']) | (User.email == data['user'])
+                    ).first()
+                    weight_kg = float(user_obj.weight_kg) if user_obj else 70.0
+                    
+                    # Default MET for custom exercises (moderate intensity)
+                    # This is a fallback - ideally frontend should calculate and send calories_burned
+                    default_met = 5.0  # Moderate intensity default
+                    calories_burned = calculate_calories_burned(default_met, weight_kg, duration_minutes)
+        
+        # Use Philippines timezone for date consistency (same as food logs)
+        if 'date' in data and data['date']:
+            try:
+                # Parse the provided date string
+                session_date = parse_date_safe(data['date'])
+                if not session_date:
+                    # If parsing fails, use Philippines date
+                    session_date = get_philippines_date()
+            except Exception:
+                # If any error, use Philippines date
+                session_date = get_philippines_date()
+        else:
+            # No date provided, use current Philippines date
+            session_date = get_philippines_date()
         
         session = ExerciseSession(
             user=data['user'],
@@ -856,7 +1478,7 @@ def log_exercise_session():
             calories_burned=calories_burned,
             sets_completed=data.get('sets_completed', 1),
             notes=data.get('notes', ''),
-            date=datetime.strptime(data.get('date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date()
+            date=session_date
         )
         
         db.session.add(session)
@@ -865,7 +1487,6 @@ def log_exercise_session():
         # Update exercise streak after logging exercise session
         try:
             user = data['user']
-            session_date = datetime.strptime(data.get('date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date()
             streak = get_or_create_streak(user, 'exercise')
             met_goal = check_exercise_goal_met(user, session_date, streak.minimum_exercise_minutes)
             update_streak(user, 'exercise', met_goal, session_date)
@@ -1383,6 +2004,10 @@ def get_food_logs():
 def edit_food_log(log_id):
     data = request.get_json()
     log = FoodLog.query.get_or_404(log_id)
+    # Store user and date before editing (needed for streak recalculation)
+    user = log.user
+    log_date = log.date
+    
     log.food_name = data.get('food_name', log.food_name)
     log.meal_type = data.get('meal_type', log.meal_type)
     log.serving_size = data.get('serving_size', log.serving_size)
@@ -1394,13 +2019,37 @@ def edit_food_log(log_id):
     log.fiber = data.get('fiber', log.fiber)
     log.sodium = data.get('sodium', log.sodium)
     db.session.commit()
+    
+    # Recalculate streak after editing (calories may have changed)
+    try:
+        met_goal = check_calories_goal_met(user, log_date)
+        update_streak(user, 'calories', met_goal, log_date)
+    except Exception as e:
+        # Don't fail the request if streak update fails
+        print(f'Warning: Failed to update streak after edit: {e}')
+    
     return jsonify({'success': True})
 
 @app.route('/log/food/<int:log_id>', methods=['DELETE'])
 def delete_food_log(log_id):
     log = FoodLog.query.get_or_404(log_id)
+    # Store user and date before deleting (needed for streak recalculation)
+    user = log.user
+    log_date = log.date
+    
+    # Delete the log
     db.session.delete(log)
     db.session.commit()
+    
+    # Recalculate streak after deletion
+    # Check if goal is still met after this deletion
+    try:
+        met_goal = check_calories_goal_met(user, log_date)
+        update_streak(user, 'calories', met_goal, log_date)
+    except Exception as e:
+        # Don't fail the request if streak update fails
+        print(f'Warning: Failed to update streak after deletion: {e}')
+    
     return jsonify({'success': True})
 
 # --- Custom Recipes Endpoints ---
@@ -2059,9 +2708,19 @@ def check_email_exists():
         return jsonify({'error': 'Email query parameter is required'}), 400
 
     try:
-        exists = bool(
+        # Check if email exists in users table
+        user_exists = bool(
             User.query.filter(func.lower(User.email) == email.lower()).first()
         )
+        
+        # Also check if email is in pending registrations
+        pending_exists = bool(
+            PendingRegistration.query.filter(
+                func.lower(PendingRegistration.email) == email.lower()
+            ).first()
+        )
+        
+        exists = user_exists or pending_exists
         return jsonify({'exists': exists}), 200
     except Exception as e:
         try:
@@ -2446,137 +3105,456 @@ def change_pending_email():
 
 @app.route('/auth/reset-password', methods=['POST'])
 def reset_password():
-    """Reset a user's password using their email or username."""
+    """Reset password - DEPRECATED: Use /auth/password-reset/request instead"""
+    return jsonify({
+        'error': 'This endpoint is deprecated. Please use POST /auth/password-reset/request to initiate password reset with email verification.',
+        'new_endpoint': '/auth/password-reset/request',
+        'method': 'POST'
+    }), 410  # 410 Gone - indicates the resource is no longer available
+
+# ===== Password Reset Verification Endpoints =====
+
+@app.route('/auth/password-reset/request', methods=['POST'])
+def request_password_reset():
+    """Request password reset - sends verification code to user's email"""
     try:
         data = request.get_json() or {}
-
+        
         email = (data.get('email') or '').strip()
-        username = (data.get('username') or '').strip()
-        identifier = (data.get('username_or_email') or '').strip()
-        new_password = (data.get('new_password') or '').strip()
-
-        if not new_password:
-            return jsonify({'error': 'New password is required'}), 400
-        if len(new_password) < 6:
-            return jsonify(
-                {'error': 'New password must be at least 6 characters long'}
-            ), 400
-
-        user = None
-        lookup_error = None
-
+        
+        # Validate email format
+        if not email:
+            return jsonify({'error': 'Email address is required'}), 400
+        
+        email_regex = re.compile(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$')
+        if not email_regex.match(email):
+            return jsonify({'error': 'Invalid email format'}), 400
+        
+        # Rate limiting: Check IP-based rate limiting for email checks (prevent enumeration)
         try:
-            if email:
-                user = User.query.filter(
-                    func.lower(User.email) == email.lower()
-                ).first()
-            elif username:
-                user = User.query.filter(
-                    func.lower(User.username) == username.lower()
-                ).first()
-            elif identifier:
-                if '@' in identifier:
-                    user = User.query.filter(
-                        func.lower(User.email) == identifier.lower()
-                    ).first()
-                else:
-                    user = User.query.filter(
-                        func.lower(User.username) == identifier.lower()
-                    ).first()
-        except Exception as lookup_ex:
-            lookup_error = lookup_ex
-
-        if lookup_error:
-            raise lookup_error
-
-        if not user:
-            return jsonify({'success': False, 'message': 'User not found'}), 404
-
-        stored_password = user.password or ''
-        is_same_password = False
-
-        if stored_password:
+            client_ip = get_client_ip()
+        except Exception as e:
+            print(f"[ERROR] Failed to get client IP: {e}")
+            client_ip = 'unknown'
+        
+        # Ensure we have a clean transaction state before database queries
+        try:
+            db.session.rollback()  # Rollback any previous failed transaction
+        except Exception:
+            pass
+        
+        # Check IP-based rate limiting for password reset requests
+        recent_ip_requests = 0
+        try:
+            recent_ip_requests = PendingPasswordChange.query.filter(
+                PendingPasswordChange.ip_address == client_ip,
+                PendingPasswordChange.created_at > datetime.utcnow() - timedelta(hours=1)
+            ).count()
+        except Exception as e:
+            print(f"[ERROR] Failed to check rate limit: {e}")
+            import traceback
+            traceback.print_exc()
+            # Rollback transaction if rate limit check fails
             try:
-                is_same_password = check_password_hash(stored_password, new_password)
+                db.session.rollback()
             except Exception:
-                is_same_password = stored_password == new_password
-        else:
-            is_same_password = False
-
-        if not is_same_password and stored_password:
-            is_same_password = stored_password == new_password
-
-        if is_same_password:
+                pass
+            # If rate limit check fails, allow the request but log it
+            recent_ip_requests = 0
+        
+        # Find user - this is the critical check
+        # Ensure clean transaction state before user query
+        try:
+            db.session.rollback()  # Rollback any previous failed transaction
+        except Exception:
+            pass
+            
+        try:
+            user = User.query.filter(func.lower(User.email) == email.lower()).first()
+        except Exception as e:
+            print(f"[ERROR] Database query failed when checking email: {e}")
+            import traceback
+            traceback.print_exc()
+            # Rollback transaction before returning error
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            # If database query fails, return a specific error
             return jsonify({
                 'success': False,
-                'message': 'New password must be different from the current password'
-            }), 400
-
-        user.password = generate_password_hash(new_password)
+                'error': 'Database error occurred. Please try again later.'
+            }), 500
         
-        # Save to database (with retry logic for connection errors)
-        max_commit_retries = 3
-        for attempt in range(max_commit_retries):
-            try:
-                db.session.commit()
-                break
-            except Exception as db_err:
-                error_str = str(db_err)
-                is_connection_error = any(keyword in error_str.lower() for keyword in [
-                    'connection', 'closed', 'lost', 'timeout', 'e3q8', 'parameter', 'bind', 'ssl'
-                ])
-                
-                if attempt < max_commit_retries - 1 and is_connection_error:
-                    print(f"[WARN] DB connection error on password reset commit (attempt {attempt + 1}/{max_commit_retries}): {db_err}")
-                    try:
-                        db.session.rollback()
-                        db.session.close()
-                        db.session.remove()
-                    except Exception:
-                        pass
-                    time.sleep(0.2)
-                    # Re-query the user and update password in the new session
-                    try:
-                        if email:
-                            user = User.query.filter(
-                                func.lower(User.email) == email.lower()
-                            ).first()
-                        elif username:
-                            user = User.query.filter(
-                                func.lower(User.username) == username.lower()
-                            ).first()
-                        elif identifier:
-                            if '@' in identifier:
-                                user = User.query.filter(
-                                    func.lower(User.email) == identifier.lower()
-                                ).first()
-                            else:
-                                user = User.query.filter(
-                                    func.lower(User.username) == identifier.lower()
-                                ).first()
-                        if user:
-                            user.password = generate_password_hash(new_password)
-                    except Exception:
-                        pass
+        # If email doesn't exist, check rate limit before revealing
+        if not user:
+            # If rate limit exceeded, return generic message to prevent enumeration
+            # But still return success: False to prevent frontend navigation
+            if recent_ip_requests >= 5:
+                parts = email.split('@')
+                masked_email = parts[0][:3] + '***@' + '***' if len(parts) > 1 and len(parts[0]) > 3 else '***@***'
+                return jsonify({
+                    'success': False,
+                    'error': 'Too many requests. Please try again later.',
+                    'message': 'If an account exists, a verification code has been sent'
+                }), 429  # 429 Too Many Requests
+            else:
+                # Rate limit allows, return error that email doesn't exist
+                return jsonify({
+                    'success': False,
+                    'error': 'No account found with this email address'
+                }), 404
+        
+        # User exists, proceed with password reset
+        if user:
+            # Check for existing pending password reset
+            existing_pending = PendingPasswordChange.query.filter_by(user_id=user.id).first()
+            
+            # Check IP-based rate limiting (reuse already calculated recent_ip_requests)
+            if recent_ip_requests >= 3:
+                # Return generic message even if rate limited
+                return jsonify({
+                    'success': True,
+                    'message': 'If an account exists, a verification code has been sent',
+                    'email': email[:3] + '***@***' if email and '@' in email else '***@***'
+                }), 200
+            
+            # Check user-based rate limiting
+            if existing_pending:
+                time_since_creation = (datetime.utcnow() - existing_pending.created_at).total_seconds()
+                if time_since_creation < 3600:  # 1 hour
+                    if existing_pending.request_count >= 3:
+                        # Return generic message
+                        return jsonify({
+                            'success': True,
+                            'message': 'If an account exists, a verification code has been sent',
+                            'email': email[:3] + '***@***' if email and '@' in email else '***@***'
+                        }), 200
+                    existing_pending.request_count += 1
                 else:
-                    print(f"[ERROR] DB error on password reset commit: {db_err}")
-                    try:
-                        db.session.rollback()
-                    except Exception:
-                        pass
-                    raise
-
-        return jsonify({
-            'success': True,
-            'message': 'Password reset successfully'
-        }), 200
-
+                    # Old pending request, delete it
+                    db.session.delete(existing_pending)
+                    existing_pending = None
+            
+            # Generate verification code
+            verification_code = generate_verification_code()
+            verification_expires_at = datetime.utcnow() + timedelta(minutes=15)
+            
+            # Create placeholder password hash (will be set when user provides new password)
+            placeholder_hash = generate_password_hash('placeholder')
+            
+            # Create or update pending password reset
+            if existing_pending and (datetime.utcnow() - existing_pending.created_at).total_seconds() < 3600:
+                existing_pending.verification_code = verification_code
+                existing_pending.verification_expires_at = verification_expires_at
+                existing_pending.ip_address = client_ip
+                pending_reset = existing_pending
+            else:
+                pending_reset = PendingPasswordChange(
+                    user_id=user.id,
+                    username=user.username,
+                    email=user.email,
+                    verification_code=verification_code,
+                    verification_expires_at=verification_expires_at,
+                    new_password_hash=placeholder_hash,  # Will be updated when password is provided
+                    ip_address=client_ip,
+                    request_count=1,
+                    resend_count=0,
+                    failed_attempts=0
+                )
+                db.session.add(pending_reset)
+            
+            db.session.commit()
+            
+            # Send verification email (only if user exists)
+            email_sent = send_password_reset_verification(user.email, verification_code, user.username)
+            
+            if not email_sent:
+                # Don't create pending record if email fails
+                db.session.delete(pending_reset)
+                db.session.commit()
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to send verification email. Please try again later.'
+                }), 500
+            
+            # Email sent successfully, return success with expires_at
+            parts = email.split('@')
+            masked_email = parts[0][:3] + '***@' + '***' if len(parts) > 1 and len(parts[0]) > 3 else '***@***'
+            
+            return jsonify({
+                'success': True,
+                'message': 'Verification code has been sent to your email',
+                'email': masked_email,
+                'expires_at': verification_expires_at.isoformat()
+            }), 200
+        
     except Exception as e:
         try:
             db.session.rollback()
         except Exception:
             pass
+        # Log the full exception with traceback for debugging
+        import traceback
+        error_traceback = traceback.format_exc()
+        print(f"[ERROR] Failed to request password reset: {e}")
+        print(f"[ERROR] Traceback:\n{error_traceback}")
+        
+        # Return error message (not success) to prevent frontend navigation
+        # But provide more specific error based on exception type
+        error_message = 'An error occurred while processing your request. Please try again later.'
+        
+        # Check if it's a database-related error
+        if 'database' in str(e).lower() or 'connection' in str(e).lower() or 'sql' in str(e).lower():
+            error_message = 'Database connection error. Please try again later.'
+        elif 'timeout' in str(e).lower():
+            error_message = 'Request timed out. Please try again.'
+        
+        return jsonify({
+            'success': False,
+            'error': error_message
+        }), 500
+
+@app.route('/auth/password-reset/verify', methods=['POST'])
+def verify_password_reset_code():
+    """Verify password reset code only (without resetting password)"""
+    try:
+        data = request.get_json() or {}
+        
+        email = (data.get('email') or '').strip()
+        code = (data.get('code') or '').strip()
+        
+        if not email:
+            return jsonify({'error': 'Email address is required'}), 400
+        if not code:
+            return jsonify({'error': 'Verification code is required'}), 400
+        
+        # Find user
+        user = User.query.filter(func.lower(User.email) == email.lower()).first()
+        
+        if not user:
+            return jsonify({'error': 'Invalid verification code or user not found'}), 400
+        
+        # Find pending password reset
+        pending_reset = PendingPasswordChange.query.filter_by(user_id=user.id).first()
+        
+        if not pending_reset:
+            return jsonify({'error': 'Invalid verification code or no pending reset found'}), 400
+        
+        # Check if code expired
+        if pending_reset.verification_expires_at < datetime.utcnow():
+            db.session.delete(pending_reset)
+            db.session.commit()
+            return jsonify({'error': 'Verification code has expired. Please request a new one.'}), 400
+        
+        # Check failed attempts
+        if pending_reset.failed_attempts >= 5:
+            db.session.delete(pending_reset)
+            db.session.commit()
+            return jsonify({'error': 'Too many failed attempts. Please request a new password reset.'}), 400
+        
+        # Verify code
+        if pending_reset.verification_code != code:
+            pending_reset.failed_attempts += 1
+            db.session.commit()
+            remaining = 5 - pending_reset.failed_attempts
+            return jsonify({
+                'error': f'Invalid verification code. {remaining} attempts remaining.',
+                'remaining_attempts': remaining
+            }), 400
+        
+        # Code is valid - return success (don't delete pending_reset yet, will be deleted when password is reset)
+        print(f"[SUCCESS] Password reset code verified for user {user.username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Verification code is valid. You can now set your new password.',
+            'expires_at': pending_reset.verification_expires_at.isoformat()
+        }), 200
+        
+    except Exception as e:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        print(f"[ERROR] Failed to verify password reset code: {e}")
+        return jsonify({'error': f'Failed to verify code: {str(e)}'}), 500
+
+@app.route('/auth/password-reset/verify-and-complete', methods=['POST'])
+def verify_and_complete_password_reset():
+    """Verify reset code and complete password reset"""
+    try:
+        data = request.get_json() or {}
+        
+        email = (data.get('email') or '').strip()
+        code = (data.get('code') or '').strip()
+        new_password = (data.get('new_password') or '').strip()
+        
+        if not email:
+            return jsonify({'error': 'Email address is required'}), 400
+        if not code:
+            return jsonify({'error': 'Verification code is required'}), 400
+        if not new_password:
+            return jsonify({'error': 'New password is required'}), 400
+        
+        # Find user
+        user = User.query.filter(func.lower(User.email) == email.lower()).first()
+        
+        if not user:
+            return jsonify({'error': 'Invalid verification code or user not found'}), 400
+        
+        # Find pending password reset
+        pending_reset = PendingPasswordChange.query.filter_by(user_id=user.id).first()
+        
+        if not pending_reset:
+            return jsonify({'error': 'Invalid verification code or no pending reset found'}), 400
+        
+        # Check if code expired
+        if pending_reset.verification_expires_at < datetime.utcnow():
+            db.session.delete(pending_reset)
+            db.session.commit()
+            return jsonify({'error': 'Verification code has expired. Please request a new one.'}), 400
+        
+        # Check failed attempts
+        if pending_reset.failed_attempts >= 5:
+            db.session.delete(pending_reset)
+            db.session.commit()
+            return jsonify({'error': 'Too many failed attempts. Please request a new password reset.'}), 400
+        
+        # Verify code
+        if pending_reset.verification_code != code:
+            pending_reset.failed_attempts += 1
+            db.session.commit()
+            remaining = 5 - pending_reset.failed_attempts
+            return jsonify({
+                'error': f'Invalid verification code. {remaining} attempts remaining.',
+                'remaining_attempts': remaining
+            }), 400
+        
+        # Validate new password strength
+        strength_result = validate_password_strength(new_password)
+        if not strength_result['is_valid']:
+            missing = ', '.join(strength_result['requirements_missing'])
+            return jsonify({
+                'error': f'Password is too weak. Please ensure: {missing}',
+                'strength': strength_result['strength'],
+                'requirements_missing': strength_result['requirements_missing']
+            }), 400
+        
+        # Check against common passwords
+        if check_common_passwords(new_password):
+            return jsonify({'error': 'This password is too common. Please choose a more unique password.'}), 400
+        
+        # Check similarity to username/email
+        similarity = check_password_similarity(new_password, user.username, user.email)
+        if similarity['is_similar']:
+            return jsonify({'error': similarity['reason']}), 400
+        
+        # Check maximum length
+        if len(new_password) > 128:
+            return jsonify({'error': 'Password cannot exceed 128 characters'}), 400
+        
+        # Update password
+        user.password = generate_password_hash(new_password)
+        db.session.delete(pending_reset)
+        db.session.commit()
+        
+        print(f"[SUCCESS] Password reset completed for user {user.username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Password reset successfully. Please log in with your new password.'
+        }), 200
+        
+    except Exception as e:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        print(f"[ERROR] Failed to verify and complete password reset: {e}")
         return jsonify({'error': f'Failed to reset password: {str(e)}'}), 500
+
+@app.route('/auth/password-reset/resend-code', methods=['POST'])
+def resend_password_reset_code():
+    """Resend password reset verification code"""
+    try:
+        data = request.get_json() or {}
+        
+        email = (data.get('email') or '').strip()
+        
+        if not email:
+            return jsonify({'error': 'Email address is required'}), 400
+        
+        # Find user (don't reveal if exists)
+        user = User.query.filter(func.lower(User.email) == email.lower()).first()
+        
+        # Always return generic success message
+        parts = email.split('@')
+        masked_email = parts[0][:3] + '***@' + '***' if len(parts) > 1 and len(parts[0]) > 3 else '***@***'
+        
+        if user:
+            # Find pending password reset
+            pending_reset = PendingPasswordChange.query.filter_by(user_id=user.id).first()
+            
+            if pending_reset:
+                # Check rate limiting
+                client_ip = get_client_ip()
+                time_since_creation = (datetime.utcnow() - pending_reset.created_at).total_seconds()
+                
+                if time_since_creation < 60:
+                    return jsonify({
+                        'success': True,
+                        'message': 'If an account exists, a verification code has been resent',
+                        'email': masked_email
+                    }), 200
+                
+                if pending_reset.resend_count >= 3:
+                    return jsonify({
+                        'success': True,
+                        'message': 'If an account exists, a verification code has been resent',
+                        'email': masked_email
+                    }), 200
+                
+                # Generate new verification code
+                verification_code = generate_verification_code()
+                verification_expires_at = datetime.utcnow() + timedelta(minutes=15)
+                
+                pending_reset.verification_code = verification_code
+                pending_reset.verification_expires_at = verification_expires_at
+                pending_reset.resend_count += 1
+                
+                db.session.commit()
+                
+                # Send verification email
+                email_sent = send_password_reset_verification(user.email, verification_code, user.username)
+                
+                if not email_sent:
+                    return jsonify({
+                        'success': True,
+                        'message': 'If an account exists, a verification code has been resent',
+                        'email': masked_email
+                    }), 200
+        
+        # Always return generic success message
+        return jsonify({
+            'success': True,
+            'message': 'If an account exists, a verification code has been resent',
+            'email': masked_email,
+            'expires_at': (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+        }), 200
+        
+    except Exception as e:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        print(f"[ERROR] Failed to resend password reset code: {e}")
+        # Return generic message
+        return jsonify({
+            'success': True,
+            'message': 'If an account exists, a verification code has been resent',
+            'email': '***@***'
+        }), 200
 
 @app.route('/login', methods=['POST'])
 def login_user():
@@ -2895,7 +3873,8 @@ def update_user(username):
                     return jsonify({'error': 'Invalid goal'}), 400
                 user.activity_level = lvl
                 user.goal = gl
-                user.daily_calorie_goal = compute_daily_calorie_goal(
+                old_goal = user.daily_calorie_goal
+                new_goal = compute_daily_calorie_goal(
                     sex=user.sex,
                     age=age_val,
                     weight_kg=weight_val,
@@ -2903,6 +3882,11 @@ def update_user(username):
                     activity_level=lvl,
                     goal=gl,
                 )
+                user.daily_calorie_goal = new_goal
+                
+                # Log goal change if it actually changed
+                if old_goal != new_goal:
+                    _log_goal_change(user.username, new_goal, date.today())
             except Exception as e:
                 return jsonify({'error': 'Invalid inputs for calorie calculation'}), 400
         
@@ -2922,9 +3906,11 @@ def update_user(username):
         print(f"[ERROR] Failed to update user {username}: {e}")
         return jsonify({'error': f'Failed to update user: {str(e)}'}), 500
 
-@app.route('/user/<username>/email', methods=['PUT'])
-def change_user_email(username):
-    """Change user email address"""
+# ===== Email Change Verification Endpoints =====
+
+@app.route('/user/<username>/email/request-change', methods=['POST'])
+def request_email_change(username):
+    """Initiate email change process - sends verification code to new email"""
     try:
         user = get_user_by_identifier(username)
         
@@ -2935,7 +3921,8 @@ def change_user_email(username):
         if not data or 'new_email' not in data:
             return jsonify({'error': 'New email is required'}), 400
         
-        new_email = data['new_email'].strip()
+        new_email = data['new_email'].strip().lower()
+        old_email = user.email or ''
         
         # Validate email format
         import re
@@ -2943,31 +3930,352 @@ def change_user_email(username):
         if not re.match(email_pattern, new_email):
             return jsonify({'error': 'Invalid email format'}), 400
         
-        # Check if email is already in use by another user
-        existing_user = User.query.filter_by(email=new_email).first()
-        if existing_user and existing_user.username != username:
-            return jsonify({'error': 'Email already in use'}), 409
+        # Check if new email is same as current
+        if old_email and old_email.lower() == new_email:
+            return jsonify({'error': 'New email must be different from current email'}), 400
         
-        # Update email
-        user.email = new_email
+        # Check if email is already in use by another user
+        existing_user = User.query.filter(func.lower(User.email) == new_email).first()
+        if existing_user and existing_user.id != user.id:
+            return jsonify({
+                'error': 'Email already registered',
+                'message': 'This email address is already registered to another account'
+            }), 409
+        
+        # Also check if email is in pending registrations
+        pending_reg = PendingRegistration.query.filter(
+            func.lower(PendingRegistration.email) == new_email
+        ).first()
+        if pending_reg:
+            return jsonify({
+                'error': 'Email already registered',
+                'message': 'This email address is already registered to another account'
+            }), 409
+        
+        # Check for existing pending email change
+        existing_pending = PendingEmailChange.query.filter_by(user_id=user.id).first()
+        
+        # Rate limiting: Check if user has made too many requests (max 3 per hour)
+        if existing_pending:
+            time_since_creation = (datetime.utcnow() - existing_pending.created_at).total_seconds()
+            if time_since_creation < 3600:  # 1 hour
+                # Check resend count
+                if existing_pending.resend_count >= 3:
+                    return jsonify({'error': 'Too many requests. Please wait before requesting again.'}), 429
+            else:
+                # Old pending request, delete it
+                db.session.delete(existing_pending)
+        
+        # Generate verification code
+        verification_code = generate_verification_code()
+        verification_expires_at = datetime.utcnow() + timedelta(minutes=15)
+        
+        # Create or update pending email change
+        if existing_pending and (datetime.utcnow() - existing_pending.created_at).total_seconds() < 3600:
+            existing_pending.new_email = new_email
+            existing_pending.old_email = old_email
+            existing_pending.verification_code = verification_code
+            existing_pending.verification_expires_at = verification_expires_at
+            # Don't reset resend_count - keep it for rate limiting
+            pending_change = existing_pending
+        else:
+            pending_change = PendingEmailChange(
+                user_id=user.id,
+                username=user.username,
+                old_email=old_email,
+                new_email=new_email,
+                verification_code=verification_code,
+                verification_expires_at=verification_expires_at,
+                resend_count=0
+            )
+            db.session.add(pending_change)
+        
         db.session.commit()
         
-        print(f"[SUCCESS] Email changed for user {username}")
+        # Send verification email to NEW email address
+        # Note: Code is sent to NEW email to verify ownership of the new email address
+        email_sent = send_email_change_verification(
+            new_email=new_email,
+            code=verification_code,
+            old_email=old_email,
+            username=user.username
+        )
+        
+        if not email_sent:
+            # Check if email service is configured
+            import os
+            if not os.environ.get('GMAIL_USERNAME') or not os.environ.get('GMAIL_APP_PASSWORD'):
+                return jsonify({
+                    'error': 'Email service not configured. Please contact support.',
+                    'details': 'Gmail SMTP credentials are missing'
+                }), 500
+            return jsonify({
+                'error': 'Failed to send verification email. Please check the new email address and try again.',
+                'details': f'Code was generated but email could not be sent to {new_email}'
+            }), 500
+        
+        # Send security notification to OLD email address (non-blocking)
+        # This is informational only - failure should not block email change
+        if old_email:
+            try:
+                notification_sent = send_email_change_notification(
+                    old_email=old_email,
+                    new_email=new_email,
+                    username=user.username,
+                    timestamp=datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+                )
+                if notification_sent:
+                    print(f"[SUCCESS] Email change notification sent to {old_email} for user {username}")
+                else:
+                    print(f"[WARN] Failed to send email change notification to {old_email} (non-blocking)")
+            except Exception as e:
+                # Log but don't fail - notification is non-critical
+                print(f"[WARN] Error sending email change notification to {old_email}: {e}")
+        
+        print(f"[SUCCESS] Email change verification code sent to {new_email} for user {username}")
         
         return jsonify({
             'success': True,
-            'message': 'Email changed successfully',
-            'new_email': new_email
+            'message': 'Verification code sent to new email address',
+            'new_email': new_email,
+            'expires_at': verification_expires_at.isoformat()
         }), 200
         
     except Exception as e:
         db.session.rollback()
-        print(f"[ERROR] Failed to change email for user {username}: {e}")
-        return jsonify({'error': f'Failed to change email: {str(e)}'}), 500
+        print(f"[ERROR] Failed to request email change for user {username}: {e}")
+        return jsonify({'error': f'Failed to request email change: {str(e)}'}), 500
+
+@app.route('/user/<username>/email/verify-change', methods=['POST'])
+def verify_email_change(username):
+    """Verify email change code and update email"""
+    try:
+        user = get_user_by_identifier(username)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        data = request.get_json()
+        if not data or 'verification_code' not in data:
+            return jsonify({'error': 'Verification code is required'}), 400
+        
+        code = data['verification_code'].strip()
+        
+        # Find pending email change
+        pending_change = PendingEmailChange.query.filter_by(user_id=user.id).first()
+        
+        if not pending_change:
+            return jsonify({'error': 'No pending email change found'}), 404
+        
+        # Check if code expired
+        if pending_change.verification_expires_at < datetime.utcnow():
+            db.session.delete(pending_change)
+            db.session.commit()
+            return jsonify({'error': 'Verification code has expired. Please request a new one.'}), 400
+        
+        # Check if code matches
+        if pending_change.verification_code != code:
+            return jsonify({'error': 'Invalid verification code'}), 400
+        
+        # Verify new email is still available
+        existing_user = User.query.filter(func.lower(User.email) == pending_change.new_email.lower()).first()
+        if existing_user and existing_user.id != user.id:
+            db.session.delete(pending_change)
+            db.session.commit()
+            return jsonify({'error': 'Email is now in use by another account'}), 409
+        
+        # Update user email
+        old_email = user.email
+        user.email = pending_change.new_email
+        
+        # Delete pending change
+        db.session.delete(pending_change)
+        db.session.commit()
+        
+        print(f"[SUCCESS] Email changed for user {username}: {old_email} -> {user.email}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Email changed successfully',
+            'new_email': user.email
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to verify email change for user {username}: {e}")
+        return jsonify({'error': f'Failed to verify email change: {str(e)}'}), 500
+
+@app.route('/user/<username>/email/resend-code', methods=['POST'])
+def resend_email_change_code(username):
+    """Resend email change verification code"""
+    try:
+        user = get_user_by_identifier(username)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Find pending email change
+        pending_change = PendingEmailChange.query.filter_by(user_id=user.id).first()
+        
+        if not pending_change:
+            return jsonify({'error': 'No pending email change found'}), 404
+        
+        # Rate limiting: Check resend count and time since last resend
+        if pending_change.resend_count >= 3:
+            time_since_creation = (datetime.utcnow() - pending_change.created_at).total_seconds()
+            if time_since_creation < 3600:  # 1 hour
+                return jsonify({'error': 'Maximum resend attempts reached. Please wait before trying again.'}), 429
+        
+        # Check minimum 60 seconds between resends (check last resend time)
+        # For simplicity, we'll allow resend if code is not expired
+        if pending_change.verification_expires_at < datetime.utcnow():
+            return jsonify({'error': 'Verification code has expired. Please request a new email change.'}), 400
+        
+        # Generate new code and reset expiration (restart timer)
+        verification_code = generate_verification_code()
+        verification_expires_at = datetime.utcnow() + timedelta(minutes=15)
+        
+        pending_change.verification_code = verification_code
+        pending_change.verification_expires_at = verification_expires_at
+        pending_change.resend_count += 1
+        
+        db.session.commit()
+        
+        # Send verification email to NEW email address
+        # Note: Code is sent to NEW email to verify ownership of the new email address
+        email_sent = send_email_change_verification(
+            new_email=pending_change.new_email,
+            code=verification_code,
+            old_email=pending_change.old_email,
+            username=user.username
+        )
+        
+        if not email_sent:
+            # Check if email service is configured
+            import os
+            if not os.environ.get('GMAIL_USERNAME') or not os.environ.get('GMAIL_APP_PASSWORD'):
+                return jsonify({
+                    'error': 'Email service not configured. Please contact support.',
+                    'details': 'Gmail SMTP credentials are missing'
+                }), 500
+            return jsonify({
+                'error': 'Failed to send verification email. Please check the new email address and try again.',
+                'details': f'Code was generated but email could not be sent to {pending_change.new_email}'
+            }), 500
+        
+        print(f"[SUCCESS] Email change verification code resent to {pending_change.new_email} for user {username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Verification code resent',
+            'expires_at': verification_expires_at.isoformat()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to resend email change code for user {username}: {e}")
+        return jsonify({'error': f'Failed to resend code: {str(e)}'}), 500
+
+@app.route('/user/<username>/email/pending-status', methods=['GET'])
+def get_email_change_status(username):
+    """Get pending email change status"""
+    try:
+        user = get_user_by_identifier(username)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        pending_change = PendingEmailChange.query.filter_by(user_id=user.id).first()
+        
+        if not pending_change:
+            return jsonify({
+                'has_pending': False
+            }), 200
+        
+        # Check if expired
+        if pending_change.verification_expires_at < datetime.utcnow():
+            db.session.delete(pending_change)
+            db.session.commit()
+            return jsonify({
+                'has_pending': False
+            }), 200
+        
+        return jsonify({
+            'has_pending': True,
+            'new_email': pending_change.new_email,
+            'expires_at': pending_change.verification_expires_at.isoformat(),
+            'can_resend': pending_change.resend_count < 3
+        }), 200
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to get email change status for user {username}: {e}")
+        return jsonify({'error': f'Failed to get status: {str(e)}'}), 500
+
+@app.route('/user/<username>/email/cancel-change', methods=['DELETE'])
+def cancel_email_change(username):
+    """Cancel pending email change"""
+    try:
+        user = get_user_by_identifier(username)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        pending_change = PendingEmailChange.query.filter_by(user_id=user.id).first()
+        
+        if pending_change:
+            db.session.delete(pending_change)
+            db.session.commit()
+            print(f"[SUCCESS] Email change cancelled for user {username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Email change cancelled'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to cancel email change for user {username}: {e}")
+        return jsonify({'error': f'Failed to cancel email change: {str(e)}'}), 500
+
+@app.route('/user/<username>/email/check-config', methods=['GET'])
+def check_email_config():
+    """Check if email service is configured (for debugging)"""
+    import os
+    gmail_username = os.environ.get('GMAIL_USERNAME')
+    gmail_password = os.environ.get('GMAIL_APP_PASSWORD')
+    
+    is_configured = bool(gmail_username and gmail_password)
+    
+    return jsonify({
+        'email_service_configured': is_configured,
+        'gmail_username_set': bool(gmail_username),
+        'gmail_password_set': bool(gmail_password),
+        'message': 'Email service is configured' if is_configured else 'Email service is NOT configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in .env'
+    }), 200
+
+@app.route('/user/<username>/email', methods=['PUT'])
+def change_user_email(username):
+    """Change user email address - DEPRECATED: Use /email/request-change instead"""
+    return jsonify({
+        'error': 'This endpoint is deprecated. Please use POST /user/<username>/email/request-change to initiate email change with verification.',
+        'new_endpoint': f'/user/{username}/email/request-change',
+        'method': 'POST'
+    }), 410  # 410 Gone - indicates the resource is no longer available
 
 @app.route('/user/<username>/password', methods=['PUT'])
 def change_user_password(username):
-    """Change user password"""
+    """Change user password - DEPRECATED: Use /password/request-change instead"""
+    return jsonify({
+        'error': 'This endpoint is deprecated. Please use POST /user/<username>/password/request-change to initiate password change with email verification.',
+        'new_endpoint': f'/user/{username}/password/request-change',
+        'method': 'POST'
+    }), 410  # 410 Gone - indicates the resource is no longer available
+
+# ===== Password Change Verification Endpoints =====
+
+@app.route('/user/<username>/password/request-change', methods=['POST'])
+def request_password_change(username):
+    """Initiate password change process - sends verification code to user's email"""
     try:
         user = get_user_by_identifier(username)
         
@@ -2984,19 +4292,202 @@ def change_user_password(username):
         if not current_password or not new_password:
             return jsonify({'error': 'Current password and new password are required'}), 400
         
-        # Verify current password
-        if not check_password_hash(user.password, current_password):
+        # Verify current password FIRST
+        current_password_correct = check_password_hash(user.password, current_password)
+        if not current_password_correct:
             return jsonify({'error': 'Current password is incorrect'}), 401
         
-        # Validate new password
-        if len(new_password) < 6:
-            return jsonify({'error': 'New password must be at least 6 characters long'}), 400
+        # Check if new password is the same as current password (do this early for better UX)
+        if check_password_hash(user.password, new_password):
+            return jsonify({'error': 'New password must be different from your current password'}), 400
         
-        # Update password
-        user.password = generate_password_hash(new_password)
+        # Validate new password strength
+        strength_result = validate_password_strength(new_password)
+        if not strength_result['is_valid']:
+            missing = ', '.join(strength_result['requirements_missing'])
+            return jsonify({
+                'error': f'Password is too weak. Please ensure: {missing}',
+                'strength': strength_result['strength'],
+                'requirements_missing': strength_result['requirements_missing']
+            }), 400
+        
+        # Check against common passwords
+        if check_common_passwords(new_password):
+            return jsonify({'error': 'This password is too common. Please choose a more unique password.'}), 400
+        
+        # Check similarity to username/email
+        similarity = check_password_similarity(new_password, user.username, user.email)
+        if similarity['is_similar']:
+            return jsonify({'error': similarity['reason']}), 400
+        
+        # Check maximum length
+        if len(new_password) > 128:
+            return jsonify({'error': 'Password cannot exceed 128 characters'}), 400
+        
+        # Check for existing pending password change
+        existing_pending = PendingPasswordChange.query.filter_by(user_id=user.id).first()
+        
+        # Rate limiting: Check if user has made too many requests (max 3 per hour)
+        if existing_pending:
+            time_since_creation = (datetime.utcnow() - existing_pending.created_at).total_seconds()
+            if time_since_creation < 3600:  # 1 hour
+                if existing_pending.request_count >= 3:
+                    return jsonify({'error': 'Too many requests. Please wait before requesting again.'}), 429
+                existing_pending.request_count += 1
+            else:
+                # Old pending request, delete it
+                db.session.delete(existing_pending)
+                existing_pending = None
+        
+        # Check for conflicting operations
+        pending_email = PendingEmailChange.query.filter_by(user_id=user.id).first()
+        if pending_email:
+            return jsonify({'error': 'Cannot change password while email change is pending'}), 409
+        
+        # Generate verification code
+        verification_code = generate_verification_code()
+        verification_expires_at = datetime.utcnow() + timedelta(minutes=15)
+        
+        # Hash new password for temporary storage
+        new_password_hash = generate_password_hash(new_password)
+        
+        # Get client IP
+        client_ip = get_client_ip()
+        
+        # Create or update pending password change
+        if existing_pending and (datetime.utcnow() - existing_pending.created_at).total_seconds() < 3600:
+            # Reset status to pending if it was cancelled or expired
+            existing_pending.verification_code = verification_code
+            existing_pending.verification_expires_at = verification_expires_at
+            existing_pending.new_password_hash = new_password_hash
+            existing_pending.ip_address = client_ip
+            existing_pending.status = 'pending'
+            existing_pending.verified_at = None
+            existing_pending.cancelled_at = None
+            pending_change = existing_pending
+        else:
+            pending_change = PendingPasswordChange(
+                user_id=user.id,
+                username=user.username,
+                email=user.email,
+                verification_code=verification_code,
+                verification_expires_at=verification_expires_at,
+                new_password_hash=new_password_hash,
+                ip_address=client_ip,
+                request_count=1,
+                resend_count=0,
+                failed_attempts=0,
+                status='pending',
+                verified_at=None,
+                cancelled_at=None
+            )
+            db.session.add(pending_change)
+        
         db.session.commit()
         
-        print(f"[SUCCESS] Password changed for user {username}")
+        # Send verification email
+        email_sent = send_password_change_verification(user.email, verification_code, user.username)
+        
+        if not email_sent:
+            # Don't create pending record if email fails
+            db.session.delete(pending_change)
+            db.session.commit()
+            return jsonify({'error': 'Email service temporarily unavailable. Please try again later.'}), 503
+        
+        print(f"[SUCCESS] Password change verification code sent to {user.email} for user {username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Verification code sent to your email',
+            'email': user.email,
+            'expires_at': verification_expires_at.isoformat()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to request password change for user {username}: {e}")
+        return jsonify({'error': f'Failed to request password change: {str(e)}'}), 500
+
+@app.route('/user/<username>/password/verify-change', methods=['POST'])
+def verify_password_change(username):
+    """Verify password change code and update password"""
+    try:
+        user = get_user_by_identifier(username)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        data = request.get_json()
+        if not data or 'code' not in data:
+            return jsonify({'error': 'Verification code is required'}), 400
+        
+        code = data['code'].strip()
+        
+        # Find pending password change
+        pending_change = PendingPasswordChange.query.filter_by(user_id=user.id).first()
+        
+        if not pending_change:
+            print(f"[SECURITY] Verify attempt for user {username}: No pending password change found")
+            return jsonify({'error': 'No pending password change found'}), 404
+        
+        # SECURITY: Check status - must be 'pending' to verify
+        if pending_change.status != 'pending':
+            if pending_change.status == 'cancelled':
+                print(f"[SECURITY] Verify attempt for user {username}: Attempted to verify cancelled request")
+                db.session.delete(pending_change)
+                db.session.commit()
+                return jsonify({'error': 'This password change request was cancelled. Please request a new one.'}), 400
+            elif pending_change.status == 'verified':
+                print(f"[SECURITY] Verify attempt for user {username}: Attempted to re-verify already verified request")
+                db.session.delete(pending_change)
+                db.session.commit()
+                return jsonify({'error': 'This password change has already been completed. Please request a new one if needed.'}), 400
+            elif pending_change.status == 'expired':
+                print(f"[SECURITY] Verify attempt for user {username}: Attempted to verify expired request")
+                db.session.delete(pending_change)
+                db.session.commit()
+                return jsonify({'error': 'Verification code has expired. Please request a new one.'}), 400
+        
+        # Check if code expired
+        if pending_change.verification_expires_at < datetime.utcnow():
+            pending_change.status = 'expired'
+            db.session.delete(pending_change)
+            db.session.commit()
+            print(f"[SECURITY] Verify attempt for user {username}: Code expired")
+            return jsonify({'error': 'Verification code has expired. Please request a new one.'}), 400
+        
+        # Check failed attempts
+        if pending_change.failed_attempts >= 5:
+            pending_change.status = 'expired'
+            db.session.delete(pending_change)
+            db.session.commit()
+            print(f"[SECURITY] Verify attempt for user {username}: Too many failed attempts")
+            return jsonify({'error': 'Too many failed attempts. Please request a new password change.'}), 400
+        
+        # Check if code matches
+        if pending_change.verification_code != code:
+            pending_change.failed_attempts += 1
+            db.session.commit()
+            remaining = 5 - pending_change.failed_attempts
+            print(f"[SECURITY] Verify attempt for user {username}: Invalid code, {remaining} attempts remaining")
+            return jsonify({
+                'error': f'Invalid verification code. {remaining} attempts remaining.',
+                'remaining_attempts': remaining
+            }), 400
+        
+        # SECURITY: Code is correct - use atomic transaction to update password
+        # Mark as verified BEFORE updating password to prevent race conditions
+        try:
+            pending_change.status = 'verified'
+            pending_change.verified_at = datetime.utcnow()
+            user.password = pending_change.new_password_hash
+            db.session.delete(pending_change)
+            db.session.commit()
+            print(f"[SUCCESS] Password changed for user {username} - verified at {datetime.utcnow()}")
+        except Exception as e:
+            db.session.rollback()
+            print(f"[ERROR] Failed to update password for user {username}: {e}")
+            raise
         
         return jsonify({
             'success': True,
@@ -3005,19 +4496,203 @@ def change_user_password(username):
         
     except Exception as e:
         db.session.rollback()
-        print(f"[ERROR] Failed to change password for user {username}: {e}")
-        return jsonify({'error': f'Failed to change password: {str(e)}'}), 500
+        print(f"[ERROR] Failed to verify password change for user {username}: {e}")
+        return jsonify({'error': f'Failed to verify password change: {str(e)}'}), 500
 
-@app.route('/user/<username>', methods=['DELETE'])
-def delete_user_account(username):
-    """Delete user account and all associated data"""
+@app.route('/user/<username>/password/resend-code', methods=['POST'])
+def resend_password_change_code(username):
+    """Resend password change verification code"""
     try:
         user = get_user_by_identifier(username)
         
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
-        # Delete all associated data
+        # Find pending password change
+        pending_change = PendingPasswordChange.query.filter_by(user_id=user.id).first()
+        
+        if not pending_change:
+            return jsonify({'error': 'No pending password change found'}), 404
+        
+        # SECURITY: Check status - can only resend for pending requests
+        if pending_change.status != 'pending':
+            if pending_change.status == 'cancelled':
+                return jsonify({'error': 'This password change request was cancelled. Please request a new one.'}), 400
+            elif pending_change.status == 'verified':
+                return jsonify({'error': 'This password change has already been completed.'}), 400
+            elif pending_change.status == 'expired':
+                return jsonify({'error': 'This password change request has expired. Please request a new one.'}), 400
+        
+        # Check rate limiting (max 3 resends per hour, 60 seconds between resends)
+        time_since_creation = (datetime.utcnow() - pending_change.created_at).total_seconds()
+        if time_since_creation < 60:
+            return jsonify({'error': 'Please wait before requesting a new code'}), 429
+        
+        if pending_change.resend_count >= 3:
+            return jsonify({'error': 'Maximum resend limit reached. Please request a new password change.'}), 429
+        
+        # Generate new verification code
+        verification_code = generate_verification_code()
+        verification_expires_at = datetime.utcnow() + timedelta(minutes=15)
+        
+        pending_change.verification_code = verification_code
+        pending_change.verification_expires_at = verification_expires_at
+        pending_change.resend_count += 1
+        
+        db.session.commit()
+        
+        # Send verification email
+        email_sent = send_password_change_verification(user.email, verification_code, user.username)
+        
+        if not email_sent:
+            return jsonify({'error': 'Email service temporarily unavailable. Please try again later.'}), 503
+        
+        print(f"[SUCCESS] Password change verification code resent to {user.email} for user {username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Verification code resent',
+            'expires_at': verification_expires_at.isoformat()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to resend password change code for user {username}: {e}")
+        return jsonify({'error': f'Failed to resend code: {str(e)}'}), 500
+
+@app.route('/user/<username>/password/cancel-change', methods=['POST'])
+def cancel_password_change(username):
+    """Cancel pending password change"""
+    try:
+        user = get_user_by_identifier(username)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Find pending password change
+        pending_change = PendingPasswordChange.query.filter_by(user_id=user.id).first()
+        
+        if pending_change:
+            # SECURITY: Mark as cancelled and set timestamp before deletion
+            if pending_change.status == 'pending':
+                pending_change.status = 'cancelled'
+                pending_change.cancelled_at = datetime.utcnow()
+                db.session.delete(pending_change)
+                db.session.commit()
+                print(f"[SUCCESS] Password change cancelled for user {username} at {datetime.utcnow()}")
+            else:
+                # Already cancelled, verified, or expired - just delete
+                print(f"[INFO] Deleting non-pending password change for user {username} (status: {pending_change.status})")
+                db.session.delete(pending_change)
+                db.session.commit()
+        else:
+            print(f"[INFO] Cancel request for user {username}: No pending password change found")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Password change cancelled'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to cancel password change for user {username}: {e}")
+        return jsonify({'error': f'Failed to cancel password change: {str(e)}'}), 500
+
+# ===== Account Deletion Verification Endpoints =====
+
+@app.route('/user/<username>/delete/request', methods=['POST'])
+def request_account_deletion(username):
+    """Initiate account deletion process - sends verification code to current email"""
+    try:
+        user = get_user_by_identifier(username)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Check for existing pending deletion
+        existing_pending = PendingAccountDeletion.query.filter_by(user_id=user.id).first()
+        
+        # Rate limiting: Max 1 request per hour
+        if existing_pending:
+            time_since_creation = (datetime.utcnow() - existing_pending.created_at).total_seconds()
+            if time_since_creation < 3600:  # 1 hour
+                return jsonify({'error': 'Account deletion request already pending. Please wait before requesting again.'}), 429
+            else:
+                # Old pending request, delete it
+                db.session.delete(existing_pending)
+        
+        # Generate verification code
+        verification_code = generate_verification_code()
+        verification_expires_at = datetime.utcnow() + timedelta(minutes=15)
+        
+        # Create pending account deletion
+        pending_deletion = PendingAccountDeletion(
+            user_id=user.id,
+            username=user.username,
+            email=user.email or user.username,  # Use email or username as fallback
+            verification_code=verification_code,
+            verification_expires_at=verification_expires_at,
+            resend_count=0
+        )
+        db.session.add(pending_deletion)
+        db.session.commit()
+        
+        # Send verification email to CURRENT email address
+        email_sent = send_account_deletion_verification(
+            email=user.email or user.username,
+            code=verification_code,
+            username=user.username
+        )
+        
+        if not email_sent:
+            return jsonify({'error': 'Failed to send verification email. Please try again.'}), 500
+        
+        print(f"[SUCCESS] Account deletion verification code sent to {user.email} for user {username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Verification code sent to your email',
+            'expires_at': verification_expires_at.isoformat(),
+            'warning': 'This action cannot be undone'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to request account deletion for user {username}: {e}")
+        return jsonify({'error': f'Failed to request account deletion: {str(e)}'}), 500
+
+@app.route('/user/<username>/delete/verify', methods=['POST'])
+def verify_account_deletion(username):
+    """Verify account deletion code and delete account"""
+    try:
+        user = get_user_by_identifier(username)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        data = request.get_json()
+        if not data or 'verification_code' not in data:
+            return jsonify({'error': 'Verification code is required'}), 400
+        
+        code = data['verification_code'].strip()
+        
+        # Find pending deletion
+        pending_deletion = PendingAccountDeletion.query.filter_by(user_id=user.id).first()
+        
+        if not pending_deletion:
+            return jsonify({'error': 'No pending account deletion found'}), 404
+        
+        # Check if code expired
+        if pending_deletion.verification_expires_at < datetime.utcnow():
+            db.session.delete(pending_deletion)
+            db.session.commit()
+            return jsonify({'error': 'Verification code has expired. Please request a new one.'}), 400
+        
+        # Check if code matches
+        if pending_deletion.verification_code != code:
+            return jsonify({'error': 'Invalid verification code'}), 400
+        
+        # Delete all associated data (same as existing delete endpoint)
         # Delete food logs
         FoodLog.query.filter_by(user=username).delete()
         
@@ -3040,19 +4715,19 @@ def delete_user_account(username):
         RecipeLog.query.filter_by(user=username).delete()
         
         # Delete custom recipes and their ingredients
-        # First, get all recipe IDs for this user
         user_recipes = CustomRecipe.query.filter_by(user=username).all()
         recipe_ids = [recipe.id for recipe in user_recipes]
         
-        # Delete recipe ingredients (foreign key to recipes)
         if recipe_ids:
             RecipeIngredient.query.filter(RecipeIngredient.recipe_id.in_(recipe_ids)).delete()
         
-        # Delete custom recipes
         CustomRecipe.query.filter_by(user=username).delete()
         
         # Delete streaks
         Streak.query.filter_by(user=username).delete()
+        
+        # Delete pending deletion record
+        db.session.delete(pending_deletion)
         
         # Delete the user
         db.session.delete(user)
@@ -3067,55 +4742,386 @@ def delete_user_account(username):
         
     except Exception as e:
         db.session.rollback()
-        print(f"[ERROR] Failed to delete user account {username}: {e}")
-        return jsonify({'error': f'Failed to delete account: {str(e)}'}), 500
+        print(f"[ERROR] Failed to verify account deletion for user {username}: {e}")
+        return jsonify({'error': f'Failed to verify account deletion: {str(e)}'}), 500
+
+@app.route('/user/<username>/delete/resend-code', methods=['POST'])
+def resend_account_deletion_code(username):
+    """Resend account deletion verification code"""
+    try:
+        user = get_user_by_identifier(username)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Find pending deletion
+        pending_deletion = PendingAccountDeletion.query.filter_by(user_id=user.id).first()
+        
+        if not pending_deletion:
+            return jsonify({'error': 'No pending account deletion found'}), 404
+        
+        # Rate limiting: Max 2 resends per hour
+        if pending_deletion.resend_count >= 2:
+            time_since_creation = (datetime.utcnow() - pending_deletion.created_at).total_seconds()
+            if time_since_creation < 3600:  # 1 hour
+                return jsonify({'error': 'Maximum resend attempts reached. Please wait before trying again.'}), 429
+        
+        # Check if code expired
+        if pending_deletion.verification_expires_at < datetime.utcnow():
+            return jsonify({'error': 'Verification code has expired. Please request a new account deletion.'}), 400
+        
+        # Generate new code and reset expiration (restart timer)
+        verification_code = generate_verification_code()
+        verification_expires_at = datetime.utcnow() + timedelta(minutes=15)
+        
+        pending_deletion.verification_code = verification_code
+        pending_deletion.verification_expires_at = verification_expires_at
+        pending_deletion.resend_count += 1
+        
+        db.session.commit()
+        
+        # Send verification email
+        email_sent = send_account_deletion_verification(
+            email=user.email or user.username,
+            code=verification_code,
+            username=user.username
+        )
+        
+        if not email_sent:
+            return jsonify({'error': 'Failed to send verification email. Please try again.'}), 500
+        
+        print(f"[SUCCESS] Account deletion verification code resent to {user.email} for user {username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Verification code resent',
+            'expires_at': verification_expires_at.isoformat()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to resend account deletion code for user {username}: {e}")
+        return jsonify({'error': f'Failed to resend code: {str(e)}'}), 500
+
+@app.route('/user/<username>/delete/cancel', methods=['DELETE'])
+def cancel_account_deletion(username):
+    """Cancel pending account deletion"""
+    try:
+        user = get_user_by_identifier(username)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        pending_deletion = PendingAccountDeletion.query.filter_by(user_id=user.id).first()
+        
+        if pending_deletion:
+            db.session.delete(pending_deletion)
+            db.session.commit()
+            print(f"[SUCCESS] Account deletion cancelled for user {username}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Account deletion cancelled'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Failed to cancel account deletion for user {username}: {e}")
+        return jsonify({'error': f'Failed to cancel account deletion: {str(e)}'}), 500
+
+@app.route('/user/<username>', methods=['DELETE'])
+def delete_user_account(username):
+    """Delete user account - DEPRECATED: Use /delete/request instead"""
+    return jsonify({
+        'error': 'This endpoint is deprecated. Please use POST /user/<username>/delete/request to initiate account deletion with email verification.',
+        'new_endpoint': f'/user/{username}/delete/request',
+        'method': 'POST'
+    }), 410  # 410 Gone - indicates the resource is no longer available
+
+def clean_food_name(name):
+    """
+    Clean food name by removing:
+    - "Var" followed by numbers (e.g., "Lechon Var1" -> "Lechon")
+    - "#" followed by numbers (e.g., "Laing #52" -> "Laing")
+    - Underscores (e.g., "tinolang_manok" -> "tinolang manok")
+    - Trailing numbers and special characters
+    """
+    if not name or pd.isna(name):
+        return name
+    
+    import re
+    name_str = str(name).strip()
+    
+    # Remove "Var" followed by numbers (case-insensitive)
+    name_str = re.sub(r'\s+var\s*\d+', '', name_str, flags=re.IGNORECASE)
+    
+    # Remove "#" followed by numbers
+    name_str = re.sub(r'\s*#\s*\d+', '', name_str)
+    
+    # Replace underscores with spaces
+    name_str = name_str.replace('_', ' ')
+    
+    # Remove trailing numbers, spaces, and special characters
+    name_str = re.sub(r'\s+\d+$', '', name_str)  # Remove trailing numbers
+    name_str = re.sub(r'\s+$', '', name_str)  # Remove trailing spaces
+    
+    return name_str.strip()
+
+def _parse_user_preferences(user_obj):
+    """Parse user's food preferences from User object."""
+    preferences = []
+    try:
+        # Try to get dietary_preferences first
+        if hasattr(user_obj, 'dietary_preferences') and user_obj.dietary_preferences:
+            prefs_str = str(user_obj.dietary_preferences).strip()
+            if prefs_str and prefs_str != 'None' and prefs_str != '[]':
+                try:
+                    if prefs_str.startswith('['):
+                        preferences = eval(prefs_str) if prefs_str else []
+                    else:
+                        preferences = [p.strip() for p in prefs_str.split(',') if p.strip()]
+                except:
+                    preferences = [prefs_str]
+        # Fallback to diet_type if dietary_preferences is not available
+        if not preferences and hasattr(user_obj, 'diet_type') and user_obj.diet_type:
+            diet_type_str = str(user_obj.diet_type).strip()
+            if diet_type_str and diet_type_str != 'None':
+                preferences = [diet_type_str]
+    except:
+        pass
+    return [p.lower() for p in preferences if p]
+
+def _filter_foods_by_preferences(foods_df, preferences):
+    """Filter foods based on user preferences."""
+    if not preferences or foods_df.empty:
+        return foods_df
+    
+    filtered_df = foods_df.copy()
+    prefs_lower = [p.lower() for p in preferences]
+    
+    # Vegetarian/Plant-based: filter out meats and fish (but keep vegetable dishes)
+    if 'vegetarian' in prefs_lower or 'plant-based' in prefs_lower or 'plant_based' in prefs_lower:
+        # Filter out foods with meat/fish keywords, but keep vegetable dishes
+        meat_keywords = ['pork', 'chicken', 'beef', 'lechon', 'sisig', 'tocino', 'longganisa', 'bangus', 'tilapia', 'galunggong', 'tuyo', 'tinapa', 'shrimp', 'crab', 'squid']
+        # Don't filter if it's a vegetable dish (contains vegetable keywords)
+        vegetable_keywords = ['sitaw', 'monggo', 'ampalaya', 'kangkong', 'pinakbet', 'laing', 'ginisang', 'vegetable']
+        filtered_df = filtered_df[
+            ~(
+                filtered_df['Food Name'].astype(str).str.lower().str.contains('|'.join(meat_keywords), na=False) &
+                ~filtered_df['Food Name'].astype(str).str.lower().str.contains('|'.join(vegetable_keywords), na=False)
+            )
+        ]
+    
+    # Protein lover: prioritize high protein foods
+    if 'protein' in prefs_lower:
+        # Keep all foods but we'll sort by protein later
+        pass
+    
+    # Healthy: prioritize foods with good nutritional density
+    if 'healthy' in prefs_lower:
+        # Keep all foods but we'll prioritize later
+        pass
+    
+    # Spicy: prioritize spicy foods
+    if 'spicy' in prefs_lower:
+        spicy_keywords = ['adobo', 'sinigang', 'bicol', 'spicy', 'hot', 'chili']
+        # We'll boost these in scoring, not filter
+        pass
+    
+    return filtered_df
+
+def _filter_foods_by_goal(foods_df, goal):
+    """Filter/prioritize foods based on user goal."""
+    if not goal or foods_df.empty:
+        return foods_df
+    
+    goal_lower = str(goal).lower()
+    
+    # For lose weight: prioritize lower calorie, high fiber foods
+    if 'lose' in goal_lower or 'weight loss' in goal_lower:
+        # Keep all but we'll sort by calories (lower first) and fiber (higher first)
+        pass
+    
+    # For gain muscle: prioritize high protein foods
+    if 'muscle' in goal_lower or 'gain' in goal_lower:
+        # Keep all but we'll sort by protein (higher first)
+        pass
+    
+    return foods_df
+
+def _get_foods_from_csv(meal_type=None, user_preferences=None, user_goal=None, activity_level=None, limit=30):
+    """
+    Get foods from CSV (food_df) filtered by meal type, preferences, goal, and activity level.
+    Returns a list of formatted strings for AI prompts.
+    """
+    try:
+        global_food_df = globals().get('food_df', None)
+        if global_food_df is None or not isinstance(global_food_df, pd.DataFrame) or global_food_df.empty:
+            return []
+        
+        foods_df = global_food_df.copy()
+        
+        # Filter by meal type if provided (using Category column)
+        if meal_type:
+            meal_type_lower = str(meal_type).lower()
+            # Map meal types to category keywords (enhanced with more Filipino food keywords)
+            meal_keywords = {
+                'breakfast': ['breakfast', 'cereal', 'bread', 'porridge', 'champorado', 'arroz caldo', 'goto', 'pandesal', 'tapsilog', 'tocino', 'longganisa'],
+                'lunch': ['main dish', 'stew', 'soup', 'noodle', 'adobo', 'sinigang', 'kare-kare', 'caldereta', 'afritada'],
+                'dinner': ['main dish', 'stew', 'soup', 'noodle', 'adobo', 'sinigang', 'kare-kare', 'caldereta', 'afritada'],
+                'snack': ['snack', 'dessert', 'appetizer', 'street food', 'beverage', 'condiment', 'spread', 'sandwich', 
+                         'puto', 'bibingka', 'halo-halo', 'leche flan', 'turon', 'kakanin', 'suman', 'biko', 'sapin-sapin', 
+                         'maja blanca', 'buko pandan', 'cassava cake', 'ube halaya', 'polvoron', 'pastillas', 'yema', 
+                         'chicharon', 'kropek', 'banana cue', 'camote cue', 'fishball', 'kikiam', 'squidball', 'tempura',
+                         'lumpia', 'siomai', 'empanada', 'ensaymada', 'pan de sal', 'pandesal', 'hopia', 'monay'],
+                'snacks': ['snack', 'dessert', 'appetizer', 'street food', 'beverage', 'condiment', 'spread', 'sandwich',
+                         'puto', 'bibingka', 'halo-halo', 'leche flan', 'turon', 'kakanin', 'suman', 'biko', 'sapin-sapin',
+                         'maja blanca', 'buko pandan', 'cassava cake', 'ube halaya', 'polvoron', 'pastillas', 'yema',
+                         'chicharon', 'kropek', 'banana cue', 'camote cue', 'fishball', 'kikiam', 'squidball', 'tempura',
+                         'lumpia', 'siomai', 'empanada', 'ensaymada', 'pan de sal', 'pandesal', 'hopia', 'monay'],  # Handle plural
+            }
+            keywords = meal_keywords.get(meal_type_lower, [])
+            if keywords:
+                # Filter by category containing any of the keywords
+                category_filter = foods_df['Category'].astype(str).str.lower().str.contains('|'.join(keywords), na=False)
+                # Also check food name for common meal type indicators
+                name_filter = foods_df['Food Name'].astype(str).str.lower().str.contains('|'.join(keywords), na=False)
+                foods_df = foods_df[category_filter | name_filter]
+                # If no matches, don't filter (return all)
+                if foods_df.empty:
+                    foods_df = global_food_df.copy()
+        
+        # Filter by preferences
+        if user_preferences:
+            foods_df = _filter_foods_by_preferences(foods_df, user_preferences)
+        
+        # Filter by goal (affects sorting, not filtering)
+        if user_goal:
+            foods_df = _filter_foods_by_goal(foods_df, user_goal)
+        
+        # Clean food names and deduplicate
+        foods_df['Cleaned Name'] = foods_df['Food Name'].apply(clean_food_name)
+        foods_df = foods_df.drop_duplicates(subset=['Cleaned Name'], keep='first')
+        
+        # Sort based on goal and preferences
+        if user_goal:
+            goal_lower = str(user_goal).lower()
+            if 'lose' in goal_lower or 'weight loss' in goal_lower:
+                # Sort by calories (ascending) and fiber (descending)
+                foods_df = foods_df.sort_values(
+                    by=['Calories', 'Fiber (g)'],
+                    ascending=[True, False],
+                    na_position='last'
+                )
+            elif 'muscle' in goal_lower or 'gain' in goal_lower:
+                # Sort by protein (descending)
+                foods_df = foods_df.sort_values(
+                    by='Protein (g)',
+                    ascending=False,
+                    na_position='last'
+                )
+        
+        # Apply activity level adjustments (affects calorie range)
+        if activity_level:
+            activity_lower = str(activity_level).lower()
+            if 'very active' in activity_lower:
+                # Include higher calorie options
+                pass  # No filtering, just include all
+            elif 'sedentary' in activity_lower:
+                # Prefer lower calorie options
+                foods_df = foods_df[foods_df['Calories'] <= 300]
+        
+        # Limit results
+        foods_df = foods_df.head(limit)
+        
+        # Format for AI prompt
+        food_list = []
+        for _, row in foods_df.iterrows():
+            food_name = row['Cleaned Name']
+            calories = float(row.get('Calories', 0) or 0)
+            category = str(row.get('Category', '') or '')
+            protein = float(row.get('Protein (g)', 0) or 0)
+            
+            food_list.append(
+                f"{food_name} (~{calories:.0f} kcal per serving, category: {category}, protein: {protein:.1f}g)"
+            )
+        
+        return food_list
+    except Exception as e:
+        print(f"[ERROR] _get_foods_from_csv failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 @app.route('/foods/search', methods=['GET'])
 def search_foods():
+    """
+    Search foods using ONLY the local Filipino_Food_Nutrition_Dataset.csv (food_df).
+
+    This endpoint intentionally does NOT call any external APIs. It returns
+    foods whose 'Food Name' contains the query substring (case-insensitive),
+    limited to the first 15 matches for performance and UX.
+    
+    Filters out "Var" variants, numbers, and special characters from food names.
+    """
     query = request.args.get('query', '').strip().lower()
+    print(f"[DEBUG] /foods/search called with query: '{query}'")
     if not query:
         return jsonify({'foods': []})
-    matches = food_df[food_df['Food Name'].str.lower().str.contains(query)]
-    foods = matches.head(15).to_dict(orient='records')
 
-    # If we have enough local results, return them
-    if len(foods) >= 3:
-        return jsonify({'foods': foods})
-
-    # Otherwise, query Open Food Facts API as fallback
     try:
-        off_url = f'https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1'
-        resp = requests.get(off_url, timeout=3)
-        if resp.status_code == 200:
-            data = resp.json()
-            for product in data.get('products', [])[:10]:
-                # Map Open Food Facts fields to your frontend model
-                name = product.get('product_name') or product.get('generic_name')
-                if not name:
-                    continue
-                calories = None
-                nutriments = product.get('nutriments', {})
-                if 'energy-kcal_100g' in nutriments:
-                    calories = nutriments['energy-kcal_100g']
-                elif 'energy_100g' in nutriments:
-                    # Convert kJ to kcal
-                    calories = round(nutriments['energy_100g'] / 4.184, 1)
-                food_item = {
-                    'Food Name': name,
-                    'Category': product.get('categories', ''),
-                    'Serving Size': product.get('serving_size', ''),
-                    'Calories': calories or 0,
-                    'Protein (g)': nutriments.get('proteins_100g', 0),
-                    'Carbs (g)': nutriments.get('carbohydrates_100g', 0),
-                    'Fat (g)': nutriments.get('fat_100g', 0),
-                    'Fiber (g)': nutriments.get('fiber_100g', 0),
-                    'Sodium (mg)': nutriments.get('sodium_100g', 0),
-                    'Source': 'Open Food Facts',
-                }
-                foods.append(food_item)
+        matches = food_df[
+            food_df['Food Name'].astype(str).str.lower().str.contains(query)
+        ]
+        print(f"[DEBUG] Found {len(matches)} matches for query '{query}'")
+        foods_raw = matches.head(50).to_dict(orient='records')  # Get more to filter
+        
+        # Clean the data: replace NaN/None with 0 for numeric fields, empty string for text
+        import math
+        foods_temp = []
+        seen_cleaned_names = set()
+        
+        for food in foods_raw:
+            # First, check if this food name (after cleaning) is a duplicate
+            original_name = food.get('Food Name', '')
+            cleaned_name = clean_food_name(original_name)
+            cleaned_name_lower = cleaned_name.lower().strip()
+            
+            # Skip if we've already seen this cleaned name
+            if cleaned_name_lower in seen_cleaned_names:
+                continue  # Skip this duplicate
+            
+            seen_cleaned_names.add(cleaned_name_lower)
+            
+            # Process the food item
+            cleaned_food = {}
+            for key, value in food.items():
+                if key == 'Food Name':
+                    cleaned_food[key] = cleaned_name
+                elif pd.isna(value) or value is None:
+                    # Use 0 for numeric columns, empty string for text
+                    if any(num_col in key for num_col in ['Calories', 'Protein', 'Carbs', 'Fat', 'Fiber', 'Sodium', 'Calcium', 'Iron']):
+                        cleaned_food[key] = 0.0
+                    else:
+                        cleaned_food[key] = ''
+                elif isinstance(value, (int, float)) and (math.isnan(value) or math.isinf(value)):
+                    cleaned_food[key] = 0.0
+                else:
+                    cleaned_food[key] = value
+            
+            foods_temp.append(cleaned_food)
+            if len(foods_temp) >= 15:  # Limit to 15 unique results
+                break
+        
+        foods = foods_temp
+        print(f"[DEBUG] Returning {len(foods)} cleaned and deduplicated food items")
+            
     except Exception as e:
-        print(f"Open Food Facts API error: {e}")
-        # Fail gracefully, just return local results
+        # Fail safely: if anything goes wrong with the DataFrame, return empty list
+        print(f"[ERROR] /foods/search failed using local dataset: {e}")
+        import traceback
+        traceback.print_exc()
+        foods = []
 
     return jsonify({'foods': foods})
 
@@ -3181,31 +5187,91 @@ def progress_calories():
 
 @app.route('/progress/workouts')
 def progress_workouts():
-    user = request.args.get('user')
-    start_date = request.args.get('start')
-    end_date = request.args.get('end')
-    
-    query = WorkoutLog.query.filter_by(user=user)
-    
-    if start_date:
-        query = query.filter(WorkoutLog.date >= datetime.fromisoformat(start_date).date())
-    if end_date:
-        query = query.filter(WorkoutLog.date <= datetime.fromisoformat(end_date).date())
-    
-    rows = (
-        query.with_entities(WorkoutLog.date, WorkoutLog.type, WorkoutLog.duration, WorkoutLog.calories_burned)
-        .order_by(WorkoutLog.date)
-        .all()
-    )
-    return jsonify([
-        {
-            'date': d.isoformat(),
-            'type': t,
-            'duration': dur,
-            'calories_burned': cb,
-        }
-        for d, t, dur, cb in rows
-    ])
+    try:
+        user = request.args.get('user')
+        start_date = request.args.get('start')
+        end_date = request.args.get('end')
+        
+        print(f"[DEBUG] /progress/workouts called: user={user}, start={start_date}, end={end_date}")
+        
+        # Parse date filters using safe date parser (no timezone conversion)
+        sd = parse_date_safe(start_date) if start_date else None
+        ed = parse_date_safe(end_date) if end_date else None
+        
+        print(f"[DEBUG] Parsed dates: start={sd}, end={ed}")
+        
+        # Query WorkoutLog table
+        workout_query = WorkoutLog.query.filter_by(user=user)
+        
+        if sd:
+            workout_query = workout_query.filter(WorkoutLog.date >= sd)
+        if ed:
+            workout_query = workout_query.filter(WorkoutLog.date <= ed)
+        
+        workout_rows = (
+            workout_query.with_entities(WorkoutLog.date, WorkoutLog.type, WorkoutLog.duration, WorkoutLog.calories_burned)
+            .order_by(WorkoutLog.date)
+            .all()
+        )
+        
+        print(f"[DEBUG] WorkoutLog query: Found {len(workout_rows)} entries")
+        
+        # Also query ExerciseSession table - FIRST check without date filter
+        all_exercise_sessions = ExerciseSession.query.filter_by(user=user).all()
+        print(f"[DEBUG] ExerciseSession total for user '{user}': {len(all_exercise_sessions)} entries")
+        
+        if all_exercise_sessions:
+            print(f"[DEBUG] Sample ExerciseSession dates: {[s.date for s in all_exercise_sessions[:3]]}")
+        
+        exercise_session_query = ExerciseSession.query.filter_by(user=user)
+        
+        if sd:
+            # ExerciseSession.date is a Date column, so compare with date directly
+            exercise_session_query = exercise_session_query.filter(ExerciseSession.date >= sd)
+            print(f"[DEBUG] Applied start date filter: >= {sd}")
+        if ed:
+            # ExerciseSession.date is a Date column, so compare with date directly
+            exercise_session_query = exercise_session_query.filter(ExerciseSession.date <= ed)
+            print(f"[DEBUG] Applied end date filter: <= {ed}")
+        
+        exercise_session_rows = (
+            exercise_session_query.with_entities(ExerciseSession.date, ExerciseSession.exercise_name, ExerciseSession.duration_seconds, ExerciseSession.calories_burned)
+            .order_by(ExerciseSession.date)
+            .all()
+        )
+        
+        print(f"[DEBUG] ExerciseSession query after filters: Found {len(exercise_session_rows)} entries")
+        
+        if exercise_session_rows:
+            print(f"[DEBUG] Sample filtered dates: {[r[0] for r in exercise_session_rows[:3]]}")
+        
+        # Combine results from both tables
+        workouts = [
+            {
+                'date': d.isoformat(),
+                'type': t,
+                'duration': int(dur) if dur else 0,  # Ensure duration is an integer
+                'calories_burned': float(cb) if cb else 0.0,
+            }
+            for d, t, dur, cb in workout_rows
+        ] + [
+            {
+                'date': d.isoformat(),
+                'type': name,  # exercise_name maps to type
+                'duration': int(dur_sec / 60) if dur_sec else 0,  # Convert seconds to minutes
+                'calories_burned': float(cb) if cb else 0.0,
+            }
+            for d, name, dur_sec, cb in exercise_session_rows
+        ]
+        
+        print(f"[DEBUG] Returning {len(workouts)} total workouts")
+        return jsonify(workouts)
+        
+    except Exception as e:
+        print(f"[ERROR] Exception in /progress/workouts: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/progress/summary')
 def progress_summary():
@@ -3238,32 +5304,63 @@ def progress_summary():
     
     total_calories = calories_query.scalar() or 0
     
-    # Get total workouts
+    # Get WorkoutLog totals
     workout_query = WorkoutLog.query.filter_by(user=user)
     if 'start' in date_filter:
         workout_query = workout_query.filter(WorkoutLog.date >= date_filter['start'])
     if 'end' in date_filter:
         workout_query = workout_query.filter(WorkoutLog.date <= date_filter['end'])
     
-    total_workouts = workout_query.count()
+    workout_count = workout_query.count()
     
-    # Get total exercise duration
-    duration_query = db.session.query(db.func.sum(WorkoutLog.duration)).filter_by(user=user)
+    workout_duration_query = db.session.query(db.func.sum(WorkoutLog.duration)).filter_by(user=user)
     if 'start' in date_filter:
-        duration_query = duration_query.filter(WorkoutLog.date >= date_filter['start'])
+        workout_duration_query = workout_duration_query.filter(WorkoutLog.date >= date_filter['start'])
     if 'end' in date_filter:
-        duration_query = duration_query.filter(WorkoutLog.date <= date_filter['end'])
+        workout_duration_query = workout_duration_query.filter(WorkoutLog.date <= date_filter['end'])
     
-    total_duration = duration_query.scalar() or 0
+    workout_duration = workout_duration_query.scalar() or 0
     
-    # Get total calories burned
-    calories_burned_query = db.session.query(db.func.sum(WorkoutLog.calories_burned)).filter_by(user=user)
+    workout_calories_query = db.session.query(db.func.sum(WorkoutLog.calories_burned)).filter_by(user=user)
     if 'start' in date_filter:
-        calories_burned_query = calories_burned_query.filter(WorkoutLog.date >= date_filter['start'])
+        workout_calories_query = workout_calories_query.filter(WorkoutLog.date >= date_filter['start'])
     if 'end' in date_filter:
-        calories_burned_query = calories_burned_query.filter(WorkoutLog.date <= date_filter['end'])
+        workout_calories_query = workout_calories_query.filter(WorkoutLog.date <= date_filter['end'])
     
-    total_calories_burned = calories_burned_query.scalar() or 0
+    workout_calories = workout_calories_query.scalar() or 0.0
+    
+    # Also get ExerciseSession totals
+    exercise_session_query = ExerciseSession.query.filter_by(user=user)
+    if 'start' in date_filter:
+        exercise_session_query = exercise_session_query.filter(ExerciseSession.date >= date_filter['start'])
+    if 'end' in date_filter:
+        exercise_session_query = exercise_session_query.filter(ExerciseSession.date <= date_filter['end'])
+    
+    exercise_session_count = exercise_session_query.count()
+    
+    # Get ExerciseSession duration (in seconds, convert to minutes)
+    exercise_duration_seconds_query = db.session.query(db.func.sum(ExerciseSession.duration_seconds)).filter_by(user=user)
+    if 'start' in date_filter:
+        exercise_duration_seconds_query = exercise_duration_seconds_query.filter(ExerciseSession.date >= date_filter['start'])
+    if 'end' in date_filter:
+        exercise_duration_seconds_query = exercise_duration_seconds_query.filter(ExerciseSession.date <= date_filter['end'])
+    
+    exercise_duration_seconds = exercise_duration_seconds_query.scalar() or 0
+    exercise_duration_minutes = int(exercise_duration_seconds / 60)  # Convert to minutes
+    
+    # Get ExerciseSession calories
+    exercise_calories_query = db.session.query(db.func.sum(ExerciseSession.calories_burned)).filter_by(user=user)
+    if 'start' in date_filter:
+        exercise_calories_query = exercise_calories_query.filter(ExerciseSession.date >= date_filter['start'])
+    if 'end' in date_filter:
+        exercise_calories_query = exercise_calories_query.filter(ExerciseSession.date <= date_filter['end'])
+    
+    exercise_calories = exercise_calories_query.scalar() or 0.0
+    
+    # Combine totals from both tables
+    total_workouts = workout_count + exercise_session_count
+    total_duration = workout_duration + exercise_duration_minutes
+    total_calories_burned = workout_calories + exercise_calories
     
     return jsonify({
         'calories': total_calories,
@@ -3289,8 +5386,24 @@ def progress_daily_summary():
     daily_workouts = WorkoutLog.query.filter_by(user=user, date=date_obj).all()
     daily_weight = WeightLog.query.filter_by(user=user, date=date_obj).first()
     
-    total_duration = sum(workout.duration for workout in daily_workouts)
-    total_calories_burned = sum(workout.calories_burned for workout in daily_workouts)
+    # Get WorkoutLog totals
+    workout_duration = sum(workout.duration for workout in daily_workouts) or 0
+    workout_calories = sum(workout.calories_burned for workout in daily_workouts) or 0.0
+    workout_sessions = len(daily_workouts)
+    
+    # Also get ExerciseSession data for the same date
+    daily_exercise_sessions = ExerciseSession.query.filter_by(user=user, date=date_obj).all()
+    
+    # Calculate ExerciseSession totals
+    exercise_duration_seconds = sum(session.duration_seconds for session in daily_exercise_sessions) or 0
+    exercise_duration_minutes = int(exercise_duration_seconds / 60)  # Convert to minutes
+    exercise_calories = sum(float(session.calories_burned or 0.0) for session in daily_exercise_sessions) or 0.0
+    exercise_sessions = len(daily_exercise_sessions)
+    
+    # Combine totals from both tables
+    total_duration = workout_duration + exercise_duration_minutes
+    total_calories_burned = workout_calories + exercise_calories
+    total_sessions = workout_sessions + exercise_sessions
     
     # Get user goals
     user_obj = User.query.filter_by(username=user).first()
@@ -3301,7 +5414,7 @@ def progress_daily_summary():
         'calories': {
             'current': daily_calories,
             'goal': calorie_goal,
-            'remaining': max(0, calorie_goal - daily_calories),
+            'remaining': max(0, calorie_goal - daily_calories + total_calories_burned),  # Include exercise in remaining
             'percentage': min(1.0, daily_calories / calorie_goal) if calorie_goal > 0 else 0
         },
         'weight': {
@@ -3311,10 +5424,10 @@ def progress_daily_summary():
         'exercise': {
             'duration': total_duration,
             'calories_burned': total_calories_burned,
-            'sessions': len(daily_workouts),
+            'sessions': total_sessions,
             'average_intensity': total_calories_burned / total_duration if total_duration > 0 else 0
         },
-        'achievements': _get_daily_achievements(daily_calories, calorie_goal, total_duration, len(daily_workouts)),
+        'achievements': _get_daily_achievements(daily_calories, calorie_goal, total_duration, total_sessions),
         'recommendations': _get_daily_recommendations(daily_calories, calorie_goal, total_duration)
     })
 
@@ -3339,14 +5452,37 @@ def progress_weekly_summary():
         FoodLog.date <= end_date
     ).scalar() or 0
     
+    # Get WorkoutLog data
     weekly_workouts = WorkoutLog.query.filter(
         WorkoutLog.user == user,
         WorkoutLog.date >= start_date,
         WorkoutLog.date <= end_date
     ).all()
     
-    total_duration = sum(workout.duration for workout in weekly_workouts)
-    total_calories_burned = sum(workout.calories_burned for workout in weekly_workouts)
+    workout_duration = sum(workout.duration for workout in weekly_workouts) or 0
+    workout_calories = sum(workout.calories_burned for workout in weekly_workouts) or 0.0
+    workout_sessions = len(weekly_workouts)
+    workout_dates = set(workout.date for workout in weekly_workouts)
+    
+    # Also get ExerciseSession data for the week
+    weekly_exercise_sessions = ExerciseSession.query.filter(
+        ExerciseSession.user == user,
+        ExerciseSession.date >= start_date,
+        ExerciseSession.date <= end_date
+    ).all()
+    
+    # Calculate ExerciseSession totals
+    exercise_duration_seconds = sum(session.duration_seconds for session in weekly_exercise_sessions) or 0
+    exercise_duration_minutes = int(exercise_duration_seconds / 60)  # Convert to minutes
+    exercise_calories = sum(float(session.calories_burned or 0.0) for session in weekly_exercise_sessions) or 0.0
+    exercise_sessions = len(weekly_exercise_sessions)
+    exercise_dates = set(session.date for session in weekly_exercise_sessions)
+    
+    # Combine totals from both tables
+    total_duration = workout_duration + exercise_duration_minutes
+    total_calories_burned = workout_calories + exercise_calories
+    total_sessions = workout_sessions + exercise_sessions
+    all_dates = workout_dates.union(exercise_dates)  # Combine date sets for consistency calculation
     
     # Get user goals
     user_obj = User.query.filter_by(username=user).first()
@@ -3359,18 +5495,18 @@ def progress_weekly_summary():
         'calories': {
             'current': weekly_calories,
             'goal': weekly_calorie_goal,
-            'remaining': max(0, weekly_calorie_goal - weekly_calories),
+            'remaining': max(0, weekly_calorie_goal - weekly_calories + total_calories_burned),  # Include exercise
             'percentage': min(1.0, weekly_calories / weekly_calorie_goal) if weekly_calorie_goal > 0 else 0,
             'daily_average': weekly_calories / 7
         },
         'exercise': {
             'total_duration': total_duration,
             'total_calories_burned': total_calories_burned,
-            'sessions': len(weekly_workouts),
+            'sessions': total_sessions,
             'daily_average_duration': total_duration / 7,
-            'consistency': len(set(workout.date for workout in weekly_workouts)) / 7
+            'consistency': len(all_dates) / 7
         },
-        'achievements': _get_weekly_achievements(weekly_calories, weekly_calorie_goal, total_duration, len(weekly_workouts)),
+        'achievements': _get_weekly_achievements(weekly_calories, weekly_calorie_goal, total_duration, total_sessions),
         'trends': _get_weekly_trends(user, start_date, end_date)
     })
 
@@ -3399,14 +5535,37 @@ def progress_monthly_summary():
         FoodLog.date <= end_date
     ).scalar() or 0
     
+    # Get WorkoutLog data
     monthly_workouts = WorkoutLog.query.filter(
         WorkoutLog.user == user,
         WorkoutLog.date >= start_date,
         WorkoutLog.date <= end_date
     ).all()
     
-    total_duration = sum(workout.duration for workout in monthly_workouts)
-    total_calories_burned = sum(workout.calories_burned for workout in monthly_workouts)
+    workout_duration = sum(workout.duration for workout in monthly_workouts) or 0
+    workout_calories = sum(workout.calories_burned for workout in monthly_workouts) or 0.0
+    workout_sessions = len(monthly_workouts)
+    workout_dates = set(workout.date for workout in monthly_workouts)
+    
+    # Also get ExerciseSession data for the month
+    monthly_exercise_sessions = ExerciseSession.query.filter(
+        ExerciseSession.user == user,
+        ExerciseSession.date >= start_date,
+        ExerciseSession.date <= end_date
+    ).all()
+    
+    # Calculate ExerciseSession totals
+    exercise_duration_seconds = sum(session.duration_seconds for session in monthly_exercise_sessions) or 0
+    exercise_duration_minutes = int(exercise_duration_seconds / 60)  # Convert to minutes
+    exercise_calories = sum(float(session.calories_burned or 0.0) for session in monthly_exercise_sessions) or 0.0
+    exercise_sessions = len(monthly_exercise_sessions)
+    exercise_dates = set(session.date for session in monthly_exercise_sessions)
+    
+    # Combine totals from both tables
+    total_duration = workout_duration + exercise_duration_minutes
+    total_calories_burned = workout_calories + exercise_calories
+    total_sessions = workout_sessions + exercise_sessions
+    all_dates = workout_dates.union(exercise_dates)  # Combine date sets for consistency calculation
     
     # Get user goals
     user_obj = User.query.filter_by(username=user).first()
@@ -3419,18 +5578,18 @@ def progress_monthly_summary():
         'calories': {
             'current': monthly_calories,
             'goal': monthly_calorie_goal,
-            'remaining': max(0, monthly_calorie_goal - monthly_calories),
+            'remaining': max(0, monthly_calorie_goal - monthly_calories + total_calories_burned),  # Include exercise
             'percentage': min(1.0, monthly_calories / monthly_calorie_goal) if monthly_calorie_goal > 0 else 0,
             'daily_average': monthly_calories / end_date.day
         },
         'exercise': {
             'total_duration': total_duration,
             'total_calories_burned': total_calories_burned,
-            'sessions': len(monthly_workouts),
+            'sessions': total_sessions,
             'daily_average_duration': total_duration / end_date.day,
-            'consistency': len(set(workout.date for workout in monthly_workouts)) / end_date.day
+            'consistency': len(all_dates) / end_date.day
         },
-        'achievements': _get_monthly_achievements(monthly_calories, monthly_calorie_goal, total_duration, len(monthly_workouts)),
+        'achievements': _get_monthly_achievements(monthly_calories, monthly_calorie_goal, total_duration, total_sessions),
         'trends': _get_monthly_trends(user, start_date, end_date)
     })
 
@@ -3439,11 +5598,30 @@ def progress_goals():
     user = request.args.get('user') or request.json.get('user')
     
     if request.method == 'GET':
-        # Get user goals
-        user_obj = User.query.filter_by(username=user).first()
+        # Get user goals - support both username and email
+        user_obj = get_user_by_identifier(user)
         if not user_obj:
             return jsonify({'error': 'User not found'}), 404
         
+        # Check if a specific date is requested (for historical goals)
+        date_str = request.args.get('date')
+        if date_str:
+            try:
+                target_date = datetime.fromisoformat(date_str).date()
+                # Get historical goal for that date
+                historical_goal = _get_goal_for_date(user, target_date)
+                return jsonify({
+                    'calories': historical_goal,
+                    'steps': 10000,  # Default step goal
+                    'water': 2000,   # Default water goal in ml
+                    'exercise': 30,   # Default exercise goal in minutes
+                    'sleep': 8,       # Default sleep goal in hours
+                })
+            except (ValueError, TypeError) as e:
+                print(f"[WARNING] Invalid date format for goal history: {date_str}, using current goal")
+                # Fall through to current goal
+        
+        # Return current goal
         return jsonify({
             'calories': _compute_daily_goal_for_user(user_obj),
             'steps': 10000,  # Default step goal
@@ -3456,8 +5634,8 @@ def progress_goals():
         # Update user goals
         goals = request.json.get('goals', {})
         
-        # Update user profile with new goals
-        user_obj = User.query.filter_by(username=user).first()
+        # Update user profile with new goals - support both username and email
+        user_obj = get_user_by_identifier(user)
         if not user_obj:
             return jsonify({'error': 'User not found'}), 404
         
@@ -3472,6 +5650,90 @@ def progress_goals():
         db.session.commit()
         
         return jsonify({'success': True, 'message': 'Goals updated successfully'})
+
+# Helper function to log goal changes
+def _log_goal_change(user: str, new_goal: int, effective_date: date = None):
+    """
+    Log a goal change to the goal_history table.
+    
+    Args:
+        user: Username
+        new_goal: New daily calorie goal
+        effective_date: Date when this goal becomes effective (defaults to today)
+    """
+    try:
+        if effective_date is None:
+            effective_date = date.today()
+        
+        # Check if a goal already exists for this date
+        existing = GoalHistory.query.filter_by(
+            user=user,
+            date=effective_date
+        ).first()
+        
+        if existing:
+            # Update existing entry
+            existing.daily_calorie_goal = new_goal
+        else:
+            # Create new entry
+            goal_entry = GoalHistory(
+                user=user,
+                date=effective_date,
+                daily_calorie_goal=new_goal
+            )
+            db.session.add(goal_entry)
+        
+        db.session.commit()
+        print(f"[GOAL_HISTORY] Logged goal change for {user}: {new_goal} cal (effective {effective_date})")
+    except Exception as e:
+        print(f"[ERROR] Failed to log goal change: {e}")
+        db.session.rollback()
+
+# Helper function to get goal for a specific date
+def _get_goal_for_date(user: str, target_date: date) -> int:
+    """
+    Get the daily calorie goal that was active on a specific date.
+    
+    Args:
+        user: Username or email
+        target_date: Date to get goal for
+    
+    Returns:
+        Daily calorie goal for that date, or None if not found
+    """
+    try:
+        # Get user object first (supports both username and email)
+        user_obj = get_user_by_identifier(user)
+        if not user_obj:
+            return 2000  # Default fallback
+        
+        username = user_obj.username  # GoalHistory stores username, not email
+        
+        # Find the most recent goal entry on or before the target date
+        goal_entry = GoalHistory.query.filter(
+            GoalHistory.user == username,
+            GoalHistory.date <= target_date
+        ).order_by(GoalHistory.date.desc()).first()
+        
+        if goal_entry:
+            return goal_entry.daily_calorie_goal
+        
+        # If no history found, get current goal from user table
+        if user_obj.daily_calorie_goal:
+            return user_obj.daily_calorie_goal
+        
+        # Default fallback
+        return 2000
+    except Exception as e:
+        print(f"[ERROR] Failed to get goal for date: {e}")
+        # Fallback to current goal
+        try:
+            user_obj = get_user_by_identifier(user)
+            if user_obj and user_obj.daily_calorie_goal:
+                return user_obj.daily_calorie_goal
+        except Exception:
+            pass
+        return 2000
 
 # Helper functions for progress calculations
 def _get_daily_achievements(calories, goal, duration, sessions):
@@ -3538,6 +5800,785 @@ def _get_monthly_trends(user, start_date, end_date):
         'improvement_areas': ['hydration', 'sleep']
     }
     return trends
+
+
+def _get_next_meal_type_by_time() -> str:
+    """
+    Determine the next meal type based on current time (Philippines timezone).
+    Returns: 'breakfast', 'lunch', 'dinner', or 'snack'
+    """
+    try:
+        ph_tz = get_philippines_timezone()
+        now = datetime.now(ph_tz)
+        hour = now.hour
+    except Exception:
+        # Fallback to UTC if timezone fails
+        hour = datetime.now().hour
+    
+    if 5 <= hour < 11:
+        return 'breakfast'
+    elif 11 <= hour < 14:
+        return 'lunch'
+    elif 14 <= hour < 17:
+        return 'snack'  # Afternoon snack
+    elif 17 <= hour < 21:
+        return 'dinner'
+    else:
+        return 'snack'  # Late night snack or early morning
+
+
+def _filter_foods_by_meal_type(foods: list[dict], meal_type: str) -> list[dict]:
+    """
+    Filter Filipino foods by meal_category that matches the requested meal_type.
+    If no exact match, returns all foods (fallback).
+    
+    Args:
+        foods: List of food dicts with 'meal_category' or 'category' field
+        meal_type: 'breakfast', 'lunch', 'dinner', or 'snack'
+    
+    Returns:
+        Filtered list of foods
+    """
+    if not foods:
+        return []
+    
+    # Map meal_type to possible category keywords
+    meal_keywords = {
+        'breakfast': ['breakfast', 'morning', 'almusal'],
+        'lunch': ['lunch', 'tanghalian', 'ulam'],
+        'dinner': ['dinner', 'hapunan', 'supper'],
+        'snack': ['snack', 'merienda', 'meryenda'],
+    }
+    
+    keywords = meal_keywords.get(meal_type.lower(), [])
+    if not keywords:
+        return foods  # Return all if unknown meal type
+    
+    filtered = []
+    for food in foods:
+        category = (
+            food.get("meal_category") or 
+            food.get("category") or 
+            ""
+        ).lower()
+        
+        # Check if category matches any keyword
+        if any(kw in category for kw in keywords):
+            filtered.append(food)
+    
+    # If no matches found, return first 20 foods as fallback
+    # (better than returning nothing)
+    return filtered if filtered else foods[:20]
+
+
+def _get_todays_meal_summary(food_logs: list) -> dict:
+    """
+    Summarize what meals the user has already eaten today.
+    
+    Returns:
+        Dict with meal_type -> list of food names
+    """
+    summary = {}
+    for log in food_logs:
+        meal_type = (log.meal_type or 'Other').lower()
+        if meal_type not in summary:
+            summary[meal_type] = []
+        summary[meal_type].append(log.food_name)
+    return summary
+
+
+def _call_groq_chat(system_prompt: str, user_prompt: str, *, max_tokens: int = 400, temperature: float = 0.4) -> tuple[bool, str]:
+    """
+    Helper to call Groq's chat completion API with a system + user prompt.
+
+    Returns (ok, content). If Groq is not configured or an error occurs,
+    ok will be False and content will contain a human-readable message.
+    
+    Rate limit information is logged to console for monitoring.
+    """
+    if not GROQ_API_KEY:
+        return False, "Groq API key (GROQ_API_KEY) is not configured on the server."
+
+    try:
+        payload = {
+            "model": GROQ_MODEL,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        resp = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=15)
+        
+        # Log rate limit information if available
+        remaining_requests = resp.headers.get('x-ratelimit-remaining-requests')
+        limit_requests = resp.headers.get('x-ratelimit-limit-requests')
+        if remaining_requests is not None and limit_requests is not None:
+            print(f"[Groq API] Rate limit: {remaining_requests}/{limit_requests} requests remaining")
+        
+        if resp.status_code != 200:
+            if resp.status_code == 429:
+                reset_time = resp.headers.get('x-ratelimit-reset-requests', 'N/A')
+                return False, f"Groq API rate limit exceeded. Reset time: {reset_time}. Response: {resp.text}"
+            return False, f"Groq API error {resp.status_code}: {resp.text}"
+        data = resp.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return False, "Groq API returned no choices."
+        content = choices[0].get("message", {}).get("content", "")
+        if not isinstance(content, str):
+            return False, "Groq API returned unexpected content format."
+        return True, content.strip()
+    except Exception as e:
+        return False, f"Groq API request failed: {e}"
+
+
+@app.route('/ai/summary/daily', methods=['POST'])
+def ai_summary_daily():
+    """
+    AI-powered daily summary for the AI Coach.
+
+    Request JSON:
+      { "user": "<username-or-email>", "date": "YYYY-MM-DD" (optional) }
+    """
+    data = request.get_json(silent=True) or {}
+    identifier = data.get('user') or data.get('username')
+    target_date_str = data.get('date')
+
+    if not identifier:
+        return jsonify({'success': False, 'error': 'user is required'}), 400
+
+    # Resolve user by username or email
+    user_obj = User.query.filter(
+        (User.username == identifier) | (User.email == identifier)
+    ).first()
+    if not user_obj:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    # Determine target date (use Philippines date for consistency with logs)
+    if target_date_str:
+        try:
+            target_date = datetime.fromisoformat(target_date_str).date()
+        except Exception:
+            target_date = get_philippines_date()
+    else:
+        target_date = get_philippines_date()
+
+    # Aggregate today's food logs
+    food_logs = FoodLog.query.filter_by(user=user_obj.username, date=target_date).all()
+    total_calories = sum(float(log.calories or 0.0) for log in food_logs)
+    total_protein = sum(float(log.protein or 0.0) for log in food_logs)
+    total_carbs = sum(float(log.carbs or 0.0) for log in food_logs)
+    total_fat = sum(float(log.fat or 0.0) for log in food_logs)
+    total_fiber = sum(float(log.fiber or 0.0) for log in food_logs)
+
+    # Get a few key foods with meal types
+    top_foods = []
+    for log in food_logs[:5]:
+        top_foods.append({
+            'food_name': log.food_name,
+            'meal_type': log.meal_type,
+            'calories': float(log.calories or 0.0),
+        })
+    
+    # Get meal summary for context
+    todays_meals = _get_todays_meal_summary(food_logs)
+    meal_summary_text = ""
+    if todays_meals:
+        meal_parts = []
+        for meal_type, foods in todays_meals.items():
+            if foods:
+                meal_parts.append(f"{meal_type}: {len(foods)} item(s)")
+        if meal_parts:
+            meal_summary_text = f"Meals logged today: {', '.join(meal_parts)}."
+    
+    # Determine what meal might be next
+    next_meal_type = _get_next_meal_type_by_time()
+
+    # Aggregate today's exercise (WorkoutLog + ExerciseSession)
+    workouts = WorkoutLog.query.filter_by(user=user_obj.username, date=target_date).all()
+    workout_duration = sum(float(w.duration or 0.0) for w in workouts)
+    workout_calories = sum(float(w.calories_burned or 0.0) for w in workouts)
+
+    sessions = ExerciseSession.query.filter_by(user=user_obj.username, date=target_date).all()
+    session_duration_min = sum(float(s.duration_seconds or 0) for s in sessions) / 60.0
+    session_calories = sum(float(s.calories_burned or 0.0) for s in sessions)
+
+    total_exercise_minutes = workout_duration + session_duration_min
+    total_exercise_calories = workout_calories + session_calories
+
+    # Daily calorie goal – use the same helper as the progress endpoints
+    # so the value matches the dashboard target shown in the app.
+    daily_goal = _compute_daily_goal_for_user(user_obj)
+
+    remaining = daily_goal - total_calories + total_exercise_calories
+
+    system_prompt = (
+        "You are a friendly, non-judgmental nutrition and exercise coach. "
+        "You DO NOT provide medical advice or diagnose conditions. "
+        "You must respond with STRICTLY VALID JSON using this exact schema:\n"
+        "{\n"
+        '  \"summaryText\": \"short overview in 2-4 sentences\",\n'
+        '  \"tips\": [\"short actionable tip 1\", \"short actionable tip 2\"]\n'
+        "}\n"
+        "Do not include any extra text, backticks, or explanations outside this JSON."
+    )
+
+    # Get user's food preferences and onboarding data
+    user_preferences = _parse_user_preferences(user_obj)
+    user_goal = user_obj.goal
+    user_activity_level = user_obj.activity_level
+    
+    # Get a shortlist of foods from CSV for meal suggestions
+    csv_foods_shortlist = _get_foods_from_csv(
+        meal_type=next_meal_type,
+        user_preferences=user_preferences,
+        user_goal=user_goal,
+        activity_level=user_activity_level,
+        limit=20
+    )
+    
+    user_prompt_parts = [
+        f"User profile: sex={user_obj.sex}, age={user_obj.age}, "
+        f"height_cm={user_obj.height_cm}, weight_kg={user_obj.weight_kg}, "
+        f"goal={user_obj.goal}, activity_level={user_activity_level}.",
+    ]
+    
+    # Add food preferences if available
+    if user_preferences:
+        user_prompt_parts.append(f"User's food preferences: {', '.join(user_preferences)}.")
+    
+    user_prompt_parts.extend([
+        f"Daily calorie goal: {daily_goal} kcal.",
+        f"Today's date: {target_date.isoformat()}.",
+        f"Food today: total_calories={total_calories:.1f}, "
+        f"protein={total_protein:.1f}g, carbs={total_carbs:.1f}g, "
+        f"fat={total_fat:.1f}g, fiber={total_fiber:.1f}g.",
+        f"Exercise today: minutes={total_exercise_minutes:.1f}, "
+        f"calories_burned={total_exercise_calories:.1f}.",
+        f"Remaining calories (goal - food + exercise): {remaining:.1f}.",
+    ])
+    
+    if meal_summary_text:
+        user_prompt_parts.append(meal_summary_text)
+    
+    user_prompt_parts.append(f"Next likely meal type (based on time): {next_meal_type}.")
+    user_prompt_parts.append(f"Top foods logged today (up to 5): {top_foods}.")
+    
+    # Add CSV foods list for meal suggestions
+    if csv_foods_shortlist:
+        user_prompt_parts.append(
+            "IMPORTANT: If suggesting meals, you MUST ONLY suggest foods from this list (these are the ONLY foods available in the app):\n"
+            + "\n".join(f"- {item}" for item in csv_foods_shortlist)
+        )
+    
+    user_prompt_parts.append(
+        "\nSummarize how today is going relative to the goal and provide 1-2 "
+        "specific, kind suggestions the user can realistically follow today or tomorrow. "
+        f"If suggesting meals, you MUST ONLY suggest foods from the list above. "
+        f"Consider the user's preferences ({', '.join(user_preferences) if user_preferences else 'none'}), goal ({user_goal}), and activity level ({user_activity_level}). "
+        "Consider what meal type is appropriate for the current time."
+    )
+    
+    user_prompt = "\n".join(user_prompt_parts)
+
+    ok, content = _call_groq_chat(system_prompt, user_prompt, max_tokens=450)
+
+    summary_text = ""
+    tips: list[str] = []
+
+    if ok:
+        try:
+            parsed = json.loads(content)
+            summary_text = str(parsed.get("summaryText") or "").strip()
+            tips_raw = parsed.get("tips") or []
+            if isinstance(tips_raw, list):
+                tips = [str(t).strip() for t in tips_raw if str(t).strip()]
+        except Exception:
+            # Fallback: treat whole content as summary
+            summary_text = content
+            tips = []
+    else:
+        summary_text = (
+            "AI summary is temporarily unavailable. "
+            "You are using this app's built-in calorie and progress tracking as usual."
+        )
+        tips = [content]
+
+    if not summary_text:
+        summary_text = (
+            "I couldn't generate a detailed summary, but keep logging your meals "
+            "and I'll provide more insights soon."
+        )
+
+    return jsonify({
+        'success': True,
+        'user': user_obj.username,
+        'date': target_date.isoformat(),
+        'summaryText': summary_text,
+        'tips': tips,
+    })
+
+
+@app.route('/ai/what-to-eat-next', methods=['POST'])
+def ai_what_to_eat_next():
+    """
+    AI-powered next-meal suggestion for the AI Coach.
+
+    Request JSON:
+      {
+        \"user\": \"<username-or-email>\",
+        \"next_meal_type\": \"breakfast|lunch|snack|dinner\" (optional)
+      }
+    """
+    data = request.get_json(silent=True) or {}
+    identifier = data.get('user') or data.get('username')
+    next_meal_type = (data.get('next_meal_type') or '').lower().strip()
+
+    if not identifier:
+      return jsonify({'success': False, 'error': 'user is required'}), 400
+
+    # Resolve user
+    user_obj = User.query.filter(
+        (User.username == identifier) | (User.email == identifier)
+    ).first()
+    if not user_obj:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    if not next_meal_type:
+        # Infer meal type from current time (Philippines timezone)
+        next_meal_type = _get_next_meal_type_by_time()
+
+    # Use same aggregates as summary to give context
+    target_date = get_philippines_date()
+    food_logs = FoodLog.query.filter_by(user=user_obj.username, date=target_date).all()
+    total_calories = sum(float(log.calories or 0.0) for log in food_logs)
+    workouts = WorkoutLog.query.filter_by(user=user_obj.username, date=target_date).all()
+    workout_calories = sum(float(w.calories_burned or 0.0) for w in workouts)
+    sessions = ExerciseSession.query.filter_by(user=user_obj.username, date=target_date).all()
+    session_calories = sum(float(s.calories_burned or 0.0) for s in sessions)
+    total_exercise_calories = workout_calories + session_calories
+
+    # Use the same helper as the progress endpoints so AI uses
+    # the exact same target calories as the dashboard.
+    daily_goal = _compute_daily_goal_for_user(user_obj)
+    remaining = daily_goal - total_calories + total_exercise_calories
+
+    # Get what meals user already ate today
+    todays_meals = _get_todays_meal_summary(food_logs)
+    already_eaten_text = ""
+    if todays_meals:
+        eaten_parts = []
+        for meal_type, foods in todays_meals.items():
+            if foods:
+                eaten_parts.append(f"{meal_type}: {', '.join(foods[:3])}")
+        if eaten_parts:
+            already_eaten_text = f"Meals already eaten today: {'; '.join(eaten_parts)}."
+
+    # Get user's food preferences and onboarding data
+    user_preferences = _parse_user_preferences(user_obj)
+    user_goal = user_obj.goal
+    user_activity_level = user_obj.activity_level
+    
+    # Build a shortlist of Filipino foods from CSV ONLY, filtered by meal type, preferences, goal, and activity level
+    filipino_shortlist = _get_foods_from_csv(
+        meal_type=next_meal_type,
+        user_preferences=user_preferences,
+        user_goal=user_goal,
+        activity_level=user_activity_level,
+        limit=30
+    )
+
+    filipino_section = ""
+    if filipino_shortlist:
+        filipino_section = (
+            "IMPORTANT: You MUST only suggest foods from this list (these are the ONLY foods available in the app):\n"
+            + "\n".join(f"- {item}" for item in filipino_shortlist)
+        )
+
+    # Build a shortlist of the user's own custom meals (if any)
+    custom_meals_descriptions: list[str] = []
+    try:
+        custom_recipes = (
+            db.session.query(CustomRecipe)
+            .filter(CustomRecipe.user == user_obj.username)
+            .order_by(CustomRecipe.created_at.desc())
+            .limit(8)
+            .all()
+        )
+        for recipe in custom_recipes:
+            total_cals = (
+                db.session.query(func.sum(RecipeIngredient.calories))
+                .filter(RecipeIngredient.recipe_id == recipe.id)
+                .scalar()
+                or 0.0
+            )
+            servings = recipe.servings or 1
+            per_serving = total_cals / servings if servings > 0 else total_cals
+            custom_meals_descriptions.append(
+                f"{recipe.recipe_name} (~{per_serving:.0f} kcal per serving)"
+            )
+    except Exception:
+        custom_meals_descriptions = []
+
+    custom_section = ""
+    if custom_meals_descriptions:
+        custom_section = (
+            "The user's own saved meals (prefer these when they fit the remaining calories and goal):\n"
+            + "\n".join(f"- {item}" for item in custom_meals_descriptions)
+        )
+
+    system_prompt = (
+        "You are a helpful nutrition coach focused on Filipino cuisine. "
+        "You DO NOT provide medical advice or strict diets; just gentle, practical ideas.\n"
+        f"IMPORTANT: The user is asking for suggestions for their NEXT meal, which is: {next_meal_type}.\n"
+        f"Only suggest foods that are appropriate for {next_meal_type} (e.g., don't suggest breakfast foods for dinner).\n"
+        "You MUST ONLY suggest foods from the provided Filipino foods list - these are the ONLY foods available in the app.\n"
+        "Always prefer Filipino dishes and ingredients and the user's own saved meals when they fit.\n"
+        "Respond with STRICTLY VALID JSON using this exact schema:\n"
+        "{{\n"
+        '  "headline": "short 1-sentence suggestion",\n'
+        '  "suggestions": ["food idea 1", "food idea 2", "optional idea 3"],\n'
+        '  "explanation": "2-4 sentence explanation in simple language"\n'
+        "}}\n"
+        "Do not include any text outside this JSON."
+    )
+
+    # Build user prompt with onboarding data
+    user_prompt_parts = [
+        f"User profile: sex={user_obj.sex}, age={user_obj.age}, goal={user_obj.goal}, activity_level={user_activity_level}.",
+    ]
+    
+    # Add food preferences if available
+    if user_preferences:
+        user_prompt_parts.append(f"User's food preferences: {', '.join(user_preferences)}.")
+    
+    user_prompt_parts.extend([
+        f"Today's date: {target_date.isoformat()}.",
+        f"Daily calorie goal: {daily_goal} kcal.",
+        f"Calories eaten so far: {total_calories:.1f} kcal.",
+        f"Exercise calories today: {total_exercise_calories:.1f} kcal.",
+        f"Estimated remaining calories for the day: {remaining:.1f} kcal.",
+        f"Next meal type: {next_meal_type}.",
+    ])
+    
+    if already_eaten_text:
+        user_prompt_parts.append(already_eaten_text)
+
+    if filipino_section:
+        user_prompt_parts.append(filipino_section)
+    if custom_section:
+        user_prompt_parts.append(custom_section)
+
+    user_prompt_parts.append(
+        "When suggesting meals or snacks, you MUST ONLY pick from the Filipino foods shortlist provided above. "
+        "These are the ONLY foods available in the app. When appropriate, also consider the user's own saved meals. "
+        "If you mention a saved meal, say that it is from the user's own meals. "
+        f"Prioritize foods that match the user's preferences ({', '.join(user_preferences) if user_preferences else 'none'}) and goal ({user_goal}). "
+        "Focus on reasonable portion sizes and a balance of protein, vegetables, and carbs. "
+        "If remaining calories are very low or negative, focus on light options or planning for tomorrow rather "
+        "than restriction."
+    )
+
+    user_prompt = "\n".join(user_prompt_parts)
+
+    ok, content = _call_groq_chat(system_prompt, user_prompt, max_tokens=450)
+
+    headline = ""
+    suggestions: list[str] = []
+    explanation = ""
+
+    if ok:
+        try:
+            parsed = json.loads(content)
+            headline = str(parsed.get("headline") or "").strip()
+            raw_suggestions = parsed.get("suggestions") or []
+            if isinstance(raw_suggestions, list):
+                suggestions = [str(s).strip() for s in raw_suggestions if str(s).strip()]
+            explanation = str(parsed.get("explanation") or "").strip()
+        except Exception:
+            headline = "AI meal ideas"
+            explanation = content
+            suggestions = []
+    else:
+        headline = "AI meal ideas temporarily unavailable"
+        explanation = content
+
+    if not headline:
+        headline = "Here are a few ideas for your next meal."
+
+    return jsonify({
+        'success': True,
+        'user': user_obj.username,
+        'next_meal_type': next_meal_type,
+        'headline': headline,
+        'suggestions': suggestions,
+        'explanation': explanation,
+    })
+
+
+def _call_groq_chat_messages(messages: list[dict], *, max_tokens: int = 500, temperature: float = 0.7) -> tuple[bool, str]:
+    """
+    Helper to call Groq's chat completion API with a full conversation history.
+    
+    Args:
+        messages: List of dicts with 'role' ('system', 'user', 'assistant') and 'content'.
+        max_tokens: Maximum tokens in response.
+        temperature: Sampling temperature (0.0-2.0).
+    
+    Returns:
+        (ok, content). If ok is False, content contains an error message.
+    
+    Rate limit information is logged to console for monitoring.
+    """
+    if not GROQ_API_KEY:
+        return False, "Groq API key (GROQ_API_KEY) is not configured on the server."
+
+    try:
+        payload = {
+            "model": GROQ_MODEL,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "messages": messages,
+        }
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        resp = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=15)
+        
+        # Log rate limit information if available
+        remaining_requests = resp.headers.get('x-ratelimit-remaining-requests')
+        limit_requests = resp.headers.get('x-ratelimit-limit-requests')
+        if remaining_requests is not None and limit_requests is not None:
+            print(f"[Groq API] Rate limit: {remaining_requests}/{limit_requests} requests remaining")
+        
+        if resp.status_code != 200:
+            if resp.status_code == 429:
+                reset_time = resp.headers.get('x-ratelimit-reset-requests', 'N/A')
+                return False, f"Groq API rate limit exceeded. Reset time: {reset_time}. Response: {resp.text}"
+            return False, f"Groq API error {resp.status_code}: {resp.text}"
+        data = resp.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return False, "Groq API returned no choices."
+        content = choices[0].get("message", {}).get("content", "")
+        if not isinstance(content, str):
+            return False, "Groq API returned unexpected content format."
+        return True, content.strip()
+    except Exception as e:
+        return False, f"Groq API request failed: {e}"
+
+
+@app.route('/ai/coach/chat', methods=['POST'])
+def ai_coach_chat():
+    """
+    AI-powered conversational chat with the AI Coach.
+    
+    Request JSON:
+      {
+        "user": "<username-or-email>",
+        "messages": [
+          {"role": "user", "content": "Why am I not losing weight?"},
+          {"role": "assistant", "content": "..."},
+          {"role": "user", "content": "What should I change?"}
+        ]
+      }
+    
+    Response JSON:
+      {
+        "success": true,
+        "reply": "AI coach answer...",
+        "used_context": {
+          "date": "2025-11-14",
+          "daily_goal": 2279,
+          "calories_today": 1200,
+          "exercise_minutes": 30
+        }
+      }
+    """
+    data = request.get_json(silent=True) or {}
+    identifier = data.get('user') or data.get('username')
+    conversation_messages = data.get('messages', [])
+
+    if not identifier:
+        return jsonify({'success': False, 'error': 'user is required'}), 400
+
+    # Resolve user
+    user_obj = User.query.filter(
+        (User.username == identifier) | (User.email == identifier)
+    ).first()
+    if not user_obj:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    # Validate messages format
+    if not isinstance(conversation_messages, list):
+        return jsonify({'success': False, 'error': 'messages must be a list'}), 400
+    
+    # Limit conversation history to last 10 messages to avoid token limits
+    recent_messages = conversation_messages[-10:] if len(conversation_messages) > 10 else conversation_messages
+
+    # Gather user context (today's data)
+    target_date = get_philippines_date()
+    food_logs = FoodLog.query.filter_by(user=user_obj.username, date=target_date).all()
+    total_calories = sum(float(log.calories or 0.0) for log in food_logs)
+    total_protein = sum(float(log.protein or 0.0) for log in food_logs)
+    total_carbs = sum(float(log.carbs or 0.0) for log in food_logs)
+    total_fat = sum(float(log.fat or 0.0) for log in food_logs)
+
+    workouts = WorkoutLog.query.filter_by(user=user_obj.username, date=target_date).all()
+    workout_duration = sum(float(w.duration or 0.0) for w in workouts)
+    workout_calories = sum(float(w.calories_burned or 0.0) for w in workouts)
+    sessions = ExerciseSession.query.filter_by(user=user_obj.username, date=target_date).all()
+    session_duration_min = sum(float(s.duration_seconds or 0) for s in sessions) / 60.0
+    session_calories = sum(float(s.calories_burned or 0.0) for s in sessions)
+    total_exercise_minutes = workout_duration + session_duration_min
+    total_exercise_calories = workout_calories + session_calories
+
+    daily_goal = _compute_daily_goal_for_user(user_obj)
+    remaining = daily_goal - total_calories + total_exercise_calories
+
+    # Get recent week's progress for context
+    week_start = target_date - timedelta(days=6)
+    week_food_logs = FoodLog.query.filter(
+        FoodLog.user == user_obj.username,
+        FoodLog.date >= week_start,
+        FoodLog.date <= target_date
+    ).all()
+    week_calories = sum(float(log.calories or 0.0) for log in week_food_logs)
+    week_avg_calories = week_calories / 7.0 if week_calories > 0 else 0.0
+
+    # Get what meals user already ate today
+    todays_meals = _get_todays_meal_summary(food_logs)
+    meal_summary_text = ""
+    if todays_meals:
+        meal_parts = []
+        for meal_type, foods in todays_meals.items():
+            if foods:
+                meal_parts.append(f"{meal_type}: {', '.join(foods[:2])}")
+        if meal_parts:
+            meal_summary_text = f"Meals already eaten today: {'; '.join(meal_parts)}."
+    
+    # Determine next meal type
+    next_meal_type = _get_next_meal_type_by_time()
+    
+    # Get user's custom meals for context
+    custom_recipes = CustomRecipe.query.filter_by(user=user_obj.username).limit(5).all()
+    custom_meals_list = []
+    for recipe in custom_recipes:
+        ingredients = RecipeIngredient.query.filter_by(recipe_id=recipe.id).all()
+        total_recipe_calories = sum(float(ing.calories or 0.0) for ing in ingredients)
+        if total_recipe_calories > 0:
+            custom_meals_list.append(f"{recipe.recipe_name} (~{int(total_recipe_calories)} kcal per serving)")
+
+    # Build system prompt with context
+    system_prompt = (
+        "You are a friendly, encouraging Filipino nutrition and exercise coach for a mobile app. "
+        "You help users understand their progress, make better food choices, and stay motivated.\n\n"
+        "IMPORTANT RULES:\n"
+        "- You DO NOT provide medical advice, diagnoses, or treatment recommendations.\n"
+        "- If asked about medical conditions, weight loss medications, or serious health concerns, "
+        "politely suggest consulting a doctor or registered dietitian.\n"
+        "- Only answer questions about nutrition, exercise, habits, and how to use this app.\n"
+        "- If asked about unrelated topics, politely redirect to nutrition/exercise questions.\n"
+        "- Prefer Filipino dishes and ingredients (sinigang, tinola, monggo, saba, malunggay, pinakbet, etc.).\n"
+        "- When suggesting meals, consider the appropriate meal type for the current time.\n"
+        "- Keep answers concise (3-6 sentences) and encouraging.\n"
+        "- Use the user's actual data (calories, goals, progress) when relevant.\n\n"
+        "APP FEATURES YOU SHOULD KNOW ABOUT:\n"
+        "- Progress Screen: Users can view their progress in the 'Progress' tab (bottom navigation). "
+        "This screen shows Daily, Weekly, Monthly, and Custom date range views.\n"
+        "- Custom Date Range: Users can select any date range in the past to view historical data. "
+        "In the Progress screen, select 'Custom' and use the date picker to choose start and end dates. "
+        "This allows users to track back and see their progress for any period.\n"
+        "- Historical Data Viewing: Users can view past dates, trends, and historical performance. "
+        "The Progress screen displays bar graphs showing calories, exercise, and other metrics over time.\n"
+        "- Weight Tracking: The app tracks weight data. Users can view their weight progress in the Progress screen. "
+        "The Weight metric shows current weight, average weight, and goal weight.\n"
+        "- Streak Tracking: The app tracks streaks for calories and exercise. Users can see their current streaks "
+        "in the Progress screen (visible in Daily view). This shows how many consecutive days they've met their goals.\n"
+        "- Multiple Metrics: The Progress screen allows users to switch between different metrics: "
+        "Calories (default), Exercise (minutes), and Weight (kg). Each metric shows relevant data and progress.\n"
+        "- Bar Graphs: Historical data is visualized using bar graphs in the Progress screen. "
+        "These graphs show trends over Daily (7 days), Weekly (4 weeks), Monthly (12 months), or Custom date ranges.\n"
+        "- Historical Goals: Users' calorie goals can change over time. When viewing historical data, "
+        "the app shows the goal that was active during that period, not just the current goal.\n\n"
+        "FEATURE GUIDANCE:\n"
+        "- If users ask about past performance, historical data, or trends, guide them to the Progress screen. "
+        "Explain they can use the 'Custom' option to select any date range they want to review.\n"
+        "- If users want to see how they did last week, last month, or any specific period, tell them to go to "
+        "Progress > Custom > Select Date Range, then choose their desired dates.\n"
+        "- If users ask about weight progress, mention the Weight metric in the Progress screen.\n"
+        "- If users want motivation, reference their streaks (if available) and encourage them to maintain them.\n"
+        "- If users want to see exercise trends, guide them to Progress screen and suggest switching to the Exercise metric.\n"
+        "- Always be helpful in guiding users to discover and use these features to better understand their progress.\n\n"
+        "CALORIE CALCULATION EXPLANATION:\n"
+        "- When users ask about remaining calories or how exercise affects their calorie budget, "
+        "explain the net calories concept clearly:\n"
+        "- Formula: Remaining = Target - Food Consumed + Exercise Burned\n"
+        "- Exercise burns calories, so it increases the remaining calories (you can eat more).\n"
+        "- This is because your body needs fuel to recover from exercise.\n"
+        "- Example: If target is 2277, food is 2277, and exercise is 2277, then remaining = 2277 - 2277 + 2277 = 2277 calories.\n"
+        "- Always explain this in a friendly, encouraging way that helps users understand why they can eat more after exercising.\n\n"
+        "User's current context:\n"
+        f"- Daily calorie goal: {daily_goal} kcal\n"
+        f"- Calories consumed today: {total_calories:.1f} kcal\n"
+        f"- Calories burned from exercise today: {total_exercise_calories:.1f} kcal\n"
+        f"- Remaining calories: {remaining:.1f} kcal\n"
+        f"- Macros today: Protein {total_protein:.1f}g, Carbs {total_carbs:.1f}g, Fat {total_fat:.1f}g\n"
+        f"- Exercise today: {total_exercise_minutes:.1f} minutes\n"
+        f"- Weekly average calories (last 7 days): {week_avg_calories:.1f} kcal/day\n"
+    )
+    
+    if meal_summary_text:
+        system_prompt += f"- {meal_summary_text}\n"
+    
+    system_prompt += f"- Next likely meal type (based on current time): {next_meal_type}\n"
+    
+    if custom_meals_list:
+        system_prompt += f"- User's saved meals: {', '.join(custom_meals_list)}\n"
+    
+    system_prompt += (
+        "\nAnswer the user's question based on this context. Be helpful, specific, and encouraging. "
+        "If mentioning foods, prefer Filipino options or the user's saved meals when appropriate."
+    )
+
+    # Build messages array: system prompt + conversation history
+    groq_messages = [{"role": "system", "content": system_prompt}]
+    
+    # Add conversation history (validate roles)
+    for msg in recent_messages:
+        role = msg.get('role', '').lower()
+        content = msg.get('content', '')
+        if role in ['user', 'assistant'] and content:
+            groq_messages.append({"role": role, "content": str(content)})
+
+    # Call Groq
+    ok, reply = _call_groq_chat_messages(groq_messages, max_tokens=500, temperature=0.7)
+
+    if not ok:
+        reply = (
+            "I'm having trouble connecting to the AI Coach right now. "
+            "Please check your internet connection or try again later."
+        )
+
+    return jsonify({
+        'success': True,
+        'reply': reply,
+        'used_context': {
+            'date': target_date.isoformat(),
+            'daily_goal': daily_goal,
+            'calories_today': round(total_calories, 1),
+            'exercise_minutes': round(total_exercise_minutes, 1),
+            'remaining_calories': round(remaining, 1),
+        }
+    })
+
 
 def calculate_streak(user):
     today = date.today()
@@ -4105,13 +7146,22 @@ def _apply_preference_filtering(foods_list, active_filters, food_df=None):
 
 @app.route('/foods/recommend')
 def foods_recommend():
-    """Compatibility endpoint for the Flutter UI to fetch recommended foods.
+    """Endpoint for the Flutter UI to fetch recommended foods based on user profile.
+    
+    NO MEAL TYPE FILTERING - Recommendations are based on user profile:
+    - Gender (sex-specific nutritional needs)
+    - Age (age-appropriate recommendations)
+    - BMI (calculated from weight/height)
+    - Goal (lose weight, gain muscle, maintain, etc.)
+    - Activity level (sedentary, moderate, active, very active)
+    - Dietary preferences (from onboarding)
+    - Medical history (allergies, conditions)
 
     Query params: 
-        - user: username
-        - meal_type: breakfast|lunch|dinner|snacks
+        - user: username (required)
+        - meal_type: (optional, ignored - kept for backward compatibility)
         - filters: comma-separated list (e.g., "healthy,spicy,protein")
-    Returns: { recommended: [ { name, calories } ] }
+    Returns: { recommended: [ { name, calories, ... } ] } - up to 25 recommendations
     """
     try:
         username = request.args.get('user')
@@ -4144,57 +7194,65 @@ def foods_recommend():
                                        getattr(user_obj, 'diet_type', None) or [])
         medical_history = parse_list(getattr(user_obj, 'medical_history', None) or [])
         
-        # Priority: Use active_filters if provided, otherwise fall back to saved preferences
+        # Always combine active_filters + saved_preferences for comprehensive scoring
+        # Active filters take precedence (70% weight), but saved preferences still considered (30% weight)
+        all_preferences = []
         if active_filters:
-            all_preferences = active_filters
-        else:
-            all_preferences = saved_preferences
-
-        # Get base recommendations from meal plan (for initial filtering)
-        rec = nutrition_model.recommend_meals(
-            user_gender=user_obj.sex or 'male',
-            user_age=int(user_obj.age),
-            user_weight=float(user_obj.weight_kg),
-            user_height=float(user_obj.height_cm),
-            user_activity_level=str(user_obj.activity_level),
-            user_goal=str(user_obj.goal),
-            dietary_preferences=all_preferences,
-            medical_history=medical_history
-        )
-        base_foods = rec.get('meal_plan', {}).get(meal_type, {}).get('foods', [])
+            all_preferences.extend(active_filters)
+        if saved_preferences:
+            # Add saved preferences that aren't already in active filters
+            for pref in saved_preferences:
+                if pref.lower() not in [f.lower() for f in active_filters]:
+                    all_preferences.append(pref)
         
-        # Use FULL food_df database (900 foods) instead of just the limited meal plan
-        # This gives us access to all 900 foods for recommendations
+        print(f'DEBUG: [Food Recommendations] Active filters: {active_filters}')
+        print(f'DEBUG: [Food Recommendations] Saved preferences: {saved_preferences}')
+        print(f'DEBUG: [Food Recommendations] Combined preferences: {all_preferences}')
+        print(f'DEBUG: [Food Recommendations] User goal: {user_obj.goal}')
+        print(f'DEBUG: [Food Recommendations] Activity level: {user_obj.activity_level}')
+
+        # REMOVED: Meal type filtering - now using ALL foods from database
+        # Score ALL foods based on user profile (gender, age, BMI, goal, activity level, preferences)
+        
         foods_to_score = []
         try:
             global_food_df = globals().get('food_df', None)
             if global_food_df is not None and isinstance(global_food_df, pd.DataFrame) and not global_food_df.empty:
-                # Get all food names from the full database
+                # Use ALL foods from database - no meal type filtering
                 all_food_names = global_food_df['Food Name'].astype(str).dropna().unique().tolist()
                 
-                # Start with base foods from meal plan (ensures some relevance)
-                foods_to_score = list(base_foods)
-                
-                # Add additional foods from full database
-                # Limit to a reasonable subset for performance (sample or take first N)
-                # Add some randomization to show different foods each time
-                remaining_foods = [f for f in all_food_names if f not in foods_to_score]
-                
-                # Sample up to 100 additional foods from the database (or all if less than 100)
-                sample_size = min(100, len(remaining_foods))
-                if sample_size > 0:
-                    sampled = random.sample(remaining_foods, sample_size) if len(remaining_foods) > sample_size else remaining_foods
-                    foods_to_score.extend(sampled)
-                
-                print(f'DEBUG: [Food Recommendations] Using full database: {len(foods_to_score)} foods to score (from {len(all_food_names)} total)')
+                # Use all foods for scoring (or sample up to 100 for performance if database is huge)
+                if len(all_food_names) > 100:
+                    # Sample 100 foods randomly for scoring (still gives good variety)
+                    foods_to_score = random.sample(all_food_names, 100)
+                    print(f'DEBUG: [Food Recommendations] Using {len(foods_to_score)} randomly sampled foods from {len(all_food_names)} total foods (no meal type filtering)')
+                else:
+                    # Use all foods if database is smaller
+                    foods_to_score = all_food_names
+                    print(f'DEBUG: [Food Recommendations] Using ALL {len(foods_to_score)} foods from database (no meal type filtering)')
             else:
-                # Fallback to base foods if food_df not available
-                foods_to_score = base_foods
-                print(f'DEBUG: [Food Recommendations] Using limited meal plan: {len(foods_to_score)} foods')
+                # Fallback: Get recommendations from nutrition model if food_df not available
+                rec = nutrition_model.recommend_meals(
+                    user_gender=user_obj.sex or 'male',
+                    user_age=int(user_obj.age),
+                    user_weight=float(user_obj.weight_kg),
+                    user_height=float(user_obj.height_cm),
+                    user_activity_level=str(user_obj.activity_level),
+                    user_goal=str(user_obj.goal),
+                    dietary_preferences=all_preferences,
+                    medical_history=medical_history
+                )
+                # Combine foods from all meal types
+                all_meal_foods = []
+                for meal in ['breakfast', 'lunch', 'dinner', 'snacks']:
+                    meal_foods = rec.get('meal_plan', {}).get(meal, {}).get('foods', [])
+                    all_meal_foods.extend(meal_foods)
+                foods_to_score = list(set(all_meal_foods))  # Remove duplicates
+                print(f'DEBUG: [Food Recommendations] Using {len(foods_to_score)} foods from nutrition model (fallback)')
         except Exception as e:
-            # Fallback to base foods if any error
-            foods_to_score = base_foods
-            print(f'DEBUG: [Food Recommendations] Error accessing full database: {e}, using {len(foods_to_score)} base foods')
+            # Final fallback: empty list
+            foods_to_score = []
+            print(f'DEBUG: [Food Recommendations] Error accessing database: {e}, using empty list')
         
         # Apply hard filtering for active filters (if any)
         if active_filters:
@@ -4210,16 +7268,15 @@ def foods_recommend():
         
         foods = foods_to_score
 
-        # Derive daily and per-meal targets
+        # Derive daily calorie needs (used for scoring, not filtering)
         daily = nutrition_model._calculate_daily_needs(
             user_obj.sex or 'male', int(user_obj.age), float(user_obj.weight_kg), float(user_obj.height_cm), str(user_obj.activity_level)
         )
-        per_meal_target = {
-            'breakfast': daily['calories'] * 0.25,
-            'lunch': daily['calories'] * 0.35,
-            'dinner': daily['calories'] * 0.30,
-            'snacks': daily['calories'] * 0.10,
-        }.get(meal_type, daily['calories'] * 0.25)
+        
+        # Use average meal target for scoring (since we're not filtering by meal type)
+        # This allows foods from all categories to be scored fairly
+        avg_meal_target = daily['calories'] * 0.30  # Average of breakfast/lunch/dinner (25%, 35%, 30%)
+        per_meal_target = avg_meal_target
 
         remaining_cals = request.args.get('remaining_calories', type=float)
         if remaining_cals is not None:
@@ -4349,46 +7406,158 @@ def foods_recommend():
                     except:
                         pass
 
-                # Scoring: target fit + goal/sex weighting + preference weighting
+                # ===== ENHANCED SCORING SYSTEM =====
+                # Base score: How well food fits meal calorie target (30% weight)
                 target_diff = abs(cal - per_meal_target)
-                target_score = max(0.0, 100 - (target_diff / 10))
+                base_score = max(0.0, 100 - (target_diff / 10))
                 
+                # Goal-based scoring (30% weight)
                 goal_score = 0.0
-                if (user_obj.goal or '').lower() == 'gain muscle':
-                    goal_score += protein * 1.5
-                elif (user_obj.goal or '').lower() == 'lose weight':
-                    goal_score += max(0.0, 30 - cal / 10)
-
+                goal_lower = (user_obj.goal or '').lower()
+                
+                if 'lose' in goal_lower or 'weight loss' in goal_lower:
+                    # Weight Loss: Boost low-calorie, high-fiber, high-protein foods
+                    # Formula: (fiber * 2) + (protein * 1.5) - (calories / 10)
+                    goal_score = (fiber * 2.0) + (protein * 1.5) - (cal / 10.0)
+                    # Additional boost for low-calorie, nutrient-dense foods
+                    if cal < 200 and (fiber > 3 or protein > 8):
+                        goal_score += 20.0
+                    # Penalize very high-calorie foods
+                    if cal > 400:
+                        goal_score -= 30.0
+                elif 'muscle' in goal_lower or 'gain' in goal_lower:
+                    # Muscle Gain: Boost high-protein, moderate-high calorie foods
+                    # Formula: (protein * 3) + (calories / 5)
+                    goal_score = (protein * 3.0) + (cal / 5.0)
+                    # Additional boost for very high protein
+                    if protein > 20:
+                        goal_score += 25.0
+                    # Penalize very low protein or very low calories
+                    if protein < 5:
+                        goal_score -= 20.0
+                    if cal < 100:
+                        goal_score -= 15.0
+                elif 'maintain' in goal_lower:
+                    # Maintain Weight: Boost balanced macros, moderate calories
+                    # Calculate balanced macro score
+                    macro_balance = 0.0
+                    if cal > 0:
+                        # Ideal ratios: 30% protein, 40% carbs, 30% fat (roughly)
+                        protein_ratio = (protein * 4) / cal
+                        carbs_ratio = (carbs * 4) / cal
+                        fat_ratio = (fat * 9) / cal
+                        # Score based on how balanced macros are
+                        macro_balance = 100 - abs(protein_ratio - 0.3) * 100 - abs(carbs_ratio - 0.4) * 100 - abs(fat_ratio - 0.3) * 100
+                        macro_balance = max(0.0, macro_balance)
+                    
+                    # Boost foods near calorie target
+                    target_alignment = 1.0 - (abs(cal - per_meal_target) / per_meal_target) if per_meal_target > 0 else 0.0
+                    target_alignment = max(0.0, target_alignment)
+                    
+                    goal_score = (macro_balance * 0.5) + (target_alignment * 50.0)
+                    # Penalize extreme values
+                    if cal > 500 or cal < 50:
+                        goal_score -= 20.0
+                else:
+                    # Default/unknown goal: Balanced approach
+                    goal_score = 50.0
+                
+                # Normalize goal_score to 0-100 range for consistent weighting
+                goal_score = max(0.0, min(100.0, goal_score))
+                
+                # Activity level consideration (10% weight)
+                activity_score = 0.0
+                activity_lower = (user_obj.activity_level or '').lower()
+                
+                if 'very active' in activity_lower or 'very_active' in activity_lower:
+                    # Very Active: Allow higher calorie foods, prioritize protein
+                    if cal > 200:
+                        activity_score += 15.0
+                    if protein > 15:
+                        activity_score += 20.0
+                    activity_score += 10.0  # Base boost for active users
+                elif 'active' in activity_lower:
+                    # Active: Balanced approach
+                    if 150 <= cal <= 350:
+                        activity_score += 15.0
+                    if protein > 10:
+                        activity_score += 10.0
+                    activity_score += 5.0  # Small base boost
+                elif 'moderate' in activity_lower:
+                    # Moderate: Slightly lower calories
+                    if 100 <= cal <= 300:
+                        activity_score += 15.0
+                    if cal > 400:
+                        activity_score -= 10.0
+                elif 'sedentary' in activity_lower:
+                    # Sedentary: Prioritize lower calorie, nutrient-dense foods
+                    if cal < 250:
+                        activity_score += 20.0
+                    if cal > 350:
+                        activity_score -= 15.0
+                    if fiber > 3 or protein > 8:
+                        activity_score += 15.0
+                
+                # Normalize activity_score to 0-100 range
+                activity_score = max(0.0, min(100.0, activity_score))
+                
+                # Sex-based scoring (kept for compatibility, but lower weight)
                 sex_score = 0.0
                 if (user_obj.sex or '').lower() == 'female':
                     sex_score += iron * 0.8 + calcium * 0.2
                 else:
                     sex_score += protein * 0.5
+                sex_score = max(0.0, min(100.0, sex_score))
 
-                # Preference-based scoring using model predictions
+                # Preference-based scoring (20% weight)
+                # Score based on how well food matches preferences
                 preference_score = 0.0
                 prefs_lower = [p.lower() for p in all_preferences]
                 food_name_lower = name.lower()
                 category_lower = category.lower() if category else ''
                 
+                # Separate active filters from saved preferences for weighted scoring
+                active_filters_lower = [f.lower() for f in active_filters]
+                saved_prefs_lower = [p.lower() for p in saved_preferences if p.lower() not in active_filters_lower]
+                
+                # Calculate preference match score (active filters weighted 70%, saved 30%)
+                active_preference_score = 0.0
+                saved_preference_score = 0.0
+                
                 # Plant-based preference: Boost plant foods, penalize meats
                 if 'plant_based' in prefs_lower or 'plant-based' in prefs_lower:
                     if category_lower in ['vegetables', 'fruits', 'grains', 'legumes']:
-                        preference_score += 25.0  # Strong boost for plant foods
+                        boost = 25.0
+                        if 'plant_based' in active_filters_lower or 'plant-based' in active_filters_lower:
+                            active_preference_score += boost
+                        else:
+                            saved_preference_score += boost * 0.3  # Saved preference gets 30% weight
                     elif category_lower == 'meats':
-                        preference_score -= 50.0  # Strong penalty for meats
+                        penalty = -50.0
+                        if 'plant_based' in active_filters_lower or 'plant-based' in active_filters_lower:
+                            active_preference_score += penalty
+                        else:
+                            saved_preference_score += penalty * 0.3
                 
-                # Protein lover preference: Boost high-protein foods (stronger boost)
+                # Protein lover preference: Boost high-protein foods
                 if 'protein' in prefs_lower:
-                    if protein > 15:  # High protein threshold
-                        preference_score += protein * 2.5 + 30.0  # Strong boost: base +30 + multiplier
+                    if protein > 15:
+                        boost = protein * 2.5 + 30.0
                     elif protein > 8:
-                        preference_score += protein * 1.5 + 20.0  # Medium boost: base +20 + multiplier
+                        boost = protein * 1.5 + 20.0
                     elif protein > 5:
-                        preference_score += protein * 0.8 + 10.0  # Small boost for moderate protein
+                        boost = protein * 0.8 + 10.0
+                    else:
+                        boost = 0.0
+                    
+                    if 'protein' in active_filters_lower:
+                        active_preference_score += boost
+                    else:
+                        saved_preference_score += boost * 0.3
                 
                 # Healthy preference: Boost nutritious, lower-calorie foods, penalize unhealthy options
                 if 'healthy' in prefs_lower:
+                    healthy_boost = 0.0
                     # Calculate nutritional density (nutrients per calorie)
                     nutrition_density = 0.0
                     if cal > 0:
@@ -4403,49 +7572,55 @@ def foods_recommend():
                     
                     # Strong boost for high nutritional density foods
                     if nutrition_density > 0.5:
-                        preference_score += 30.0
+                        healthy_boost += 30.0
                     elif nutrition_density > 0.3:
-                        preference_score += 20.0
+                        healthy_boost += 20.0
                     elif nutrition_density > 0.15:
-                        preference_score += 10.0
+                        healthy_boost += 10.0
                     
                     # Boost for whole grains and natural foods
                     if 'brown' in food_name_lower or 'whole grain' in food_name_lower:
-                        preference_score += 15.0
+                        healthy_boost += 15.0
                     
                     # Boost for fruits and vegetables
                     if category_lower in ['fruits', 'vegetables']:
-                        preference_score += 25.0
+                        healthy_boost += 25.0
                     elif 'fruit' in food_name_lower or 'vegetable' in food_name_lower:
-                        preference_score += 20.0
+                        healthy_boost += 20.0
                     
                     # Boost for lean proteins
                     if protein > 10 and fat < 10 and category_lower != 'meats':
-                        preference_score += 15.0
+                        healthy_boost += 15.0
                     
                     # STRONG PENALTIES for unhealthy foods
                     # Penalize fried foods heavily
                     if 'fried' in food_name_lower or 'deep fried' in food_name_lower:
-                        preference_score -= 40.0  # Strong penalty
+                        healthy_boost -= 40.0  # Strong penalty
                     
                     # Penalize refined grains (white rice, white bread)
                     if 'white_rice' in food_name_lower or ('white rice' in food_name_lower and 'brown' not in food_name_lower):
-                        preference_score -= 25.0  # Prefer brown rice
+                        healthy_boost -= 25.0  # Prefer brown rice
                     
                     if 'white bread' in food_name_lower or 'white_bread' in food_name_lower:
-                        preference_score -= 20.0
+                        healthy_boost -= 20.0
                     
                     # Penalize high-calorie, low-nutrition foods
                     if cal > 300 and nutrition_density < 0.1:
-                        preference_score -= 20.0
+                        healthy_boost -= 20.0
                     
                     # Penalize high-fat, high-calorie foods
                     if fat > 20 and cal > 250:
-                        preference_score -= 15.0
+                        healthy_boost -= 15.0
                     
                     # Small boost for moderate calories with good nutrition
                     if 100 <= cal <= 200 and (fiber > 3 or protein > 8):
-                        preference_score += 10.0
+                        healthy_boost += 10.0
+                    
+                    # Apply weighted scoring
+                    if 'healthy' in active_filters_lower:
+                        active_preference_score += healthy_boost
+                    else:
+                        saved_preference_score += healthy_boost * 0.3
                 
                 # Comfort food preference: No specific boost (all foods considered)
                 # This is more about emotional satisfaction than nutrition scoring
@@ -4454,21 +7629,79 @@ def foods_recommend():
                 if 'spicy' in prefs_lower:
                     spicy_keywords = ['spicy', 'hot', 'chili', 'sili', 'sili', 'adobo', 'sinigang', 'bicol']
                     if any(keyword in food_name_lower for keyword in spicy_keywords):
-                        preference_score += 15.0
+                        boost = 15.0
+                        if 'spicy' in active_filters_lower:
+                            active_preference_score += boost
+                        else:
+                            saved_preference_score += boost * 0.3
                 
                 # Sweet tooth preference: Boost sweet foods
                 if 'sweet' in prefs_lower:
                     sweet_keywords = ['sweet', 'cake', 'dessert', 'candy', 'fruit', 'mango', 'banana', 'papaya']
                     if any(keyword in food_name_lower for keyword in sweet_keywords):
-                        preference_score += 15.0
-
-                score = target_score + goal_score + sex_score + preference_score
+                        boost = 15.0
+                        if 'sweet' in active_filters_lower:
+                            active_preference_score += boost
+                        else:
+                            saved_preference_score += boost * 0.3
+                
+                # Comfort food preference: Boost comfort foods
+                if 'comfort' in prefs_lower:
+                    comfort_keywords = ['rice', 'noodles', 'soup', 'stew', 'adobo', 'sinigang', 'tinola']
+                    if any(keyword in food_name_lower for keyword in comfort_keywords):
+                        boost = 15.0
+                        if 'comfort' in active_filters_lower:
+                            active_preference_score += boost
+                        else:
+                            saved_preference_score += boost * 0.3
+                
+                # Combine active and saved preference scores (70% active, 30% saved)
+                preference_score = (active_preference_score * 0.7) + (saved_preference_score * 0.3)
+                
+                # Normalize preference_score to 0-100 range
+                preference_score = max(0.0, min(100.0, preference_score))
+                
+                # Meal type match score (10% weight) - boost foods that match meal type
+                meal_type_score = 0.0
+                meal_type_lower = meal_type.lower()
+                meal_keywords = {
+                    'breakfast': ['breakfast', 'cereal', 'bread', 'porridge', 'champorado', 'arroz caldo', 'goto', 'pandesal', 'tapsilog', 'tocino', 'longganisa'],
+                    'lunch': ['main dish', 'stew', 'soup', 'noodle', 'adobo', 'sinigang', 'kare-kare', 'caldereta', 'afritada'],
+                    'dinner': ['main dish', 'stew', 'soup', 'noodle', 'adobo', 'sinigang', 'kare-kare', 'caldereta', 'afritada'],
+                    'snack': ['snack', 'dessert', 'bread', 'puto', 'bibingka', 'halo-halo', 'leche flan', 'turon'],
+                    'snacks': ['snack', 'dessert', 'bread', 'puto', 'bibingka', 'halo-halo', 'leche flan', 'turon'],
+                }
+                keywords = meal_keywords.get(meal_type_lower, [])
+                if keywords:
+                    if any(kw in category_lower for kw in keywords) or any(kw in food_name_lower for kw in keywords):
+                        meal_type_score = 20.0
+                
+                # ===== COMBINED SCORING FORMULA =====
+                # final_score = (base_score * 0.3) + (goal_alignment_score * 0.3) + 
+                #              (preference_match_score * 0.2) + (meal_type_match_score * 0.1) + 
+                #              (activity_level_score * 0.1)
+                final_score = (
+                    base_score * 0.3 +
+                    goal_score * 0.3 +
+                    preference_score * 0.2 +
+                    meal_type_score * 0.1 +
+                    activity_score * 0.1
+                )
+                
+                score = final_score
+                
+                # Debug logging for top foods
+                if len(scored) < 5:  # Log first 5 foods for debugging
+                    print(f'DEBUG: [Scoring] Food: {name[:30]}')
+                    print(f'  Base: {base_score:.1f}, Goal: {goal_score:.1f}, Preference: {preference_score:.1f}, '
+                          f'Meal: {meal_type_score:.1f}, Activity: {activity_score:.1f}')
+                    print(f'  Final Score: {score:.1f}, Cal: {cal:.0f}, Protein: {protein:.1f}g, Fiber: {fiber:.1f}g')
             except Exception:
                 score = 10.0  # Default score if calculation fails
             
             # Format to match FoodItem.fromJson() expectations
-            # Use the original name from the database if we found a match, otherwise use the name as-is
-            final_food_name = name.strip()
+            # Clean the food name to remove Var variants, numbers, and special characters
+            final_food_name = clean_food_name(name.strip())
             scored.append({
                 'Food Name': final_food_name,
                 'Calories': round(cal, 1),
@@ -4485,8 +7718,9 @@ def foods_recommend():
         # Sort by score desc
         scored.sort(key=lambda x: x.get('_score', 0), reverse=True)
         
-        # Take top 20 recommendations for variety (instead of just 8)
-        top_recommendations = scored[:20]
+        # Take top recommendations for variety (we'll select top 10 at the end)
+        # Keep more candidates to ensure we have enough after deduplication
+        top_recommendations = scored[:30]  # Get top 30 to ensure we have 10 unique after deduplication
         
         # Add some randomization: shuffle the top recommendations slightly
         # Keep top 3-5 as-is (highest scores), then slightly shuffle the rest
@@ -4498,9 +7732,9 @@ def foods_recommend():
         
         scored = top_recommendations
         
-        # Fallback: if we have less than 8 recommendations or empty, use default foods
-        if len(scored) < 8:
-            fallback_count = 8 - len(scored)
+        # Fallback: if we have less than 10 recommendations, add more to reach 10
+        if len(scored) < 10:
+            fallback_count = 10 - len(scored)
             try:
                 global_food_df_fallback = globals().get('food_df', None)
                 if global_food_df_fallback is not None and isinstance(global_food_df_fallback, pd.DataFrame) and not global_food_df_fallback.empty:
@@ -4542,8 +7776,10 @@ def foods_recommend():
                         continue
                     
                     # Format to match FoodItem.fromJson() expectations
+                    # Clean the food name to remove Var variants, numbers, and special characters
+                    cleaned_food_name = clean_food_name(food_name)
                     scored.append({
-                        'Food Name': food_name,
+                        'Food Name': cleaned_food_name,
                         'Calories': float(food.get('Calories', 0)),
                         'Category': food.get('Category', ''),
                         'Serving Size': food.get('Serving Size', '100g'),
@@ -4555,13 +7791,13 @@ def foods_recommend():
                         '_score': 10.0  # Lower score for fallback foods
                     })
                     seen_foods.add(food_name_normalized)  # Track in seen_foods to prevent future duplicates
-                    if len(scored) >= 8:
+                    if len(scored) >= 10:
                         break
             except Exception as e:
                 # If fallback fails, at least return what we have
                 pass
         
-        # Final deduplication: Remove any remaining duplicates by Food Name (normalized)
+        # Final deduplication: Remove any remaining duplicates by Food Name (normalized and cleaned)
         final_seen = set()
         final_recs = []
         for item in scored:
@@ -4569,31 +7805,44 @@ def foods_recommend():
             if not food_name:
                 continue
             
-            # Use same normalization function for consistency
-            food_name_normalized = normalize_food_name(food_name)
+            # Clean the food name first, then normalize for duplicate detection
+            cleaned_food_name = clean_food_name(food_name)
+            food_name_normalized = normalize_food_name(cleaned_food_name)
             # Skip if we've already added this food (normalized comparison)
             if not food_name_normalized or food_name_normalized in final_seen:
                 continue
             
             final_seen.add(food_name_normalized)
-            # Remove internal _score field
+            # Remove internal _score field and ensure cleaned name is used
             item_copy = {k: v for k, v in item.items() if k != '_score'}
+            item_copy['Food Name'] = cleaned_food_name  # Ensure cleaned name is used
             final_recs.append(item_copy)
             
-            # Limit to 15 recommendations for more variety (from full 900-food database)
-            if len(final_recs) >= 15:
+            # Limit to 25 recommendations (increased from 10 for better variety)
+            if len(final_recs) >= 25:
                 break
         
-        return jsonify({'recommended': final_recs}), 200
+        # Return up to 25 recommendations (or all if we have less)
+        # This gives users more variety and better discovery, aligned with their profile
+        if len(final_recs) < 10:
+            print(f'DEBUG: [Food Recommendations] Warning: Only {len(final_recs)} unique foods available (less than target of 10)')
+        else:
+            print(f'DEBUG: [Food Recommendations] Returning {len(final_recs)} recommendations (aligned with user profile: gender={user_obj.sex}, age={user_obj.age}, goal={user_obj.goal}, activity={user_obj.activity_level})')
+        
+        return jsonify({'recommended': final_recs[:25]}), 200
     except Exception as e:
         return jsonify({'error': str(e), 'recommended': []}), 200
 
-@app.route('/foods/search')
-def foods_search():
-    """Compatibility endpoint mapping to recommendations search.
+@app.route('/foods/search/model')
+def foods_search_model():
+    """Experimental model-based food search (kept on a separate path).
 
-    Query params: query
-    Returns: { foods: [ { name, calories } ] }
+    This uses the nutrition_model to score a single food candidate based on
+    the raw query string and the user's profile. It is NOT used by the
+    mobile Log Food search bar, which now relies purely on the local CSV.
+
+    Query params: query, user
+    Returns: { foods: [ { name, calories, score } ] }
     """
     try:
         query = (request.args.get('query') or '').strip()
@@ -4601,11 +7850,6 @@ def foods_search():
         if not query:
             return jsonify({'foods': []}), 200
 
-        data = {
-            'query': query,
-            'user': username,
-        }
-        # Reuse internal function by calling the model directly
         profile = None
         if username:
             user_obj = User.query.filter_by(username=username).first()
@@ -4621,10 +7865,14 @@ def foods_search():
         if not profile:
             # Minimal neutral defaults
             profile = {
-                'sex': 'male', 'age': 25, 'height_cm': 175, 'weight_kg': 70, 'activity_level': 'active', 'goal': 'maintain'
+                'sex': 'male',
+                'age': 25,
+                'height_cm': 175,
+                'weight_kg': 70,
+                'activity_level': 'active',
+                'goal': 'maintain',
             }
 
-        # Simple candidate: the query itself
         pn = nutrition_model.predict_nutrition(
             food_name=query,
             serving_size=100,
@@ -4635,18 +7883,29 @@ def foods_search():
             user_activity_level=str(profile['activity_level']),
             user_goal=str(profile['goal']),
         )
-        info = pn.get('nutrition_info',{})
+        info = pn.get('nutrition_info', {})
         cal = float(info.get('calories', pn.get('calories', 0)))
         protein = float(info.get('protein', 0))
         iron = float(info.get('iron', 0))
         calcium = float(info.get('calcium', 0))
-        # Simple score for search result
+
         score = 100.0
         if (profile['goal'] or '').lower() == 'gain muscle':
             score += protein * 1.5
         if (profile['sex'] or '').lower() == 'female':
             score += iron * 0.8 + calcium * 0.2
-        return jsonify({'foods': [{'name': query, 'calories': round(cal,1), 'score': round(score,2)}]}), 200
+
+        return jsonify(
+            {
+                'foods': [
+                    {
+                        'name': query,
+                        'calories': round(cal, 1),
+                        'score': round(score, 2),
+                    }
+                ]
+            }
+        ), 200
     except Exception as e:
         return jsonify({'foods': [], 'error': str(e)}), 200
 
@@ -4751,13 +8010,15 @@ def progress_all():
     weight_q = WeightLog.query.filter_by(user=user)
     workout_q = WorkoutLog.query.filter_by(user=user)
 
-    if start_date:
-        sd = datetime.fromisoformat(start_date).date()
+    # Parse dates using safe date parser (no timezone conversion)
+    sd = parse_date_safe(start_date) if start_date else None
+    ed = parse_date_safe(end_date) if end_date else None
+
+    if sd:
         food_q = food_q.filter(FoodLog.date >= sd)
         weight_q = weight_q.filter(WeightLog.date >= sd)
         workout_q = workout_q.filter(WorkoutLog.date >= sd)
-    if end_date:
-        ed = datetime.fromisoformat(end_date).date()
+    if ed:
         food_q = food_q.filter(FoodLog.date <= ed)
         weight_q = weight_q.filter(WeightLog.date <= ed)
         workout_q = workout_q.filter(WorkoutLog.date <= ed)
@@ -4781,11 +8042,11 @@ def progress_all():
     
     # Also get ExerciseSession data
     exercise_session_q = ExerciseSession.query.filter_by(user=user)
-    if start_date:
-        sd = datetime.fromisoformat(start_date).date()
+    if sd:
+        # ExerciseSession.date is a Date column, so compare with date directly
         exercise_session_q = exercise_session_q.filter(ExerciseSession.date >= sd)
-    if end_date:
-        ed = datetime.fromisoformat(end_date).date()
+    if ed:
+        # ExerciseSession.date is a Date column, so compare with date directly
         exercise_session_q = exercise_session_q.filter(ExerciseSession.date <= ed)
     
     exercise_session_rows = (
@@ -4822,6 +8083,38 @@ def progress_all():
         ]
     })
 
+@app.route('/progress/start-date')
+def progress_start_date():
+    """Get the user's first food log date (when they started tracking).
+    
+    Query params: user
+    Returns: {'success': true, 'start_date': 'YYYY-MM-DD', 'has_data': true}
+    """
+    user = request.args.get('user')
+    
+    if not user:
+        return jsonify({'error': 'user is required'}), 400
+    
+    try:
+        # Query the earliest date in FoodLog table for the user
+        from sqlalchemy import func
+        earliest_date = db.session.query(func.min(FoodLog.date)).filter_by(user=user).scalar()
+        
+        if earliest_date is None:
+            return jsonify({
+                'success': True,
+                'start_date': None,
+                'has_data': False
+            })
+        
+        return jsonify({
+            'success': True,
+            'start_date': earliest_date.isoformat(),
+            'has_data': True
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # --- Streak Helper Functions ---
 def get_philippines_timezone():
     """Get Philippines timezone object (Asia/Manila)"""
@@ -4845,6 +8138,39 @@ def get_philippines_date():
     except Exception:
         # Fallback to UTC if timezone fails
         return date.today()
+
+def parse_date_safe(date_str):
+    """Parse ISO8601 date string and extract date-only without timezone conversion.
+    
+    This function safely extracts the date part (YYYY-MM-DD) from ISO8601 datetime strings
+    without timezone conversion, preventing date shifts when parsing dates from different timezones.
+    
+    Args:
+        date_str: ISO8601 date string (e.g., "2025-11-13T00:00:00.000" or "2025-11-13")
+    
+    Returns:
+        date object or None if parsing fails
+    """
+    if not date_str:
+        return None
+    try:
+        # Extract date part directly (YYYY-MM-DD) without timezone conversion
+        if 'T' in date_str:
+            # Has time component, extract date part only
+            date_part = date_str.split('T')[0]
+        else:
+            # Already date-only string
+            date_part = date_str
+        
+        # Remove any timezone suffix if present (e.g., "2025-11-13+08:00" -> "2025-11-13")
+        if '+' in date_part or date_part.endswith('Z'):
+            date_part = date_part.split('+')[0].split('Z')[0]
+        
+        # Parse as date-only (no timezone conversion)
+        return datetime.strptime(date_part, '%Y-%m-%d').date()
+    except (ValueError, AttributeError) as e:
+        print(f"[ERROR] Error parsing date: {date_str}, error: {e}")
+        return None
 
 def get_or_create_streak(user, streak_type, lock_for_update=False):
     """Get existing streak or create new one for user and type

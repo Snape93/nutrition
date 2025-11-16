@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Health Connect permissions are now defined in arrays.xml -->
-    <!-- This file is kept for reference but arrays are moved to avoid duplicates -->
-</resources>

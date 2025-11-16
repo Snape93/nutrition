@@ -212,6 +212,30 @@ class ProgressDataService {
     }
   }
 
+  /// Get user's first food log date (when they started tracking)
+  static Future<DateTime?> getUserStartDate({
+    required String usernameOrEmail,
+  }) async {
+    try {
+      final uri = Uri.parse('$apiBase/progress/start-date?user=$usernameOrEmail');
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final body = json.decode(response.body) as Map<String, dynamic>;
+        if (body['success'] == true && body['has_data'] == true) {
+          final startDateStr = body['start_date'] as String?;
+          if (startDateStr != null) {
+            return DateTime.parse(startDateStr);
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error fetching user start date: $e');
+      return null;
+    }
+  }
+
   // Private helper methods
 
   static bool _isCacheValid() {
@@ -278,6 +302,14 @@ class ProgressDataService {
   }
 
   // Data fetching methods
+
+  /// Fetch raw backend data for bar graph (public method)
+  static Future<Map<String, dynamic>> fetchRawBackendData(
+    String username,
+    DateRange dateRange,
+  ) async {
+    return await _fetchBackendData(username, dateRange);
+  }
 
   static Future<Map<String, dynamic>> _fetchBackendData(
     String username,
@@ -390,11 +422,20 @@ class ProgressDataService {
     }
   }
 
-  static Future<Map<String, dynamic>> _fetchUserGoals(String username) async {
+  static Future<Map<String, dynamic>> _fetchUserGoals(
+    String username, {
+    DateTime? targetDate,
+  }) async {
     try {
-      final response = await http.get(
-        Uri.parse('$apiBase/progress/goals?user=$username'),
-      );
+      String url = '$apiBase/progress/goals?user=$username';
+      
+      // Add date parameter if provided (for historical goals)
+      if (targetDate != null) {
+        final dateStr = targetDate.toIso8601String().split('T')[0]; // YYYY-MM-DD
+        url += '&date=$dateStr';
+      }
+      
+      final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         // Convert all numeric values to double to avoid type errors
@@ -410,6 +451,20 @@ class ProgressDataService {
     } catch (e) {
       debugPrint('❌ Error fetching user goals: $e');
       return _getDefaultGoals();
+    }
+  }
+
+  /// Fetch user goal for a specific date (for historical goals)
+  static Future<double> fetchGoalForDate(
+    String usernameOrEmail,
+    DateTime targetDate,
+  ) async {
+    try {
+      final goals = await _fetchUserGoals(usernameOrEmail, targetDate: targetDate);
+      return _safeToDouble(goals['calories'] ?? 2000);
+    } catch (e) {
+      debugPrint('❌ Error fetching goal for date: $e');
+      return 2000.0;
     }
   }
 
@@ -635,8 +690,14 @@ class ProgressDataService {
     final List<DailyBreakdownData> breakdown = [];
     final startDate = DateTime(dateRange.start.year, dateRange.start.month, dateRange.start.day);
     
+    final now = DateTime.now();
+    final todayDate = DateTime(now.year, now.month, now.day);
+
     for (int i = 0; i < 7; i++) {
       final currentDate = startDate.add(Duration(days: i));
+      if (currentDate.isAfter(todayDate)) {
+        break;
+      }
       final dateKey = '${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')}';
       final dayName = _getDayName(currentDate.weekday);
       
@@ -696,7 +757,13 @@ class ProgressDataService {
     var currentWeekStart = _getWeekStart(monthStart);
     int weekNumber = 1;
     
+    final now = DateTime.now();
+    final todayDate = DateTime(now.year, now.month, now.day);
+
     while (currentWeekStart.isBefore(monthEnd) || currentWeekStart.isAtSameMomentAs(monthEnd)) {
+      if (currentWeekStart.isAfter(todayDate)) {
+        break;
+      }
       final weekEnd = currentWeekStart.add(const Duration(days: 6));
       final weekKey = '${currentWeekStart.year}-${currentWeekStart.month}-${currentWeekStart.day}';
       
@@ -720,6 +787,262 @@ class ProgressDataService {
   static String _getDayName(int weekday) {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return days[weekday - 1];
+  }
+
+  // Bar graph aggregation methods
+
+  /// Aggregate data for bar graph - Daily view
+  static List<GraphDataPoint> aggregateDailyDataForBarGraph(
+    List<Map<String, dynamic>> rawData,
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    // Group by date
+    final Map<String, double> dailyTotals = {};
+    for (final entry in rawData) {
+      try {
+        final dateStr = entry['date'] as String? ?? '';
+        if (dateStr.isEmpty) continue;
+        
+        DateTime parsedDate;
+        if (dateStr.contains('T')) {
+          parsedDate = DateTime.parse(dateStr.split('T')[0]);
+        } else {
+          parsedDate = DateTime.parse(dateStr);
+        }
+        final dateKey = '${parsedDate.year}-${parsedDate.month}-${parsedDate.day}';
+        final value = _safeToDouble(entry['calories'] ?? 0);
+        dailyTotals[dateKey] = (dailyTotals[dateKey] ?? 0) + value;
+      } catch (e) {
+        debugPrint('⚠️ Failed to parse date in daily aggregation: $e');
+        continue;
+      }
+    }
+
+    // Fill missing dates with 0
+    final List<GraphDataPoint> result = [];
+    var currentDate = DateTime(startDate.year, startDate.month, startDate.day);
+    final end = DateTime(endDate.year, endDate.month, endDate.day);
+    
+    while (currentDate.isBefore(end) || currentDate.isAtSameMomentAs(end)) {
+      final dateKey = '${currentDate.year}-${currentDate.month}-${currentDate.day}';
+      final value = dailyTotals[dateKey] ?? 0.0;
+      final dayName = _getDayName(currentDate.weekday);
+      
+      result.add(GraphDataPoint(
+        date: currentDate,
+        value: value,
+        label: dayName,
+      ));
+      
+      currentDate = currentDate.add(const Duration(days: 1));
+    }
+
+    return result;
+  }
+
+  /// Aggregate data for bar graph - Weekly view
+  /// Returns average daily calories per week (not total)
+  static List<GraphDataPoint> aggregateWeeklyDataForBarGraph(
+    List<Map<String, dynamic>> rawData,
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    // Group by week - track totals and day counts
+    final Map<String, double> weeklyTotals = {};
+    final Map<String, int> weeklyDayCounts = {};
+    
+    for (final entry in rawData) {
+      try {
+        final dateStr = entry['date'] as String? ?? '';
+        if (dateStr.isEmpty) continue;
+        
+        DateTime parsedDate;
+        if (dateStr.contains('T')) {
+          parsedDate = DateTime.parse(dateStr.split('T')[0]);
+        } else {
+          parsedDate = DateTime.parse(dateStr);
+        }
+        final weekStart = _getWeekStart(parsedDate);
+        final weekKey = '${weekStart.year}-${weekStart.month}-${weekStart.day}';
+        final value = _safeToDouble(entry['calories'] ?? 0);
+        
+        // Sum calories and count days
+        weeklyTotals[weekKey] = (weeklyTotals[weekKey] ?? 0) + value;
+        weeklyDayCounts[weekKey] = (weeklyDayCounts[weekKey] ?? 0) + 1;
+      } catch (e) {
+        debugPrint('⚠️ Failed to parse date in weekly aggregation: $e');
+        continue;
+      }
+    }
+
+    // Generate weeks in range
+    final List<GraphDataPoint> result = [];
+    var currentWeekStart = _getWeekStart(startDate);
+    final end = DateTime(endDate.year, endDate.month, endDate.day);
+    int weekNumber = 1;
+    
+    while (currentWeekStart.isBefore(end) || currentWeekStart.isAtSameMomentAs(end)) {
+      final weekKey = '${currentWeekStart.year}-${currentWeekStart.month}-${currentWeekStart.day}';
+      final weekEnd = currentWeekStart.add(const Duration(days: 6));
+      
+      // Calculate actual days in this week (handle partial weeks)
+      final actualWeekEnd = weekEnd.isAfter(end) ? end : weekEnd;
+      final daysInWeek = actualWeekEnd.difference(currentWeekStart).inDays + 1;
+      
+      // Get total and day count for this week
+      final total = weeklyTotals[weekKey] ?? 0.0;
+      final dayCount = weeklyDayCounts[weekKey] ?? 0;
+      
+      // Calculate average daily calories (use actual days in week, not just days with data)
+      // If no data, return 0.0; otherwise divide total by actual days in week
+      final averageValue = (dayCount > 0 && daysInWeek > 0) 
+          ? total / daysInWeek 
+          : 0.0;
+      
+      result.add(GraphDataPoint(
+        date: currentWeekStart,
+        value: averageValue,
+        label: 'Week $weekNumber',
+        metadata: {
+          'weekStart': currentWeekStart.toIso8601String(),
+          'weekEnd': weekEnd.toIso8601String(),
+          'daysInWeek': daysInWeek,
+          'totalCalories': total,
+        },
+      ));
+      
+      currentWeekStart = currentWeekStart.add(const Duration(days: 7));
+      weekNumber++;
+      
+      // Limit to 5 weeks max
+      if (weekNumber > 5) break;
+    }
+
+    return result;
+  }
+
+  /// Aggregate data for bar graph - Monthly view
+  /// Returns average daily calories per month (not total)
+  static List<GraphDataPoint> aggregateMonthlyDataForBarGraph(
+    List<Map<String, dynamic>> rawData,
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    // Group by month - track totals and day counts
+    final Map<String, double> monthlyTotals = {};
+    final Map<String, int> monthlyDayCounts = {};
+    
+    for (final entry in rawData) {
+      try {
+        final dateStr = entry['date'] as String? ?? '';
+        if (dateStr.isEmpty) continue;
+        
+        DateTime parsedDate;
+        if (dateStr.contains('T')) {
+          parsedDate = DateTime.parse(dateStr.split('T')[0]);
+        } else {
+          parsedDate = DateTime.parse(dateStr);
+        }
+        final monthKey = '${parsedDate.year}-${parsedDate.month}';
+        final value = _safeToDouble(entry['calories'] ?? 0);
+        
+        // Sum calories and count days
+        monthlyTotals[monthKey] = (monthlyTotals[monthKey] ?? 0) + value;
+        monthlyDayCounts[monthKey] = (monthlyDayCounts[monthKey] ?? 0) + 1;
+      } catch (e) {
+        debugPrint('⚠️ Failed to parse date in monthly aggregation: $e');
+        continue;
+      }
+    }
+
+    // Generate months in range
+    final List<GraphDataPoint> result = [];
+    var currentMonth = DateTime(startDate.year, startDate.month, 1);
+    final end = DateTime(endDate.year, endDate.month, 1);
+    
+    while (currentMonth.isBefore(end) || currentMonth.isAtSameMomentAs(end)) {
+      final monthKey = '${currentMonth.year}-${currentMonth.month}';
+      final monthName = _getMonthName(currentMonth.month);
+      
+      // Calculate actual days in this month (handle partial months)
+      DateTime monthEnd;
+      if (currentMonth.month == 12) {
+        monthEnd = DateTime(currentMonth.year + 1, 1, 0); // Last day of December
+      } else {
+        monthEnd = DateTime(currentMonth.year, currentMonth.month + 1, 0); // Last day of month
+      }
+      
+      // Handle partial months at start/end of range
+      final actualMonthStart = currentMonth.isBefore(startDate) ? startDate : currentMonth;
+      final actualMonthEnd = monthEnd.isAfter(endDate) ? endDate : monthEnd;
+      final daysInMonth = actualMonthEnd.difference(actualMonthStart).inDays + 1;
+      
+      // Get total and day count for this month
+      final total = monthlyTotals[monthKey] ?? 0.0;
+      final dayCount = monthlyDayCounts[monthKey] ?? 0;
+      
+      // Calculate average daily calories (use actual days in month, not just days with data)
+      // If no data, return 0.0; otherwise divide total by actual days in month
+      final averageValue = (dayCount > 0 && daysInMonth > 0) 
+          ? total / daysInMonth 
+          : 0.0;
+      
+      result.add(GraphDataPoint(
+        date: currentMonth,
+        value: averageValue,
+        label: monthName,
+        metadata: {
+          'monthStart': currentMonth.toIso8601String(),
+          'monthEnd': monthEnd.toIso8601String(),
+          'daysInMonth': daysInMonth,
+          'totalCalories': total,
+        },
+      ));
+      
+      // Move to next month
+      if (currentMonth.month == 12) {
+        currentMonth = DateTime(currentMonth.year + 1, 1, 1);
+      } else {
+        currentMonth = DateTime(currentMonth.year, currentMonth.month + 1, 1);
+      }
+      
+      // Limit to 12 months max
+      if (result.length >= 12) break;
+    }
+
+    return result;
+  }
+
+  /// Aggregate data for bar graph - Custom view (same as daily)
+  static List<GraphDataPoint> aggregateCustomDataForBarGraph(
+    List<Map<String, dynamic>> rawData,
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    return aggregateDailyDataForBarGraph(rawData, startDate, endDate);
+  }
+
+  static String _getMonthName(int month) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return months[month - 1];
+  }
+
+  static String _formatDateRange(DateTime start, DateTime end) {
+    return '${start.day}/${end.day}';
   }
 
   // Sync methods

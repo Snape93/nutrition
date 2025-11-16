@@ -5,6 +5,9 @@ import '../models/graph_models.dart';
 import '../models/streak_model.dart';
 import '../widgets/beautiful_progress_card.dart';
 import '../widgets/streak_card.dart';
+import '../widgets/bar_graph_widget.dart';
+import '../widgets/single_date_picker.dart';
+import '../widgets/bar_graph_statistics.dart';
 import '../design_system/app_design_system.dart';
 
 /// Beautiful Progress Screen matching the new design
@@ -26,15 +29,26 @@ class BeautifulProgressScreen extends StatefulWidget {
 class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
     with TickerProviderStateMixin {
   // Progress metrics selection
-  ProgressMetric _selectedMetric = ProgressMetric.calories;
+  final ProgressMetric _selectedMetric = ProgressMetric.calories;
 
   // Time range selection
   TimeRange _selectedTimeRange = TimeRange.daily;
+
+  // Custom date state (single date selection)
+  DateTime? _customSelectedDate;
+  DateTime? _userStartDate;
+  DateTime? _maxEndDate; // Yesterday
+  bool _isLoadingStartDate = false;
+
+  // Bar graph data
+  List<GraphDataPoint> _barGraphData = [];
+  bool _isLoadingBarGraph = false;
 
   // Progress data
   ProgressData? _progressData;
   bool _isLoading = false;
   String? _errorMessage;
+  double? _historicalGoal; // Historical goal for single date view
 
   // Streak data
   StreakData? _caloriesStreak;
@@ -56,9 +70,36 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
   @override
   void initState() {
     super.initState();
+    _maxEndDate = DateTime.now().subtract(const Duration(days: 1)); // Yesterday
     _setupAnimations();
+    _loadUserStartDate();
     _loadProgressData();
     _loadStreakData();
+  }
+
+  Future<void> _loadUserStartDate() async {
+    setState(() {
+      _isLoadingStartDate = true;
+    });
+
+    try {
+      final startDate = await ProgressDataService.getUserStartDate(
+        usernameOrEmail: widget.usernameOrEmail,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _userStartDate = startDate;
+        _isLoadingStartDate = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading user start date: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoadingStartDate = false;
+      });
+    }
   }
 
   void _setupAnimations() {
@@ -80,22 +121,59 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
   Future<void> _loadProgressData({bool forceRefresh = false}) async {
     if (!mounted) return;
 
+    // Don't load if Custom is selected but date not chosen
+    if (_selectedTimeRange == TimeRange.custom && _customSelectedDate == null) {
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      // Only load bar graph for Custom time range
+      if (_selectedTimeRange == TimeRange.custom) {
+        _isLoadingBarGraph = true;
+      }
     });
 
     try {
+      // For single date view, fetch historical goal for that date
+      double? historicalGoal;
+      if (_selectedTimeRange == TimeRange.custom &&
+          _customSelectedDate != null) {
+        try {
+          historicalGoal = await ProgressDataService.fetchGoalForDate(
+            widget.usernameOrEmail,
+            _customSelectedDate!,
+          );
+        } catch (e) {
+          debugPrint('Error fetching historical goal: $e');
+        }
+      }
+
       final progressData = await ProgressDataService.getProgressData(
         usernameOrEmail: widget.usernameOrEmail,
         timeRange: _selectedTimeRange,
+        customStartDate: _customSelectedDate,
+        customEndDate:
+            _customSelectedDate, // Same date for single date selection
         forceRefresh: forceRefresh,
       );
+
+      // Store historical goal for use in UI
+      _historicalGoal = historicalGoal;
+
+      // Load bar graph data only for Custom time range
+      if (_selectedTimeRange == TimeRange.custom) {
+        await _loadBarGraphData();
+      }
 
       if (mounted) {
         setState(() {
           _progressData = progressData;
           _isLoading = false;
+          if (_selectedTimeRange == TimeRange.custom) {
+            _isLoadingBarGraph = false;
+          }
         });
         _fadeController.forward();
       }
@@ -104,20 +182,213 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
         setState(() {
           _errorMessage = 'Failed to load progress data: $e';
           _isLoading = false;
+          if (_selectedTimeRange == TimeRange.custom) {
+            _isLoadingBarGraph = false;
+          }
         });
       }
     }
   }
 
-  void _onMetricChanged(ProgressMetric metric) {
+  Future<void> _loadBarGraphData() async {
+    try {
+      // Calculate date range based on time range
+      DateTime startDate;
+      DateTime endDate;
+      final yesterday = DateTime.now().subtract(const Duration(days: 1));
+
+      switch (_selectedTimeRange) {
+        case TimeRange.daily:
+          endDate = yesterday;
+          startDate = endDate.subtract(const Duration(days: 6));
+          if (_userStartDate != null && _userStartDate!.isAfter(startDate)) {
+            startDate = _userStartDate!;
+          }
+          break;
+        case TimeRange.weekly:
+          endDate = yesterday;
+          startDate = endDate.subtract(const Duration(days: 28));
+          if (_userStartDate != null && _userStartDate!.isAfter(startDate)) {
+            startDate = _userStartDate!;
+          }
+          break;
+        case TimeRange.monthly:
+          endDate = yesterday;
+          startDate = DateTime(endDate.year - 1, endDate.month, 1);
+          if (_userStartDate != null && _userStartDate!.isAfter(startDate)) {
+            startDate = _userStartDate!;
+          }
+          break;
+        case TimeRange.custom:
+          // Custom date is handled separately via _loadBarGraphDataForSingleDate
+          return;
+      }
+
+      // Fetch raw data from backend
+      final backendData = await ProgressDataService.fetchRawBackendData(
+        widget.usernameOrEmail,
+        DateRange(startDate, endDate),
+      );
+
+      final rawCaloriesData = backendData['calories'] as List<dynamic>? ?? [];
+      final caloriesList =
+          rawCaloriesData.map((e) => e as Map<String, dynamic>).toList();
+
+      // Aggregate based on time range
+      List<GraphDataPoint> aggregatedData;
+      switch (_selectedTimeRange) {
+        case TimeRange.daily:
+          aggregatedData = ProgressDataService.aggregateDailyDataForBarGraph(
+            caloriesList,
+            startDate,
+            endDate,
+          );
+          break;
+        case TimeRange.weekly:
+          aggregatedData = ProgressDataService.aggregateWeeklyDataForBarGraph(
+            caloriesList,
+            startDate,
+            endDate,
+          );
+          break;
+        case TimeRange.monthly:
+          aggregatedData = ProgressDataService.aggregateMonthlyDataForBarGraph(
+            caloriesList,
+            startDate,
+            endDate,
+          );
+          break;
+        case TimeRange.custom:
+          // Custom date is handled separately via _loadBarGraphDataForSingleDate
+          aggregatedData = [];
+          break;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _barGraphData = aggregatedData;
+      });
+    } catch (e) {
+      debugPrint('Error loading bar graph data: $e');
+    }
+  }
+
+  void _onCustomDateSelected(DateTime date) {
     setState(() {
-      _selectedMetric = metric;
+      _customSelectedDate = date;
     });
+    // Load both progress data (for goal) and bar graph data
+    _loadProgressData(forceRefresh: true);
+    _loadBarGraphDataForSingleDate(date);
+  }
+
+  /// Load bar graph data for a single selected date (meal breakdown)
+  Future<void> _loadBarGraphDataForSingleDate(DateTime date) async {
+    try {
+      setState(() {
+        _isLoadingBarGraph = true;
+      });
+
+      // Fetch raw data for single date (same date for start and end)
+      final backendData = await ProgressDataService.fetchRawBackendData(
+        widget.usernameOrEmail,
+        DateRange(date, date),
+      );
+
+      final rawCaloriesData = backendData['calories'] as List<dynamic>? ?? [];
+      final caloriesList =
+          rawCaloriesData.map((e) => e as Map<String, dynamic>).toList();
+
+      // Process for meal breakdown
+      final processedData = _processMealData(caloriesList, date);
+
+      if (!mounted) return;
+      setState(() {
+        _barGraphData = processedData;
+        _isLoadingBarGraph = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading single date data: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoadingBarGraph = false;
+      });
+    }
+  }
+
+  /// Process raw data into meal breakdown (Breakfast, Lunch, Dinner, Snacks)
+  List<GraphDataPoint> _processMealData(
+    List<Map<String, dynamic>> rawData,
+    DateTime date,
+  ) {
+    // Initialize meal map
+    final Map<String, double> mealCalories = {
+      'Breakfast': 0.0,
+      'Lunch': 0.0,
+      'Dinner': 0.0,
+      'Snacks': 0.0,
+      'Other': 0.0,
+    };
+
+    // Process raw data
+    for (var entry in rawData) {
+      final calories = (entry['calories'] as num?)?.toDouble() ?? 0.0;
+      final mealType = (entry['meal_type'] as String?)?.trim() ?? 'Other';
+
+      // Normalize meal type
+      final normalizedMeal = _normalizeMealType(mealType);
+      mealCalories[normalizedMeal] =
+          (mealCalories[normalizedMeal] ?? 0.0) + calories;
+    }
+
+    // Create GraphDataPoint for each meal (only if has calories)
+    final List<GraphDataPoint> result = [];
+    final mealOrder = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Other'];
+
+    for (final meal in mealOrder) {
+      final calories = mealCalories[meal] ?? 0.0;
+      if (calories > 0 || result.isEmpty) {
+        // Include at least one bar
+        result.add(
+          GraphDataPoint(
+            date: date,
+            value: calories,
+            label: meal,
+            metadata: {'meal_type': meal, 'calories': calories},
+          ),
+        );
+      }
+    }
+
+    // If no data at all, return empty list (will show "No data" message)
+    if (result.isEmpty || result.every((point) => point.value == 0)) {
+      return [];
+    }
+
+    return result;
+  }
+
+  /// Normalize meal type to standard names
+  /// "Other" includes: unspecified, unknown, or custom meal types that don't match standard categories
+  String _normalizeMealType(String mealType) {
+    final lower = mealType.toLowerCase().trim();
+    if (lower.isEmpty || lower == 'unspecified' || lower == 'unknown') {
+      return 'Other';
+    }
+    if (lower.contains('breakfast')) return 'Breakfast';
+    if (lower.contains('lunch')) return 'Lunch';
+    if (lower.contains('dinner') || lower.contains('supper')) return 'Dinner';
+    if (lower.contains('snack')) return 'Snacks';
+    return 'Other'; // Any other meal type (e.g., "Brunch", "Dessert", custom types)
   }
 
   void _onTimeRangeChanged(TimeRange timeRange) {
     setState(() {
       _selectedTimeRange = timeRange;
+      // Reset custom date when switching away from Custom
+      if (timeRange != TimeRange.custom) {
+        _customSelectedDate = null;
+      }
     });
     _loadProgressData(forceRefresh: true);
   }
@@ -132,9 +403,9 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
       debugPrint('⏸️ Streak data already loading, skipping...');
       return;
     }
-    
+
     debugPrint('🔥 Starting to load streak data for ${widget.usernameOrEmail}');
-    
+
     setState(() {
       _isLoadingStreak = true;
     });
@@ -157,22 +428,26 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
           _caloriesStreak = streaks.firstWhere(
             (s) => s.streakType.toLowerCase() == 'calories',
           );
-          debugPrint('✅ Found calories streak: ${_caloriesStreak!.currentStreak} days');
+          debugPrint(
+            '✅ Found calories streak: ${_caloriesStreak!.currentStreak} days',
+          );
         } catch (e) {
           _caloriesStreak = null;
           debugPrint('ℹ️ No calories streak found');
         }
-        
+
         try {
           _exerciseStreak = streaks.firstWhere(
             (s) => s.streakType.toLowerCase() == 'exercise',
           );
-          debugPrint('✅ Found exercise streak: ${_exerciseStreak!.currentStreak} days');
+          debugPrint(
+            '✅ Found exercise streak: ${_exerciseStreak!.currentStreak} days',
+          );
         } catch (e) {
           _exerciseStreak = null;
           debugPrint('ℹ️ No exercise streak found');
         }
-        
+
         _isLoadingStreak = false;
         debugPrint('✅ Streak data loading complete');
       });
@@ -241,82 +516,35 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildMetricSelector(),
-            const SizedBox(height: 16),
             _buildTimeRangeSelector(),
             const SizedBox(height: 16),
-            _buildProgressContent(),
-            const SizedBox(height: AppDesignSystem.spaceMD),
-            _buildStreakCard(),
-            const SizedBox(height: AppDesignSystem.spaceMD),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildMetricSelector() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _buildMetricButton(
-            metric: ProgressMetric.calories,
-            icon: Icons.local_fire_department,
-            label: 'Calories',
-            isSelected: _selectedMetric == ProgressMetric.calories,
-          ),
-          const SizedBox(width: 12),
-          _buildMetricButton(
-            metric: ProgressMetric.exercise,
-            icon: Icons.fitness_center,
-            label: 'Exercise',
-            isSelected: _selectedMetric == ProgressMetric.exercise,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricButton({
-    required ProgressMetric metric,
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-  }) {
-    return GestureDetector(
-      onTap: () => _onMetricChanged(metric),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? _primaryColor : Colors.white,
-          borderRadius: BorderRadius.circular(25),
-          border: Border.all(
-            color: isSelected ? _primaryColor : _lightColor,
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : _lightColor,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : _lightColor,
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
+            // Custom date picker and bar graph (only when Custom is selected)
+            if (_selectedTimeRange == TimeRange.custom) ...[
+              SingleDatePicker(
+                selectedDate: _customSelectedDate,
+                minDate: _userStartDate,
+                maxDate: _maxEndDate,
+                onDateSelected: _onCustomDateSelected,
+                primaryColor: _primaryColor,
               ),
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 4),
-              const Icon(Icons.check, color: Colors.white, size: 16),
+              // Bar graph card (only for Custom when date is selected)
+              if (_customSelectedDate != null) ...[
+                const SizedBox(height: 16),
+                _buildBarGraphCard(),
+              ],
+            ],
+
+            // Progress content (only show for multi-day views, not Custom)
+            if (_selectedTimeRange != TimeRange.custom) ...[
+              const SizedBox(height: 16),
+              _buildProgressContent(),
+              const SizedBox(height: AppDesignSystem.spaceMD),
+            ],
+            // Streak card - only show for Daily view
+            if (_selectedTimeRange == TimeRange.daily) ...[
+              _buildStreakCard(),
+              const SizedBox(height: AppDesignSystem.spaceMD),
             ],
           ],
         ),
@@ -326,18 +554,28 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
 
   Widget _buildTimeRangeSelector() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildTimeRangeButton('Daily', TimeRange.daily),
-          _buildTimeRangeButton('Weekly', TimeRange.weekly),
-          _buildTimeRangeButton('Monthly', TimeRange.monthly),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
         ],
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildTimeRangeButton('Daily', TimeRange.daily),
+            _buildTimeRangeButton('Weekly', TimeRange.weekly),
+            _buildTimeRangeButton('Monthly', TimeRange.monthly),
+            _buildTimeRangeButton('Custom', TimeRange.custom),
+          ],
+        ),
       ),
     );
   }
@@ -346,15 +584,409 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
     final isSelected = _selectedTimeRange == timeRange;
     return GestureDetector(
       onTap: () => _onTimeRangeChanged(timeRange),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? _lightColor : _textGray,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          fontSize: 14,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? _primaryColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border:
+              isSelected
+                  ? null
+                  : Border.all(color: AppDesignSystem.outline, width: 1),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.grey[600],
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            fontSize: 14,
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildBarGraphCard() {
+    // Get goal value - for single date, use historical goal if available
+    // For multi-day views, goal is calculated for the range
+    double goalValue;
+
+    if (_selectedTimeRange == TimeRange.custom && _customSelectedDate != null) {
+      // Single date: use historical goal if available, otherwise use current goal
+      goalValue = _historicalGoal ?? _progressData?.calories.goal ?? 0.0;
+    } else {
+      goalValue = _progressData?.calories.goal ?? 0.0;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(AppDesignSystem.spaceMD),
+      margin: EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppDesignSystem.radiusLG),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Title
+          Text(
+            'Calories',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: AppDesignSystem.onSurface,
+            ),
+          ),
+          SizedBox(height: AppDesignSystem.spaceSM),
+          Text(
+            _getTimeRangeText(),
+            style: TextStyle(
+              fontSize: 12,
+              color: AppDesignSystem.onSurfaceVariant,
+            ),
+          ),
+          SizedBox(height: AppDesignSystem.spaceMD),
+
+          // Summary statistics
+          if (_barGraphData.isNotEmpty) ...[
+            _buildSummaryStats(goalValue),
+            SizedBox(height: AppDesignSystem.spaceMD),
+          ],
+
+          // Bar graph
+          BarGraphWidget(
+            data: _barGraphData,
+            goalValue: goalValue > 0 ? goalValue : null,
+            unit: 'cal',
+            primaryColor: _primaryColor,
+            userGender: widget.userSex,
+            isLoading: _isLoadingBarGraph,
+          ),
+
+          // Statistics cards (only show for multi-day views, not single-date)
+          if (_barGraphData.isNotEmpty &&
+              _selectedTimeRange != TimeRange.custom) ...[
+            SizedBox(height: AppDesignSystem.spaceMD),
+            BarGraphStatistics(
+              data: _barGraphData,
+              unit: 'cal',
+              primaryColor: _primaryColor,
+              goalValue: goalValue > 0 ? goalValue : null,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryStats(double? goalValue) {
+    if (_barGraphData.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Check if this is a single date view (Custom time range)
+    final isSingleDateView = _selectedTimeRange == TimeRange.custom;
+
+    if (isSingleDateView) {
+      // Single date trackback view: TOTAL, GOAL, REMAINING/OVER
+      return _buildSingleDateSummaryStats(goalValue);
+    } else {
+      // Multi-day view: AVERAGE, CURRENT, CHANGE
+      return _buildMultiDaySummaryStats(goalValue);
+    }
+  }
+
+  /// Summary stats for single date trackback view
+  Widget _buildSingleDateSummaryStats(double? goalValue) {
+    // Calculate total calories for the selected date
+    final total = _barGraphData.fold(0.0, (sum, point) => sum + point.value);
+
+    // Get daily goal - use historical goal if available, otherwise use current goal
+    double? dailyGoal;
+
+    // Prefer historical goal for old dates
+    if (_historicalGoal != null &&
+        _historicalGoal! > 0 &&
+        _historicalGoal! <= 5000) {
+      dailyGoal = _historicalGoal;
+    } else if (goalValue != null && goalValue > 0 && goalValue <= 5000) {
+      dailyGoal =
+          goalValue; // Already daily goal for single date (daysInRange = 1)
+    } else if (goalValue != null && goalValue > 5000) {
+      // If goal is too high, it might be an error - use null to hide goal card
+      dailyGoal = null;
+    } else {
+      dailyGoal = null;
+    }
+
+    // Calculate difference
+    double difference = 0.0;
+    String differenceLabel = 'REMAINING';
+    Color differenceColor = _primaryColor;
+
+    if (dailyGoal != null) {
+      if (total < dailyGoal) {
+        // Under goal - show remaining
+        difference = dailyGoal - total;
+        differenceLabel = 'REMAINING';
+        differenceColor = AppDesignSystem.success; // Green
+      } else {
+        // Over goal - show over
+        difference = total - dailyGoal;
+        differenceLabel = 'OVER';
+        differenceColor = AppDesignSystem.error; // Red
+      }
+    }
+
+    // Format date for subtitle
+    final selectedDate = _customSelectedDate;
+    String dateSubtitle = '';
+    if (selectedDate != null) {
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      dateSubtitle = 'on ${months[selectedDate.month - 1]} ${selectedDate.day}';
+    }
+
+    // Determine if viewing an old date (not today or yesterday)
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final yesterdayDate = todayDate.subtract(Duration(days: 1));
+    final selectedDateOnly =
+        selectedDate != null
+            ? DateTime(selectedDate.year, selectedDate.month, selectedDate.day)
+            : null;
+
+    final isOldDate =
+        selectedDateOnly != null && (selectedDateOnly.isBefore(yesterdayDate));
+
+    // Goal subtitle: show "current goal" for old dates, "daily target" for recent dates
+    final goalSubtitle = isOldDate ? 'current goal' : 'daily target';
+
+    return Row(
+      children: [
+        Expanded(
+          child: _buildSummaryCard(
+            value: total,
+            label: 'TOTAL',
+            unit: 'cal',
+            subtitle: dateSubtitle,
+            color: _primaryColor,
+          ),
+        ),
+        SizedBox(width: AppDesignSystem.spaceSM),
+        Expanded(
+          child: _buildSummaryCard(
+            value: dailyGoal ?? 0.0,
+            label: 'GOAL',
+            unit: 'cal',
+            subtitle: goalSubtitle,
+            color: _primaryColor,
+          ),
+        ),
+        SizedBox(width: AppDesignSystem.spaceSM),
+        Expanded(
+          child: _buildSummaryCard(
+            value: difference,
+            label: differenceLabel,
+            unit: 'cal',
+            subtitle: 'vs goal',
+            color: differenceColor,
+            showSign:
+                false, // Don't show sign, label already indicates direction
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Summary stats for multi-day views (Daily, Weekly, Monthly)
+  Widget _buildMultiDaySummaryStats(double? goalValue) {
+    // Calculate statistics
+    final values = _barGraphData.map((point) => point.value).toList();
+    final average =
+        values.fold(0.0, (sum, value) => sum + value) / values.length;
+    final current = values.last; // Most recent value
+
+    // Cap goal value at reasonable maximum (5,000) to prevent unrealistic change values
+    // Goals above 5,000 are likely errors (weekly totals, etc.)
+    final cappedGoal =
+        goalValue != null && goalValue > 0 && goalValue <= 5000
+            ? goalValue
+            : null;
+
+    final change =
+        cappedGoal != null
+            ? current - cappedGoal
+            : (values.length > 1 ? current - values[values.length - 2] : 0.0);
+
+    return Row(
+      children: [
+        Expanded(
+          child: _buildSummaryCard(
+            value: average,
+            label: 'AVERAGE',
+            unit: 'cal',
+            color: _primaryColor,
+          ),
+        ),
+        SizedBox(width: AppDesignSystem.spaceSM),
+        Expanded(
+          child: _buildSummaryCard(
+            value: current,
+            label: 'CURRENT',
+            unit: 'cal',
+            color: _primaryColor,
+          ),
+        ),
+        SizedBox(width: AppDesignSystem.spaceSM),
+        Expanded(
+          child: _buildSummaryCard(
+            value: change,
+            label: 'CHANGE',
+            unit: 'cal',
+            color:
+                change >= 0 ? AppDesignSystem.success : AppDesignSystem.error,
+            showSign: true,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryCard({
+    required double value,
+    required String label,
+    required String unit,
+    required Color color,
+    bool showSign = false,
+    String subtitle = '',
+  }) {
+    final formattedValue = _formatSummaryValue(value, showSign);
+
+    return Container(
+      padding: EdgeInsets.all(AppDesignSystem.spaceSM),
+      decoration: BoxDecoration(
+        color: AppDesignSystem.surface,
+        borderRadius: BorderRadius.circular(AppDesignSystem.radiusMD),
+        border: Border.all(
+          color: AppDesignSystem.outline.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            formattedValue,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: AppDesignSystem.onSurfaceVariant,
+              letterSpacing: 0.5,
+            ),
+          ),
+          if (subtitle.isNotEmpty) ...[
+            SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w400,
+                color: AppDesignSystem.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatSummaryValue(double value, bool showSign) {
+    final intValue = value.toInt();
+    final absValue = value.abs();
+
+    if (absValue >= 1000) {
+      final thousands = absValue / 1000;
+      final formatted =
+          thousands >= 10
+              ? thousands.toStringAsFixed(0)
+              : thousands.toStringAsFixed(1);
+      final sign = showSign ? (value >= 0 ? '+' : '-') : '';
+      return '$sign${formatted}K';
+    } else {
+      final sign = showSign ? (value >= 0 ? '+' : '-') : '';
+      return '$sign$intValue';
+    }
+  }
+
+  String _getTimeRangeText() {
+    // Use natural language for better UX
+    switch (_selectedTimeRange) {
+      case TimeRange.daily:
+        return 'Last 7 days';
+      case TimeRange.weekly:
+        return 'Last 4 weeks';
+      case TimeRange.monthly:
+        return 'Last 12 months';
+      case TimeRange.custom:
+        if (_customSelectedDate != null) {
+          // Format custom date
+          final date = _customSelectedDate!;
+          final months = [
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+          ];
+          return '${months[date.month - 1]} ${date.day}, ${date.year}';
+        }
+        return 'Select date';
+    }
   }
 
   Widget _buildProgressContent() {
@@ -711,7 +1343,7 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
   Widget _buildStreakCard() {
     // Show calories streak by default, or exercise if calories not available
     final streakToShow = _caloriesStreak ?? _exerciseStreak;
-    
+
     // Always show the streak card, even if no data (will show empty state)
     return StreakCard(
       streakData: streakToShow,
@@ -738,11 +1370,12 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => _ProgressInstructionsSheet(
-        primaryColor: _primaryColor,
-        backgroundColor: _backgroundColor,
-        userSex: widget.userSex,
-      ),
+      builder:
+          (context) => _ProgressInstructionsSheet(
+            primaryColor: _primaryColor,
+            backgroundColor: _backgroundColor,
+            userSex: widget.userSex,
+          ),
     );
   }
 }
@@ -962,35 +1595,37 @@ class _ProgressInstructionsSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppDesignSystem.spaceMD),
-          ...items.map((item) => Padding(
-                padding: const EdgeInsets.only(
-                  top: AppDesignSystem.spaceSM,
-                  left: AppDesignSystem.spaceMD,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.only(top: 6),
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: primaryColor,
-                        shape: BoxShape.circle,
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(
+                top: AppDesignSystem.spaceSM,
+                left: AppDesignSystem.spaceMD,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: AppDesignSystem.spaceMD),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: AppDesignSystem.bodySmall.copyWith(
+                        color: AppDesignSystem.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(width: AppDesignSystem.spaceMD),
-                    Expanded(
-                      child: Text(
-                        item,
-                        style: AppDesignSystem.bodySmall.copyWith(
-                          color: AppDesignSystem.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

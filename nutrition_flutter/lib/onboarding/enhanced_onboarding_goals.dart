@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'widgets/animated_progress_bar.dart';
 import 'widgets/interactive_goal_card.dart';
 import 'widgets/sex_specific_theme.dart';
+import '../design_system/app_design_system.dart';
 
 class EnhancedOnboardingGoals extends StatefulWidget {
   final String usernameOrEmail;
@@ -159,11 +160,6 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
   @override
   Widget build(BuildContext context) {
     final theme = SexSpecificTheme.getThemeFromString(_selectedGender);
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenHeight < 700;
-    final isVerySmallScreen = screenHeight < 600;
-    final isNarrowScreen = screenWidth < 360;
 
     return SexSpecificBackground(
       gender: _selectedGender,
@@ -191,62 +187,58 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                   // Content
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: EdgeInsets.symmetric(
-                        horizontal:
-                            isNarrowScreen ? 8 : (isSmallScreen ? 12 : 16),
-                        vertical:
-                            isVerySmallScreen ? 8 : (isSmallScreen ? 12 : 16),
+                      padding: AppDesignSystem.getResponsivePaddingExact(
+                        context,
+                        xs: 8, // < 360px
+                        sm: 12, // 360-600px
+                        md: 16, // 600-900px
                       ),
                       child: Column(
                         children: [
                           // Welcome message - more compact
-                          _buildWelcomeMessage(
-                            theme,
-                            isSmallScreen,
-                            isVerySmallScreen,
-                          ),
+                          _buildWelcomeMessage(context, theme),
                           SizedBox(
-                            height:
-                                isVerySmallScreen
-                                    ? 8
-                                    : (isSmallScreen ? 12 : 16),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 8,
+                              sm: 12,
+                              md: 16,
+                            ),
                           ),
 
                           // Gender selection (always show, allow changing)
-                          _buildGenderSelection(
-                            theme,
-                            isSmallScreen,
-                            isVerySmallScreen,
-                          ),
+                          _buildGenderSelection(context, theme),
                           SizedBox(
-                            height:
-                                isVerySmallScreen
-                                    ? 8
-                                    : (isSmallScreen ? 12 : 16),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 8,
+                              sm: 12,
+                              md: 16,
+                            ),
                           ),
 
                           // Goal selection - more compact
-                          _buildGoalSelection(
-                            theme,
-                            isSmallScreen,
-                            isVerySmallScreen,
-                          ),
+                          _buildGoalSelection(context, theme),
 
                           SizedBox(
-                            height:
-                                isVerySmallScreen
-                                    ? 8
-                                    : (isSmallScreen ? 12 : 16),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 8,
+                              sm: 12,
+                              md: 16,
+                            ),
                           ),
 
                           // Navigation button
                           _buildNavigationButton(theme),
 
                           SizedBox(
-                            height:
-                                isVerySmallScreen
-                                    ? 8
-                                    : (isSmallScreen ? 12 : 16),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 8,
+                              sm: 12,
+                              md: 16,
+                            ),
                           ),
                         ],
                       ),
@@ -268,13 +260,15 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
   }
 
   Widget _buildWelcomeMessage(
+    BuildContext context,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
     return Container(
-      padding: EdgeInsets.all(
-        isVerySmallScreen ? 12 : (isSmallScreen ? 16 : 20),
+      padding: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 12,
+        sm: 16,
+        md: 20,
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.9),
@@ -294,16 +288,33 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                 ? (_selectedGender == 'female' ? '💕' : '💪')
                 : '🎯',
             style: TextStyle(
-              fontSize: isVerySmallScreen ? 32 : (isSmallScreen ? 36 : 48),
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 32,
+                sm: 36,
+                md: 48,
+              ),
             ),
           ),
-          SizedBox(height: isVerySmallScreen ? 6 : (isSmallScreen ? 8 : 12)),
+          SizedBox(
+            height: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 6,
+              sm: 8,
+              md: 12,
+            ),
+          ),
           Text(
             _selectedGender != null
                 ? SexSpecificMessaging.getWelcomeMessage(_selectedGender)
                 : 'Welcome to Your Personalized Nutrition Journey!',
             style: TextStyle(
-              fontSize: isVerySmallScreen ? 18 : (isSmallScreen ? 20 : 24),
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 18,
+                sm: 20,
+                md: 24,
+              ),
               fontWeight: FontWeight.bold,
               color: theme.primaryColor,
             ),
@@ -311,13 +322,25 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          SizedBox(height: isVerySmallScreen ? 3 : (isSmallScreen ? 4 : 8)),
+          SizedBox(
+            height: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 3,
+              sm: 4,
+              md: 8,
+            ),
+          ),
           Text(
             _selectedGender != null
                 ? SexSpecificMessaging.getMotivationalMessage(_selectedGender)
                 : 'We\'ll create a nutrition plan tailored specifically for you. This takes just 2 minutes!',
             style: TextStyle(
-              fontSize: isVerySmallScreen ? 12 : (isSmallScreen ? 14 : 16),
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 12,
+                sm: 14,
+                md: 16,
+              ),
               color: Colors.grey[600],
             ),
             textAlign: TextAlign.center,
@@ -330,42 +353,48 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
   }
 
   Widget _buildGenderSelection(
+    BuildContext context,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
     return Column(
       children: [
         Text(
           'First, tell us about yourself',
           style: TextStyle(
-            fontSize: isVerySmallScreen ? 16 : (isSmallScreen ? 18 : 22),
+            fontSize: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 16,
+              sm: 18,
+              md: 22,
+            ),
             fontWeight: FontWeight.bold,
             color: theme.primaryColor,
           ),
           textAlign: TextAlign.center,
         ),
-        SizedBox(height: isVerySmallScreen ? 8 : (isSmallScreen ? 12 : 16)),
+        SizedBox(
+          height: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 8,
+            sm: 12,
+            md: 16,
+          ),
+        ),
         Row(
           children: [
             Expanded(
-              child: _buildGenderCard(
-                'female',
-                '👩',
-                'Female',
-                isSmallScreen,
-                isVerySmallScreen,
+              child: _buildGenderCard(context, 'female', '👩', 'Female'),
+            ),
+            SizedBox(
+              width: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 8,
+                sm: 16,
+                md: 16,
               ),
             ),
-            SizedBox(width: isVerySmallScreen ? 8 : 16),
             Expanded(
-              child: _buildGenderCard(
-                'male',
-                '👨',
-                'Male',
-                isSmallScreen,
-                isVerySmallScreen,
-              ),
+              child: _buildGenderCard(context, 'male', '👨', 'Male'),
             ),
           ],
         ),
@@ -374,11 +403,10 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
   }
 
   Widget _buildGenderCard(
+    BuildContext context,
     String gender,
     String emoji,
     String label,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
     final isSelected = _selectedGender == gender;
     final cardTheme = SexSpecificTheme.getThemeFromString(gender);
@@ -391,8 +419,11 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        padding: EdgeInsets.all(
-          isVerySmallScreen ? 12 : (isSmallScreen ? 16 : 20),
+        padding: AppDesignSystem.getResponsivePaddingExact(
+          context,
+          xs: 12,
+          sm: 16,
+          md: 20,
         ),
         decoration: BoxDecoration(
           color:
@@ -420,14 +451,31 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
             Text(
               emoji,
               style: TextStyle(
-                fontSize: isVerySmallScreen ? 32 : (isSmallScreen ? 36 : 48),
+                fontSize: AppDesignSystem.getResponsiveFontSize(
+                  context,
+                  xs: 32,
+                  sm: 36,
+                  md: 48,
+                ),
               ),
             ),
-            SizedBox(height: isVerySmallScreen ? 3 : (isSmallScreen ? 4 : 8)),
+            SizedBox(
+              height: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 3,
+                sm: 4,
+                md: 8,
+              ),
+            ),
             Text(
               label,
               style: TextStyle(
-                fontSize: isVerySmallScreen ? 14 : (isSmallScreen ? 16 : 18),
+                fontSize: AppDesignSystem.getResponsiveFontSize(
+                  context,
+                  xs: 14,
+                  sm: 16,
+                  md: 18,
+                ),
                 fontWeight: FontWeight.bold,
                 color: isSelected ? cardTheme.primaryColor : Colors.grey[800],
               ),
@@ -439,9 +487,8 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
   }
 
   Widget _buildGoalSelection(
+    BuildContext context,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,42 +496,80 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
         Text(
           'What\'s your main goal?',
           style: TextStyle(
-            fontSize: isVerySmallScreen ? 20 : (isSmallScreen ? 22 : 28),
+            fontSize: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 20,
+              sm: 22,
+              md: 28,
+            ),
             fontWeight: FontWeight.bold,
             color: theme.primaryColor,
           ),
         ),
-        SizedBox(height: isVerySmallScreen ? 2 : (isSmallScreen ? 4 : 8)),
+        SizedBox(
+          height: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 2,
+            sm: 4,
+            md: 8,
+          ),
+        ),
         Text(
           'Choose the goal that best describes what you want to achieve.',
           style: TextStyle(
-            fontSize: isVerySmallScreen ? 12 : (isSmallScreen ? 14 : 16),
+            fontSize: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 12,
+              sm: 14,
+              md: 16,
+            ),
             color: Colors.grey[600],
           ),
         ),
-        SizedBox(height: isVerySmallScreen ? 8 : (isSmallScreen ? 12 : 16)),
+        SizedBox(
+          height: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 8,
+            sm: 12,
+            md: 16,
+          ),
+        ),
 
         // Enhanced goal cards - more compact
         ...GoalOptions.getGoals().map((goal) {
           return Padding(
             padding: EdgeInsets.only(
-              bottom: isVerySmallScreen ? 4 : (isSmallScreen ? 6 : 8),
+              bottom: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 4,
+                sm: 6,
+                md: 8,
+              ),
             ),
             child: _buildCompactGoalCard(
+              context,
               goal,
               theme,
-              isSmallScreen,
-              isVerySmallScreen,
             ),
           );
         }),
 
         // Sex-specific encouragement message - more compact
         if (_selectedGoal != null && _selectedGender != null) ...[
-          SizedBox(height: isVerySmallScreen ? 6 : (isSmallScreen ? 8 : 12)),
+          SizedBox(
+            height: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 6,
+              sm: 8,
+              md: 12,
+            ),
+          ),
           Container(
-            padding: EdgeInsets.all(
-              isVerySmallScreen ? 8 : (isSmallScreen ? 10 : 12),
+            padding: AppDesignSystem.getResponsivePaddingExact(
+              context,
+              xs: 8,
+              sm: 10,
+              md: 12,
             ),
             decoration: BoxDecoration(
               color: theme.primaryColor.withValues(alpha: 0.1),
@@ -504,10 +589,12 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                       Text(
                         'Personalized for You',
                         style: TextStyle(
-                          fontSize:
-                              isVerySmallScreen
-                                  ? 11
-                                  : (isSmallScreen ? 13 : 14),
+                          fontSize: AppDesignSystem.getResponsiveFontSize(
+                            context,
+                            xs: 11,
+                            sm: 13,
+                            md: 14,
+                          ),
                           fontWeight: FontWeight.bold,
                           color: theme.primaryColor,
                         ),
@@ -519,10 +606,12 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                           _selectedGoal!,
                         ),
                         style: TextStyle(
-                          fontSize:
-                              isVerySmallScreen
-                                  ? 10
-                                  : (isSmallScreen ? 11 : 12),
+                          fontSize: AppDesignSystem.getResponsiveFontSize(
+                            context,
+                            xs: 10,
+                            sm: 11,
+                            md: 12,
+                          ),
                           color: Colors.grey[700],
                           height: 1.3,
                         ),
@@ -541,11 +630,12 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
   }
 
   Widget _buildCompactGoalCard(
+    BuildContext context,
     GoalOption goal,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
+    final isVerySmallScreen =
+        AppDesignSystem.getScreenHeight(context) < 600;
     final isSelected = _selectedGoal == goal.id;
 
     return GestureDetector(
@@ -563,8 +653,18 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.symmetric(
-          horizontal: isVerySmallScreen ? 8 : (isSmallScreen ? 12 : 16),
-          vertical: isVerySmallScreen ? 6 : (isSmallScreen ? 8 : 12),
+          horizontal: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 8,
+            sm: 12,
+            md: 16,
+          ),
+          vertical: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 6,
+            sm: 8,
+            md: 12,
+          ),
         ),
         decoration: BoxDecoration(
           color: isSelected ? goal.color.withValues(alpha: 0.1) : Colors.white,
@@ -588,8 +688,18 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
           children: [
             // Emoji container - much smaller
             Container(
-              width: isVerySmallScreen ? 35 : (isSmallScreen ? 40 : 45),
-              height: isVerySmallScreen ? 35 : (isSmallScreen ? 40 : 45),
+              width: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 35,
+                sm: 40,
+                md: 45,
+              ),
+              height: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 35,
+                sm: 40,
+                md: 45,
+              ),
               decoration: BoxDecoration(
                 color: goal.color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
@@ -598,13 +708,24 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                 child: Text(
                   goal.emoji,
                   style: TextStyle(
-                    fontSize:
-                        isVerySmallScreen ? 18 : (isSmallScreen ? 20 : 24),
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 18,
+                      sm: 20,
+                      md: 24,
+                    ),
                   ),
                 ),
               ),
             ),
-            SizedBox(width: isVerySmallScreen ? 8 : (isSmallScreen ? 10 : 12)),
+            SizedBox(
+              width: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 8,
+                sm: 10,
+                md: 12,
+              ),
+            ),
 
             // Content - very compact
             Expanded(
@@ -618,10 +739,12 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                         child: Text(
                           goal.title,
                           style: TextStyle(
-                            fontSize:
-                                isVerySmallScreen
-                                    ? 14
-                                    : (isSmallScreen ? 16 : 18),
+                            fontSize: AppDesignSystem.getResponsiveFontSize(
+                              context,
+                              xs: 14,
+                              sm: 16,
+                              md: 18,
+                            ),
                             fontWeight: FontWeight.bold,
                             color: isSelected ? goal.color : Colors.grey[800],
                           ),
@@ -637,13 +760,23 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                             Icon(
                               Icons.trending_up,
                               color: Colors.green,
-                              size: isSmallScreen ? 12 : 14,
+                              size: AppDesignSystem.getResponsiveFontSize(
+                                context,
+                                xs: 12,
+                                sm: 12,
+                                md: 14,
+                              ),
                             ),
                             const SizedBox(width: 2),
                             Text(
                               goal.successRate.replaceAll(' success rate', ''),
                               style: TextStyle(
-                                fontSize: isSmallScreen ? 10 : 11,
+                                fontSize: AppDesignSystem.getResponsiveFontSize(
+                                  context,
+                                  xs: 10,
+                                  sm: 10,
+                                  md: 11,
+                                ),
                                 color: Colors.green,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -654,7 +787,12 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                     ],
                   ),
                   SizedBox(
-                    height: isVerySmallScreen ? 1 : (isSmallScreen ? 2 : 3),
+                    height: AppDesignSystem.getResponsiveSpacingExact(
+                      context,
+                      xs: 1,
+                      sm: 2,
+                      md: 3,
+                    ),
                   ),
                   Row(
                     children: [
@@ -662,10 +800,12 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                         child: Text(
                           goal.subtitle,
                           style: TextStyle(
-                            fontSize:
-                                isVerySmallScreen
-                                    ? 10
-                                    : (isSmallScreen ? 12 : 13),
+                            fontSize: AppDesignSystem.getResponsiveFontSize(
+                              context,
+                              xs: 10,
+                              sm: 12,
+                              md: 13,
+                            ),
                             color: Colors.grey[600],
                           ),
                           maxLines: 1,
@@ -677,8 +817,18 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                         // Benefit badge - smaller
                         Container(
                           padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 6 : 8,
-                            vertical: isSmallScreen ? 2 : 3,
+                            horizontal: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 6,
+                              sm: 6,
+                              md: 8,
+                            ),
+                            vertical: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 2,
+                              sm: 2,
+                              md: 3,
+                            ),
                           ),
                           decoration: BoxDecoration(
                             color: goal.color.withValues(alpha: 0.1),
@@ -687,7 +837,12 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                           child: Text(
                             goal.benefit,
                             style: TextStyle(
-                              fontSize: isSmallScreen ? 9 : 10,
+                              fontSize: AppDesignSystem.getResponsiveFontSize(
+                                context,
+                                xs: 9,
+                                sm: 9,
+                                md: 10,
+                              ),
                               color: goal.color,
                               fontWeight: FontWeight.w600,
                             ),
@@ -700,12 +855,29 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
               ),
             ),
 
-            SizedBox(width: isVerySmallScreen ? 6 : (isSmallScreen ? 8 : 10)),
+            SizedBox(
+              width: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 6,
+                sm: 8,
+                md: 10,
+              ),
+            ),
 
             // Selection indicator - smaller
             Container(
-              width: isVerySmallScreen ? 18 : (isSmallScreen ? 20 : 24),
-              height: isVerySmallScreen ? 18 : (isSmallScreen ? 20 : 24),
+              width: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 18,
+                sm: 20,
+                md: 24,
+              ),
+              height: AppDesignSystem.getResponsiveSpacingExact(
+                context,
+                xs: 18,
+                sm: 20,
+                md: 24,
+              ),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isSelected ? goal.color : Colors.grey[300],
@@ -715,8 +887,12 @@ class _EnhancedOnboardingGoalsState extends State<EnhancedOnboardingGoals>
                       ? Icon(
                         Icons.check,
                         color: Colors.white,
-                        size:
-                            isVerySmallScreen ? 10 : (isSmallScreen ? 12 : 14),
+                        size: AppDesignSystem.getResponsiveFontSize(
+                          context,
+                          xs: 10,
+                          sm: 12,
+                          md: 14,
+                        ),
                       )
                       : null,
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../design_system/app_design_system.dart';
 
 class AnimatedProgressBar extends StatefulWidget {
   final int currentStep;
@@ -112,9 +113,36 @@ class _AnimatedProgressBarState extends State<AnimatedProgressBar>
 
   @override
   Widget build(BuildContext context) {
+    final containerPadding = AppDesignSystem.getResponsivePaddingExact(
+      context,
+      xs: 12,
+      sm: 16,
+      md: 20,
+    );
+    final sectionSpacing = AppDesignSystem.getResponsiveSpacingExact(
+      context,
+      xs: 10,
+      sm: 12,
+      md: 16,
+    );
+    final barHeight = AppDesignSystem.getResponsiveSpacingExact(
+      context,
+      xs: 10,
+      sm: 10,
+      md: 12,
+    );
+    final indicatorSize = AppDesignSystem.getResponsiveSpacingExact(
+      context,
+      xs: 18,
+      sm: 20,
+      md: 22,
+    );
+    final indicatorInnerSize = indicatorSize / 2.5;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: containerPadding,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Step indicator and percentage
           Row(
@@ -131,9 +159,14 @@ class _AnimatedProgressBarState extends State<AnimatedProgressBar>
                     child: Text(
                       'Step ${widget.currentStep} of ${widget.totalSteps}',
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: AppDesignSystem.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
-                        fontSize: 16,
+                        fontSize: AppDesignSystem.getResponsiveFontSize(
+                          context,
+                          xs: 14,
+                          sm: 15,
+                          md: 16,
+                        ),
                       ),
                     ),
                   );
@@ -155,7 +188,12 @@ class _AnimatedProgressBarState extends State<AnimatedProgressBar>
                           style: TextStyle(
                             color: widget.primaryColor,
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: AppDesignSystem.getResponsiveFontSize(
+                              context,
+                              xs: 14,
+                              sm: 15,
+                              md: 16,
+                            ),
                           ),
                         ),
                       );
@@ -165,122 +203,134 @@ class _AnimatedProgressBarState extends State<AnimatedProgressBar>
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: sectionSpacing),
 
           // Progress bar
-          Stack(
-            children: [
-              // Background bar
-              Container(
-                height: 12,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final progressWidth =
+                  constraints.maxWidth *
+                      _progressAnimation.value.clamp(0.0, 1.0);
 
-              // Progress bar
-              AnimatedBuilder(
-                animation: _progressAnimation,
-                builder: (context, child) {
-                  return Container(
-                    height: 12,
-                    width:
-                        MediaQuery.of(context).size.width *
-                        (_progressAnimation.value.clamp(0.0, 1.0) *
-                            0.85), // Account for padding
+              return Stack(
+                children: [
+                  Container(
+                    height: barHeight,
+                    width: constraints.maxWidth,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          widget.primaryColor,
-                          widget.primaryColor.withValues(alpha: 0.8),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(6),
-                      boxShadow: [
-                        BoxShadow(
-                          color: widget.primaryColor.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      color: AppDesignSystem.outline.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(barHeight / 2),
                     ),
-                  );
-                },
-              ),
-
-              // Step indicators
-              Positioned.fill(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(widget.totalSteps, (index) {
-                    final isCompleted = index < widget.currentStep;
-                    final isCurrent = index == widget.currentStep - 1;
-
-                    return AnimatedBuilder(
-                      animation: _celebrationAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale:
-                              (isCurrent && widget.showCelebration)
-                                  ? 1.0 +
-                                      (_celebrationAnimation.value.clamp(
-                                            0.0,
-                                            1.0,
-                                          ) *
-                                          0.5)
-                                  : 1.0,
-                          child: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color:
-                                  isCompleted || isCurrent
-                                      ? widget.primaryColor
-                                      : Colors.grey[300],
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                              boxShadow: [
-                                if (isCompleted || isCurrent)
-                                  BoxShadow(
-                                    color: widget.primaryColor.withValues(
-                                      alpha: 0.4,
-                                    ),
-                                    blurRadius: 8,
-                                    spreadRadius: 1,
-                                  ),
-                              ],
+                  ),
+                  AnimatedBuilder(
+                    animation: _progressAnimation,
+                    builder: (context, child) {
+                      return Container(
+                        height: barHeight,
+                        width: progressWidth,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              widget.primaryColor,
+                              widget.primaryColor.withValues(alpha: 0.8),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(barHeight / 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: widget.primaryColor.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
-                            child: Center(
-                              child:
-                                  isCompleted
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  Positioned.fill(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(widget.totalSteps, (index) {
+                        final isCompleted = index < widget.currentStep;
+                        final isCurrent = index == widget.currentStep - 1;
+
+                        return AnimatedBuilder(
+                          animation: _celebrationAnimation,
+                          builder: (context, child) {
+                            final scale =
+                                (isCurrent && widget.showCelebration)
+                                    ? 1.0 +
+                                        (_celebrationAnimation.value.clamp(
+                                              0.0,
+                                              1.0,
+                                            ) *
+                                            0.5)
+                                    : 1.0;
+                            return Transform.scale(
+                              scale: scale,
+                              child: Container(
+                                width: indicatorSize,
+                                height: indicatorSize,
+                                decoration: BoxDecoration(
+                                  color:
+                                      isCompleted || isCurrent
+                                          ? widget.primaryColor
+                                          : AppDesignSystem.outline
+                                              .withValues(alpha: 0.4),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    if (isCompleted || isCurrent)
+                                      BoxShadow(
+                                        color: widget.primaryColor.withValues(
+                                          alpha: 0.4,
+                                        ),
+                                        blurRadius: 8,
+                                        spreadRadius: 1,
+                                      ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: isCompleted
                                       ? Icon(
-                                        Icons.check,
-                                        color: Colors.white,
-                                        size: 12,
-                                      )
+                                          Icons.check,
+                                          color: Colors.white,
+                                          size: indicatorSize * 0.6,
+                                        )
                                       : isCurrent
                                       ? Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: const BoxDecoration(
-                                          color: Colors.white,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      )
+                                          width: indicatorInnerSize,
+                                          height: indicatorInnerSize,
+                                          decoration: const BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        )
                                       : null,
-                            ),
-                          ),
+                                ),
+                              ),
+                            );
+                          },
                         );
-                      },
-                    );
-                  }),
-                ),
-              ),
-            ],
+                      }),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
 
-          const SizedBox(height: 8),
+          SizedBox(
+            height: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 6,
+              sm: 8,
+              md: 10,
+            ),
+          ),
 
           // Current step name
           if (widget.currentStep <= widget.stepNames.length)
@@ -297,7 +347,12 @@ class _AnimatedProgressBarState extends State<AnimatedProgressBar>
                     style: TextStyle(
                       color: widget.primaryColor,
                       fontWeight: FontWeight.w500,
-                      fontSize: 14,
+                      fontSize: AppDesignSystem.getResponsiveFontSize(
+                        context,
+                        xs: 12,
+                        sm: 13,
+                        md: 14,
+                      ),
                     ),
                     textAlign: TextAlign.center,
                   ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'models/exercise.dart';
+import 'models/graph_models.dart';
 import 'services/exercise_service.dart';
 import 'services/processed_exercise_service.dart';
 import 'services/progress_data_service.dart';
@@ -69,8 +70,9 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
 
   @override
   void didPopNext() {
-    // Returning to this screen - refresh history
+    // Returning to this screen - refresh history and exercises (in case weight changed)
     _loadLoggedExercises();
+    _loadExercises(); // Refresh exercises to get updated personalized calories
   }
 
   // Helper method to determine exercise category from name
@@ -456,18 +458,23 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
     }
 
     try {
-      // Try to load from processed exercise service first
-      List<Exercise> categoryExercises;
-      try {
-        categoryExercises =
-            await ProcessedExerciseService.getExercisesByCategory(
-              widget.category,
-            );
-      } catch (e) {
-        // Fallback to original service
-        categoryExercises = await ExerciseService.getExercisesByCategory(
-          widget.category,
-        );
+      // Use ExerciseService with user parameter to get personalized calories
+      // This ensures calories are calculated based on current user's weight
+      List<Exercise> categoryExercises = await ExerciseService.getExercisesByCategory(
+        widget.category,
+        user: widget.usernameOrEmail,
+      );
+      
+      // If ExerciseService fails, fallback to ProcessedExerciseService (local JSON)
+      // Note: ProcessedExerciseService won't have personalized calories
+      if (categoryExercises.isEmpty) {
+        try {
+          categoryExercises = await ProcessedExerciseService.getExercisesByCategory(
+            widget.category,
+          );
+        } catch (e) {
+          // If both fail, categoryExercises will remain empty
+        }
       }
 
       if (!mounted) return;
@@ -842,6 +849,14 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
   }
 
   void _showExerciseDetail(Exercise exercise) async {
+    // Fetch fresh exercise data with current user's weight for personalized calories
+    Exercise? freshExercise = await ExerciseService.getExerciseById(
+      exercise.id,
+      user: widget.usernameOrEmail,
+    );
+    // Use fresh exercise if available, otherwise fall back to cached exercise
+    final displayExercise = freshExercise ?? exercise;
+    
     final exerciseAdded = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -877,7 +892,7 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                       children: [
                         // Exercise name and target
                         Text(
-                          exercise.name,
+                          displayExercise.name,
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -886,7 +901,7 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Target: ${exercise.target}',
+                          'Target: ${displayExercise.target}',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[600],
@@ -900,9 +915,9 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                             Expanded(
                               child: _buildInfoCard(
                                 'Difficulty',
-                                exercise.exerciseDifficulty,
+                                displayExercise.exerciseDifficulty,
                                 _getDifficultyColor(
-                                  exercise.exerciseDifficulty,
+                                  displayExercise.exerciseDifficulty,
                                 ),
                               ),
                             ),
@@ -910,7 +925,7 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                             Expanded(
                               child: _buildInfoCard(
                                 'Equipment',
-                                exercise.equipment,
+                                displayExercise.equipment,
                                 primaryColor,
                               ),
                             ),
@@ -928,7 +943,7 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                           ),
                         ),
                         SizedBox(height: 12),
-                        ...exercise.instructions.asMap().entries.map((entry) {
+                        ...displayExercise.instructions.asMap().entries.map((entry) {
                           final index = entry.key;
                           final instruction = entry.value;
                           return Padding(
@@ -985,7 +1000,9 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  'Estimated ${exercise.exerciseCaloriesPerMinute.toStringAsFixed(1)} calories burned per minute',
+                                  displayExercise.estimatedCaloriesPerMinute != null
+                                      ? 'Estimated ${displayExercise.estimatedCaloriesPerMinute!.toStringAsFixed(1)} calories burned per minute'
+                                      : 'Enter duration to calculate calories',
                                   style: TextStyle(
                                     fontSize: 16,
                                     color: primaryColor,
@@ -1004,7 +1021,7 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                 // Duration input and Calories computed section
                 _DurationAndCaloriesFooter(
                   primaryColor: primaryColor,
-                  exercise: exercise,
+                  exercise: displayExercise,
                   usernameOrEmail: widget.usernameOrEmail,
                   userSex: userSex,
                 ),
@@ -1139,6 +1156,7 @@ class _DurationAndCaloriesFooterState
         id: widget.exercise.id,
         name: widget.exercise.name,
         durationSeconds: secs,
+        user: widget.usernameOrEmail, // Pass user for personalized calculation
       );
       if (!mounted) return;
 
@@ -1345,7 +1363,7 @@ class _DurationAndCaloriesFooterState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${calories.toStringAsFixed(1)}',
+                              calories.toStringAsFixed(1),
                               style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
@@ -1376,18 +1394,82 @@ class _DurationAndCaloriesFooterState
                     ),
                     textAlign: TextAlign.center,
                   ),
+                  // Contextual message about calorie impact
+                  FutureBuilder<int>(
+                    future: _getDailyGoal(),
+                    builder: (context, snapshot) {
+                      final dailyGoal = snapshot.data ?? 2000;
+                      final isLargeWorkout = calories >= dailyGoal * 0.5;
+                      final isMediumWorkout = calories >= 200;
+                      
+                      String message;
+                      if (isLargeWorkout) {
+                        message = 'Amazing workout! You burned ${calories.toStringAsFixed(0)} calories. This means you can eat ${calories.toStringAsFixed(0)} more calories today and still stay on track. Your body needs fuel to recover! 💪';
+                      } else if (isMediumWorkout) {
+                        message = 'Great workout! You burned ${calories.toStringAsFixed(0)} calories. This means you can eat ${calories.toStringAsFixed(0)} more calories today and still meet your goal. Would you like suggestions for a post-workout snack?';
+                      } else {
+                        message = 'Nice workout! You burned ${calories.toStringAsFixed(0)} calories. You can enjoy a small snack to refuel. I can suggest healthy options!';
+                      }
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(top: 20),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.orange[200]!,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.lightbulb_outline,
+                              size: 20,
+                              color: Colors.orange[700],
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                message,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.orange[900],
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
           ),
     );
 
-    // Auto-close after 1.5 seconds
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    // Auto-close after 3 seconds (increased to allow reading the message)
+    Future.delayed(const Duration(milliseconds: 3000), () {
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
     });
+  }
+
+  Future<int> _getDailyGoal() async {
+    try {
+      final progressData = await ProgressDataService.getProgressData(
+        usernameOrEmail: widget.usernameOrEmail,
+        timeRange: TimeRange.daily,
+      );
+      return progressData.calories.goal.toInt();
+    } catch (e) {
+      return 2000; // Default fallback
+    }
   }
 
   @override

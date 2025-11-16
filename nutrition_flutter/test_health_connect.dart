@@ -7,6 +7,8 @@ void main() {
 }
 
 class HealthConnectTestApp extends StatelessWidget {
+  const HealthConnectTestApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -18,6 +20,8 @@ class HealthConnectTestApp extends StatelessWidget {
 }
 
 class HealthConnectTestScreen extends StatefulWidget {
+  const HealthConnectTestScreen({super.key});
+
   @override
   _HealthConnectTestScreenState createState() =>
       _HealthConnectTestScreenState();

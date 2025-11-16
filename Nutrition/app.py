@@ -10,9 +10,27 @@ from datetime import datetime, date, timedelta
 from dotenv import load_dotenv
 import requests
 import re
+
+# Timezone support
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    try:
+        from backports.zoneinfo import ZoneInfo
+    except ImportError:
+        ZoneInfo = None
+        import pytz
 from config import config
 from werkzeug.security import generate_password_hash, check_password_hash
 import csv
+
+# Optional Groq AI configuration (for AI Coach features)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GROQ_API_URL = os.environ.get(
+    "GROQ_API_URL",
+    "https://api.groq.com/openai/v1/chat/completions",
+)
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama3-8b-8192")
 
 # Load environment variables
 load_dotenv()
@@ -283,16 +301,36 @@ with app.app_context():
 
 # Load Filipino food dataset at startup (robust path + encoding)
 try:
-    FOOD_CSV_PATH = os.path.join(os.path.dirname(__file__), 'Filipino_Food_Nutrition_Dataset.csv')
-    if os.path.exists(FOOD_CSV_PATH):
+    # Try multiple possible locations for the CSV file
+    base_dir = os.path.dirname(os.path.dirname(__file__))  # Go up from Nutrition/ to root
+    possible_paths = [
+        os.path.join(base_dir, 'nutrition_flutter', 'lib', 'Filipino_Food_Nutrition_Dataset.csv'),  # nutrition_flutter/lib/ folder
+        os.path.join(base_dir, 'data', 'Filipino_Food_Nutrition_Dataset.csv'),  # data/ folder
+        os.path.join(os.path.dirname(__file__), 'Filipino_Food_Nutrition_Dataset.csv'),  # Same dir as app.py
+        os.path.join(base_dir, 'Filipino_Food_Nutrition_Dataset.csv'),  # Root directory
+    ]
+    
+    FOOD_CSV_PATH = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            FOOD_CSV_PATH = path
+            break
+    
+    if FOOD_CSV_PATH and os.path.exists(FOOD_CSV_PATH):
         food_df = pd.read_csv(FOOD_CSV_PATH, encoding='utf-8')
-        print('[SUCCESS] Loaded Filipino food dataset')
+        print(f'[SUCCESS] Loaded Filipino food dataset from {FOOD_CSV_PATH}')
+        print(f'[INFO] Dataset contains {len(food_df)} foods')
     else:
         # Minimal fallback DataFrame
-        print(f"[WARNING] Filipino food CSV not found at {FOOD_CSV_PATH}; using empty dataset")
+        print(f"[WARNING] Filipino food CSV not found. Tried paths:")
+        for path in possible_paths:
+            print(f"  - {path} (exists: {os.path.exists(path)})")
+        print(f"[WARNING] Using empty dataset - search will not work!")
         food_df = pd.DataFrame(columns=['Food Name','Calories','Protein (g)','Carbs (g)','Fat (g)','Fiber (g)','Sodium (mg)'])
 except Exception as e:
     print(f"[ERROR] Failed to load Filipino food dataset: {e}")
+    import traceback
+    traceback.print_exc()
     food_df = pd.DataFrame(columns=['Food Name','Calories','Protein (g)','Carbs (g)','Fat (g)','Fiber (g)','Sodium (mg)'])
 
 
@@ -584,6 +622,21 @@ def log_exercise_session():
             if exercise:
                 calories_burned = exercise.estimated_calories_per_minute * duration_minutes
         
+        # Use Philippines timezone for date consistency (same as food logs)
+        if 'date' in data and data['date']:
+            try:
+                # Parse the provided date string
+                session_date = parse_date_safe(data['date'])
+                if not session_date:
+                    # If parsing fails, use Philippines date
+                    session_date = get_philippines_date()
+            except Exception:
+                # If any error, use Philippines date
+                session_date = get_philippines_date()
+        else:
+            # No date provided, use current Philippines date
+            session_date = get_philippines_date()
+        
         session = ExerciseSession(
             user=data['user'],
             exercise_id=data['exercise_id'],
@@ -592,7 +645,7 @@ def log_exercise_session():
             calories_burned=calories_burned,
             sets_completed=data.get('sets_completed', 1),
             notes=data.get('notes', ''),
-            date=datetime.strptime(data.get('date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date()
+            date=session_date
         )
         
         db.session.add(session)
@@ -1656,52 +1709,267 @@ def delete_user_account(username):
         print(f"[ERROR] Failed to delete user account {username}: {e}")
         return jsonify({'error': f'Failed to delete account: {str(e)}'}), 500
 
+def clean_food_name(name):
+    """
+    Clean food name by removing:
+    - "Var" followed by numbers (e.g., "Lechon Var1" -> "Lechon")
+    - "#" followed by numbers (e.g., "Laing #52" -> "Laing")
+    - Underscores (e.g., "tinolang_manok" -> "tinolang manok")
+    - Trailing numbers and special characters
+    """
+    if not name or pd.isna(name):
+        return name
+    
+    import re
+    name_str = str(name).strip()
+    
+    # Remove "Var" followed by numbers (case-insensitive)
+    name_str = re.sub(r'\s+var\s*\d+', '', name_str, flags=re.IGNORECASE)
+    
+    # Remove "#" followed by numbers
+    name_str = re.sub(r'\s*#\s*\d+', '', name_str)
+    
+    # Replace underscores with spaces
+    name_str = name_str.replace('_', ' ')
+    
+    # Remove trailing numbers, spaces, and special characters
+    name_str = re.sub(r'\s+\d+$', '', name_str)  # Remove trailing numbers
+    name_str = re.sub(r'\s+$', '', name_str)  # Remove trailing spaces
+    
+    return name_str.strip()
+
+def _parse_user_preferences(user_obj):
+    """Parse user's food preferences from User object."""
+    preferences = []
+    try:
+        # Try to get dietary_preferences first
+        if hasattr(user_obj, 'dietary_preferences') and user_obj.dietary_preferences:
+            prefs_str = str(user_obj.dietary_preferences).strip()
+            if prefs_str and prefs_str != 'None' and prefs_str != '[]':
+                try:
+                    if prefs_str.startswith('['):
+                        preferences = eval(prefs_str) if prefs_str else []
+                    else:
+                        preferences = [p.strip() for p in prefs_str.split(',') if p.strip()]
+                except:
+                    preferences = [prefs_str]
+        # Fallback to diet_type if dietary_preferences is not available
+        if not preferences and hasattr(user_obj, 'diet_type') and user_obj.diet_type:
+            diet_type_str = str(user_obj.diet_type).strip()
+            if diet_type_str and diet_type_str != 'None':
+                preferences = [diet_type_str]
+    except:
+        pass
+    return [p.lower() for p in preferences if p]
+
+def _filter_foods_by_preferences(foods_df, preferences):
+    """Filter foods based on user preferences."""
+    if not preferences or foods_df.empty:
+        return foods_df
+    
+    filtered_df = foods_df.copy()
+    prefs_lower = [p.lower() for p in preferences]
+    
+    # Vegetarian/Plant-based: filter out meats and fish (but keep vegetable dishes)
+    if 'vegetarian' in prefs_lower or 'plant-based' in prefs_lower or 'plant_based' in prefs_lower:
+        # Filter out foods with meat/fish keywords, but keep vegetable dishes
+        meat_keywords = ['pork', 'chicken', 'beef', 'lechon', 'sisig', 'tocino', 'longganisa', 'bangus', 'tilapia', 'galunggong', 'tuyo', 'tinapa', 'shrimp', 'crab', 'squid']
+        # Don't filter if it's a vegetable dish (contains vegetable keywords)
+        vegetable_keywords = ['sitaw', 'monggo', 'ampalaya', 'kangkong', 'pinakbet', 'laing', 'ginisang', 'vegetable']
+        filtered_df = filtered_df[
+            ~(
+                filtered_df['Food Name'].astype(str).str.lower().str.contains('|'.join(meat_keywords), na=False) &
+                ~filtered_df['Food Name'].astype(str).str.lower().str.contains('|'.join(vegetable_keywords), na=False)
+            )
+        ]
+    
+    return filtered_df
+
+def _filter_foods_by_goal(foods_df, goal):
+    """Filter/prioritize foods based on user goal."""
+    if not goal or foods_df.empty:
+        return foods_df
+    return foods_df
+
+def _get_todays_meal_summary(food_logs: list) -> dict:
+    """
+    Summarize what meals the user has already eaten today.
+    
+    Returns:
+        Dict with meal_type -> list of food names
+    """
+    summary = {}
+    for log in food_logs:
+        meal_type = (log.meal_type or 'Other').lower()
+        if meal_type not in summary:
+            summary[meal_type] = []
+        summary[meal_type].append(log.food_name)
+    return summary
+
+def _get_foods_from_csv(meal_type=None, user_preferences=None, user_goal=None, activity_level=None, limit=30):
+    """
+    Get foods from CSV (food_df) filtered by meal type, preferences, goal, and activity level.
+    Returns a list of formatted strings for AI prompts.
+    """
+    try:
+        global_food_df = globals().get('food_df', None)
+        if global_food_df is None or not isinstance(global_food_df, pd.DataFrame) or global_food_df.empty:
+            return []
+        
+        foods_df = global_food_df.copy()
+        
+        # Filter by meal type if provided (using Category column)
+        if meal_type:
+            meal_type_lower = str(meal_type).lower()
+            # Map meal types to category keywords
+            meal_keywords = {
+                'breakfast': ['breakfast', 'cereal', 'bread', 'porridge', 'champorado', 'arroz caldo', 'goto'],
+                'lunch': ['main dish', 'stew', 'soup', 'noodle'],
+                'dinner': ['main dish', 'stew', 'soup', 'noodle'],
+                'snack': ['snack', 'dessert', 'bread'],
+            }
+            keywords = meal_keywords.get(meal_type_lower, [])
+            if keywords:
+                # Filter by category containing any of the keywords
+                category_filter = foods_df['Category'].astype(str).str.lower().str.contains('|'.join(keywords), na=False)
+                # Also check food name for common meal type indicators
+                name_filter = foods_df['Food Name'].astype(str).str.lower().str.contains('|'.join(keywords), na=False)
+                foods_df = foods_df[category_filter | name_filter]
+                # If no matches, don't filter (return all)
+                if foods_df.empty:
+                    foods_df = global_food_df.copy()
+        
+        # Filter by preferences
+        if user_preferences:
+            foods_df = _filter_foods_by_preferences(foods_df, user_preferences)
+        
+        # Filter by goal (affects sorting, not filtering)
+        if user_goal:
+            foods_df = _filter_foods_by_goal(foods_df, user_goal)
+        
+        # Clean food names and deduplicate
+        foods_df['Cleaned Name'] = foods_df['Food Name'].apply(clean_food_name)
+        foods_df = foods_df.drop_duplicates(subset=['Cleaned Name'], keep='first')
+        
+        # Sort based on goal and preferences
+        if user_goal:
+            goal_lower = str(user_goal).lower()
+            if 'lose' in goal_lower or 'weight loss' in goal_lower:
+                # Sort by calories (ascending) and fiber (descending)
+                foods_df = foods_df.sort_values(
+                    by=['Calories', 'Fiber (g)'],
+                    ascending=[True, False],
+                    na_position='last'
+                )
+            elif 'muscle' in goal_lower or 'gain' in goal_lower:
+                # Sort by protein (descending)
+                foods_df = foods_df.sort_values(
+                    by='Protein (g)',
+                    ascending=False,
+                    na_position='last'
+                )
+        
+        # Apply activity level adjustments (affects calorie range)
+        if activity_level:
+            activity_lower = str(activity_level).lower()
+            if 'very active' in activity_lower:
+                # Include higher calorie options
+                pass  # No filtering, just include all
+            elif 'sedentary' in activity_lower:
+                # Prefer lower calorie options
+                foods_df = foods_df[foods_df['Calories'] <= 300]
+        
+        # Limit results
+        foods_df = foods_df.head(limit)
+        
+        # Format for AI prompt
+        food_list = []
+        for _, row in foods_df.iterrows():
+            food_name = row['Cleaned Name']
+            calories = float(row.get('Calories', 0) or 0)
+            category = str(row.get('Category', '') or '')
+            protein = float(row.get('Protein (g)', 0) or 0)
+            
+            food_list.append(
+                f"{food_name} (~{calories:.0f} kcal per serving, category: {category}, protein: {protein:.1f}g)"
+            )
+        
+        return food_list
+    except Exception as e:
+        print(f"[ERROR] _get_foods_from_csv failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
 @app.route('/foods/search', methods=['GET'])
 def search_foods():
+    """
+    Search foods using ONLY the local Filipino_Food_Nutrition_Dataset.csv (food_df).
+
+    This endpoint intentionally does NOT call any external APIs. It returns
+    foods whose 'Food Name' contains the query substring (case-insensitive),
+    limited to the first 15 matches for performance and UX.
+    
+    Filters out "Var" variants, numbers, and special characters from food names.
+    """
     query = request.args.get('query', '').strip().lower()
+    print(f"[DEBUG] /foods/search called with query: '{query}'")
     if not query:
         return jsonify({'foods': []})
-    matches = food_df[food_df['Food Name'].str.lower().str.contains(query)]
-    foods = matches.head(15).to_dict(orient='records')
 
-    # If we have enough local results, return them
-    if len(foods) >= 3:
-        return jsonify({'foods': foods})
-
-    # Otherwise, query Open Food Facts API as fallback
     try:
-        off_url = f'https://world.openfoodfacts.org/cgi/search.pl?search_terms={query}&search_simple=1&action=process&json=1'
-        resp = requests.get(off_url, timeout=3)
-        if resp.status_code == 200:
-            data = resp.json()
-            for product in data.get('products', [])[:10]:
-                # Map Open Food Facts fields to your frontend model
-                name = product.get('product_name') or product.get('generic_name')
-                if not name:
-                    continue
-                calories = None
-                nutriments = product.get('nutriments', {})
-                if 'energy-kcal_100g' in nutriments:
-                    calories = nutriments['energy-kcal_100g']
-                elif 'energy_100g' in nutriments:
-                    # Convert kJ to kcal
-                    calories = round(nutriments['energy_100g'] / 4.184, 1)
-                food_item = {
-                    'Food Name': name,
-                    'Category': product.get('categories', ''),
-                    'Serving Size': product.get('serving_size', ''),
-                    'Calories': calories or 0,
-                    'Protein (g)': nutriments.get('proteins_100g', 0),
-                    'Carbs (g)': nutriments.get('carbohydrates_100g', 0),
-                    'Fat (g)': nutriments.get('fat_100g', 0),
-                    'Fiber (g)': nutriments.get('fiber_100g', 0),
-                    'Sodium (mg)': nutriments.get('sodium_100g', 0),
-                    'Source': 'Open Food Facts',
-                }
-                foods.append(food_item)
+        matches = food_df[
+            food_df['Food Name'].astype(str).str.lower().str.contains(query)
+        ]
+        print(f"[DEBUG] Found {len(matches)} matches for query '{query}'")
+        foods_raw = matches.head(50).to_dict(orient='records')  # Get more to filter
+        
+        # Clean the data: replace NaN/None with 0 for numeric fields, empty string for text
+        import math
+        foods_temp = []
+        seen_cleaned_names = set()
+        
+        for food in foods_raw:
+            # First, check if this food name (after cleaning) is a duplicate
+            original_name = food.get('Food Name', '')
+            cleaned_name = clean_food_name(original_name)
+            cleaned_name_lower = cleaned_name.lower().strip()
+            
+            # Skip if we've already seen this cleaned name
+            if cleaned_name_lower in seen_cleaned_names:
+                continue  # Skip this duplicate
+            
+            seen_cleaned_names.add(cleaned_name_lower)
+            
+            # Process the food item
+            cleaned_food = {}
+            for key, value in food.items():
+                if key == 'Food Name':
+                    cleaned_food[key] = cleaned_name
+                elif pd.isna(value) or value is None:
+                    # Use 0 for numeric columns, empty string for text
+                    if any(num_col in key for num_col in ['Calories', 'Protein', 'Carbs', 'Fat', 'Fiber', 'Sodium', 'Calcium', 'Iron']):
+                        cleaned_food[key] = 0.0
+                    else:
+                        cleaned_food[key] = ''
+                elif isinstance(value, (int, float)) and (math.isnan(value) or math.isinf(value)):
+                    cleaned_food[key] = 0.0
+                else:
+                    cleaned_food[key] = value
+            
+            foods_temp.append(cleaned_food)
+            if len(foods_temp) >= 15:  # Limit to 15 unique results
+                break
+        
+        foods = foods_temp
+        print(f"[DEBUG] Returning {len(foods)} cleaned and deduplicated food items")
+            
     except Exception as e:
-        print(f"Open Food Facts API error: {e}")
-        # Fail gracefully, just return local results
+        # Fail safely: if anything goes wrong with the DataFrame, return empty list
+        print(f"[ERROR] /foods/search failed using local dataset: {e}")
+        import traceback
+        traceback.print_exc()
+        foods = []
 
     return jsonify({'foods': foods})
 
@@ -1765,10 +2033,23 @@ def recommend_foods():
                 seen.add(food)
                 unique_foods.append(food)
         recs = []
+        seen_cleaned_names = set()
         for food_name in unique_foods:
             match = food_df[food_df['Food Name'].str.lower() == food_name.lower()]
             if not match.empty:
-                recs.append(match.iloc[0].to_dict())
+                food_dict = match.iloc[0].to_dict()
+                # Clean the food name
+                original_name = food_dict.get('Food Name', food_name)
+                cleaned_name = clean_food_name(original_name)
+                cleaned_name_lower = cleaned_name.lower().strip()
+                
+                # Skip if we've already seen this cleaned name
+                if cleaned_name_lower in seen_cleaned_names:
+                    continue
+                
+                seen_cleaned_names.add(cleaned_name_lower)
+                food_dict['Food Name'] = cleaned_name
+                recs.append(food_dict)
             if len(recs) >= 8:
                 break
         # Fallback: most popular foods for that meal type if available
@@ -1778,18 +2059,39 @@ def recommend_foods():
                 meal_col = 'Meal Type' if 'Meal Type' in food_df.columns else None
                 if meal_col:
                     popular = food_df[food_df[meal_col].str.lower() == meal_type].head(8 - len(recs)).to_dict(orient='records')
-                    recs.extend(popular)
+                    for food in popular:
+                        original_name = food.get('Food Name', '')
+                        cleaned_name = clean_food_name(original_name)
+                        cleaned_name_lower = cleaned_name.lower().strip()
+                        if cleaned_name_lower not in seen_cleaned_names:
+                            seen_cleaned_names.add(cleaned_name_lower)
+                            food['Food Name'] = cleaned_name
+                            recs.append(food)
+                            if len(recs) >= 8:
+                                break
             # If still not enough, fallback to any popular foods
             if len(recs) < 8:
                 popular = food_df.head(8 - len(recs)).to_dict(orient='records')
-                recs.extend(popular)
-        # Final deduplication
+                for food in popular:
+                    original_name = food.get('Food Name', '')
+                    cleaned_name = clean_food_name(original_name)
+                    cleaned_name_lower = cleaned_name.lower().strip()
+                    if cleaned_name_lower not in seen_cleaned_names:
+                        seen_cleaned_names.add(cleaned_name_lower)
+                        food['Food Name'] = cleaned_name
+                        recs.append(food)
+                        if len(recs) >= 8:
+                            break
+        # Final deduplication using cleaned names
         final_seen = set()
         final_recs = []
         for food in recs:
-            food_name = food.get('Food Name', '').lower()
-            if food_name and food_name not in final_seen:
-                final_seen.add(food_name)
+            food_name = food.get('Food Name', '')
+            cleaned_name = clean_food_name(food_name)
+            cleaned_name_lower = cleaned_name.lower().strip()
+            if cleaned_name_lower and cleaned_name_lower not in final_seen:
+                final_seen.add(cleaned_name_lower)
+                food['Food Name'] = cleaned_name  # Ensure cleaned name is used
                 final_recs.append(food)
         return jsonify({'recommended': final_recs})
     # If no user profile, fallback to old logic
@@ -1862,22 +2164,89 @@ def progress_calories():
 
 @app.route('/progress/workouts')
 def progress_workouts():
-    user = request.args.get('user')
-    start_date = request.args.get('start')
-    end_date = request.args.get('end')
-    
-    query = WorkoutLog.query.filter_by(user=user)
-    
-    if start_date:
-        query = query.filter(WorkoutLog.date >= datetime.fromisoformat(start_date).date())
-    if end_date:
-        query = query.filter(WorkoutLog.date <= datetime.fromisoformat(end_date).date())
-    
-    logs = query.order_by(WorkoutLog.date).all()
-    return jsonify([
-        {'date': log.date.isoformat(), 'type': log.type, 'duration': log.duration, 'calories_burned': log.calories_burned}
-        for log in logs
-    ])
+    try:
+        user = request.args.get('user')
+        start_date = request.args.get('start')
+        end_date = request.args.get('end')
+        
+        print(f"[DEBUG] /progress/workouts called: user={user}, start={start_date}, end={end_date}")
+        
+        # Parse date filters using safe date parser (no timezone conversion)
+        sd = parse_date_safe(start_date) if start_date else None
+        ed = parse_date_safe(end_date) if end_date else None
+        
+        print(f"[DEBUG] Parsed dates: start={sd}, end={ed}")
+        
+        # Query WorkoutLog table
+        workout_query = WorkoutLog.query.filter_by(user=user)
+        
+        if sd:
+            workout_query = workout_query.filter(WorkoutLog.date >= sd)
+        if ed:
+            workout_query = workout_query.filter(WorkoutLog.date <= ed)
+        
+        workout_rows = (
+            workout_query.with_entities(WorkoutLog.date, WorkoutLog.type, WorkoutLog.duration, WorkoutLog.calories_burned)
+            .order_by(WorkoutLog.date)
+            .all()
+        )
+        
+        print(f"[DEBUG] WorkoutLog query: Found {len(workout_rows)} entries")
+        
+        # Also query ExerciseSession table - FIRST check without date filter
+        all_exercise_sessions = ExerciseSession.query.filter_by(user=user).all()
+        print(f"[DEBUG] ExerciseSession total for user '{user}': {len(all_exercise_sessions)} entries")
+        
+        if all_exercise_sessions:
+            print(f"[DEBUG] Sample ExerciseSession dates: {[s.date for s in all_exercise_sessions[:3]]}")
+        
+        exercise_session_query = ExerciseSession.query.filter_by(user=user)
+        
+        if sd:
+            exercise_session_query = exercise_session_query.filter(ExerciseSession.date >= sd)
+            print(f"[DEBUG] Applied start date filter: >= {sd}")
+        if ed:
+            exercise_session_query = exercise_session_query.filter(ExerciseSession.date <= ed)
+            print(f"[DEBUG] Applied end date filter: <= {ed}")
+        
+        exercise_session_rows = (
+            exercise_session_query.with_entities(ExerciseSession.date, ExerciseSession.exercise_name, ExerciseSession.duration_seconds, ExerciseSession.calories_burned)
+            .order_by(ExerciseSession.date)
+            .all()
+        )
+        
+        print(f"[DEBUG] ExerciseSession query after filters: Found {len(exercise_session_rows)} entries")
+        
+        if exercise_session_rows:
+            print(f"[DEBUG] Sample filtered dates: {[r[0] for r in exercise_session_rows[:3]]}")
+        
+        # Combine results from both tables
+        workouts = [
+            {
+                'date': d.isoformat(),
+                'type': t,
+                'duration': int(dur) if dur else 0,  # Ensure duration is an integer
+                'calories_burned': float(cb) if cb else 0.0,
+            }
+            for d, t, dur, cb in workout_rows
+        ] + [
+            {
+                'date': d.isoformat(),
+                'type': name,  # exercise_name maps to type
+                'duration': int(dur_sec / 60) if dur_sec else 0,  # Convert seconds to minutes
+                'calories_burned': float(cb) if cb else 0.0,
+            }
+            for d, name, dur_sec, cb in exercise_session_rows
+        ]
+        
+        print(f"[DEBUG] Returning {len(workouts)} total workouts")
+        return jsonify(workouts)
+        
+    except Exception as e:
+        print(f"[ERROR] Exception in /progress/workouts: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/progress/summary')
 def progress_summary():
@@ -1910,32 +2279,63 @@ def progress_summary():
     
     total_calories = calories_query.scalar() or 0
     
-    # Get total workouts
+    # Get WorkoutLog totals
     workout_query = WorkoutLog.query.filter_by(user=user)
     if 'start' in date_filter:
         workout_query = workout_query.filter(WorkoutLog.date >= date_filter['start'])
     if 'end' in date_filter:
         workout_query = workout_query.filter(WorkoutLog.date <= date_filter['end'])
     
-    total_workouts = workout_query.count()
+    workout_count = workout_query.count()
     
-    # Get total exercise duration
-    duration_query = db.session.query(db.func.sum(WorkoutLog.duration)).filter_by(user=user)
+    workout_duration_query = db.session.query(db.func.sum(WorkoutLog.duration)).filter_by(user=user)
     if 'start' in date_filter:
-        duration_query = duration_query.filter(WorkoutLog.date >= date_filter['start'])
+        workout_duration_query = workout_duration_query.filter(WorkoutLog.date >= date_filter['start'])
     if 'end' in date_filter:
-        duration_query = duration_query.filter(WorkoutLog.date <= date_filter['end'])
+        workout_duration_query = workout_duration_query.filter(WorkoutLog.date <= date_filter['end'])
     
-    total_duration = duration_query.scalar() or 0
+    workout_duration = workout_duration_query.scalar() or 0
     
-    # Get total calories burned
-    calories_burned_query = db.session.query(db.func.sum(WorkoutLog.calories_burned)).filter_by(user=user)
+    workout_calories_query = db.session.query(db.func.sum(WorkoutLog.calories_burned)).filter_by(user=user)
     if 'start' in date_filter:
-        calories_burned_query = calories_burned_query.filter(WorkoutLog.date >= date_filter['start'])
+        workout_calories_query = workout_calories_query.filter(WorkoutLog.date >= date_filter['start'])
     if 'end' in date_filter:
-        calories_burned_query = calories_burned_query.filter(WorkoutLog.date <= date_filter['end'])
+        workout_calories_query = workout_calories_query.filter(WorkoutLog.date <= date_filter['end'])
     
-    total_calories_burned = calories_burned_query.scalar() or 0
+    workout_calories = workout_calories_query.scalar() or 0.0
+    
+    # Also get ExerciseSession totals
+    exercise_session_query = ExerciseSession.query.filter_by(user=user)
+    if 'start' in date_filter:
+        exercise_session_query = exercise_session_query.filter(ExerciseSession.date >= date_filter['start'])
+    if 'end' in date_filter:
+        exercise_session_query = exercise_session_query.filter(ExerciseSession.date <= date_filter['end'])
+    
+    exercise_session_count = exercise_session_query.count()
+    
+    # Get ExerciseSession duration (in seconds, convert to minutes)
+    exercise_duration_seconds_query = db.session.query(db.func.sum(ExerciseSession.duration_seconds)).filter_by(user=user)
+    if 'start' in date_filter:
+        exercise_duration_seconds_query = exercise_duration_seconds_query.filter(ExerciseSession.date >= date_filter['start'])
+    if 'end' in date_filter:
+        exercise_duration_seconds_query = exercise_duration_seconds_query.filter(ExerciseSession.date <= date_filter['end'])
+    
+    exercise_duration_seconds = exercise_duration_seconds_query.scalar() or 0
+    exercise_duration_minutes = int(exercise_duration_seconds / 60)  # Convert to minutes
+    
+    # Get ExerciseSession calories
+    exercise_calories_query = db.session.query(db.func.sum(ExerciseSession.calories_burned)).filter_by(user=user)
+    if 'start' in date_filter:
+        exercise_calories_query = exercise_calories_query.filter(ExerciseSession.date >= date_filter['start'])
+    if 'end' in date_filter:
+        exercise_calories_query = exercise_calories_query.filter(ExerciseSession.date <= date_filter['end'])
+    
+    exercise_calories = exercise_calories_query.scalar() or 0.0
+    
+    # Combine totals from both tables
+    total_workouts = workout_count + exercise_session_count
+    total_duration = workout_duration + exercise_duration_minutes
+    total_calories_burned = workout_calories + exercise_calories
     
     return jsonify({
         'calories': total_calories,
@@ -1961,8 +2361,24 @@ def progress_daily_summary():
     daily_workouts = WorkoutLog.query.filter_by(user=user, date=date_obj).all()
     daily_weight = WeightLog.query.filter_by(user=user, date=date_obj).first()
     
-    total_duration = sum(workout.duration for workout in daily_workouts)
-    total_calories_burned = sum(workout.calories_burned for workout in daily_workouts)
+    # Get WorkoutLog totals
+    workout_duration = sum(workout.duration for workout in daily_workouts) or 0
+    workout_calories = sum(workout.calories_burned for workout in daily_workouts) or 0.0
+    workout_sessions = len(daily_workouts)
+    
+    # Also get ExerciseSession data for the same date
+    daily_exercise_sessions = ExerciseSession.query.filter_by(user=user, date=date_obj).all()
+    
+    # Calculate ExerciseSession totals
+    exercise_duration_seconds = sum(session.duration_seconds for session in daily_exercise_sessions) or 0
+    exercise_duration_minutes = int(exercise_duration_seconds / 60)  # Convert to minutes
+    exercise_calories = sum(float(session.calories_burned or 0.0) for session in daily_exercise_sessions) or 0.0
+    exercise_sessions = len(daily_exercise_sessions)
+    
+    # Combine totals from both tables
+    total_duration = workout_duration + exercise_duration_minutes
+    total_calories_burned = workout_calories + exercise_calories
+    total_sessions = workout_sessions + exercise_sessions
     
     # Get user goals
     user_obj = User.query.filter_by(username=user).first()
@@ -1973,7 +2389,7 @@ def progress_daily_summary():
         'calories': {
             'current': daily_calories,
             'goal': calorie_goal,
-            'remaining': max(0, calorie_goal - daily_calories),
+            'remaining': max(0, calorie_goal - daily_calories + total_calories_burned),  # Include exercise in remaining
             'percentage': min(1.0, daily_calories / calorie_goal) if calorie_goal > 0 else 0
         },
         'weight': {
@@ -1983,10 +2399,10 @@ def progress_daily_summary():
         'exercise': {
             'duration': total_duration,
             'calories_burned': total_calories_burned,
-            'sessions': len(daily_workouts),
+            'sessions': total_sessions,
             'average_intensity': total_calories_burned / total_duration if total_duration > 0 else 0
         },
-        'achievements': _get_daily_achievements(daily_calories, calorie_goal, total_duration, len(daily_workouts)),
+        'achievements': _get_daily_achievements(daily_calories, calorie_goal, total_duration, total_sessions),
         'recommendations': _get_daily_recommendations(daily_calories, calorie_goal, total_duration)
     })
 
@@ -2011,14 +2427,37 @@ def progress_weekly_summary():
         FoodLog.date <= end_date
     ).scalar() or 0
     
+    # Get WorkoutLog data
     weekly_workouts = WorkoutLog.query.filter(
         WorkoutLog.user == user,
         WorkoutLog.date >= start_date,
         WorkoutLog.date <= end_date
     ).all()
     
-    total_duration = sum(workout.duration for workout in weekly_workouts)
-    total_calories_burned = sum(workout.calories_burned for workout in weekly_workouts)
+    workout_duration = sum(workout.duration for workout in weekly_workouts) or 0
+    workout_calories = sum(workout.calories_burned for workout in weekly_workouts) or 0.0
+    workout_sessions = len(weekly_workouts)
+    workout_dates = set(workout.date for workout in weekly_workouts)
+    
+    # Also get ExerciseSession data for the week
+    weekly_exercise_sessions = ExerciseSession.query.filter(
+        ExerciseSession.user == user,
+        ExerciseSession.date >= start_date,
+        ExerciseSession.date <= end_date
+    ).all()
+    
+    # Calculate ExerciseSession totals
+    exercise_duration_seconds = sum(session.duration_seconds for session in weekly_exercise_sessions) or 0
+    exercise_duration_minutes = int(exercise_duration_seconds / 60)  # Convert to minutes
+    exercise_calories = sum(float(session.calories_burned or 0.0) for session in weekly_exercise_sessions) or 0.0
+    exercise_sessions = len(weekly_exercise_sessions)
+    exercise_dates = set(session.date for session in weekly_exercise_sessions)
+    
+    # Combine totals from both tables
+    total_duration = workout_duration + exercise_duration_minutes
+    total_calories_burned = workout_calories + exercise_calories
+    total_sessions = workout_sessions + exercise_sessions
+    all_dates = workout_dates.union(exercise_dates)  # Combine date sets for consistency calculation
     
     # Get user goals
     user_obj = User.query.filter_by(username=user).first()
@@ -2031,18 +2470,18 @@ def progress_weekly_summary():
         'calories': {
             'current': weekly_calories,
             'goal': weekly_calorie_goal,
-            'remaining': max(0, weekly_calorie_goal - weekly_calories),
+            'remaining': max(0, weekly_calorie_goal - weekly_calories + total_calories_burned),  # Include exercise
             'percentage': min(1.0, weekly_calories / weekly_calorie_goal) if weekly_calorie_goal > 0 else 0,
             'daily_average': weekly_calories / 7
         },
         'exercise': {
             'total_duration': total_duration,
             'total_calories_burned': total_calories_burned,
-            'sessions': len(weekly_workouts),
+            'sessions': total_sessions,
             'daily_average_duration': total_duration / 7,
-            'consistency': len(set(workout.date for workout in weekly_workouts)) / 7
+            'consistency': len(all_dates) / 7
         },
-        'achievements': _get_weekly_achievements(weekly_calories, weekly_calorie_goal, total_duration, len(weekly_workouts)),
+        'achievements': _get_weekly_achievements(weekly_calories, weekly_calorie_goal, total_duration, total_sessions),
         'trends': _get_weekly_trends(user, start_date, end_date)
     })
 
@@ -2071,14 +2510,37 @@ def progress_monthly_summary():
         FoodLog.date <= end_date
     ).scalar() or 0
     
+    # Get WorkoutLog data
     monthly_workouts = WorkoutLog.query.filter(
         WorkoutLog.user == user,
         WorkoutLog.date >= start_date,
         WorkoutLog.date <= end_date
     ).all()
     
-    total_duration = sum(workout.duration for workout in monthly_workouts)
-    total_calories_burned = sum(workout.calories_burned for workout in monthly_workouts)
+    workout_duration = sum(workout.duration for workout in monthly_workouts) or 0
+    workout_calories = sum(workout.calories_burned for workout in monthly_workouts) or 0.0
+    workout_sessions = len(monthly_workouts)
+    workout_dates = set(workout.date for workout in monthly_workouts)
+    
+    # Also get ExerciseSession data for the month
+    monthly_exercise_sessions = ExerciseSession.query.filter(
+        ExerciseSession.user == user,
+        ExerciseSession.date >= start_date,
+        ExerciseSession.date <= end_date
+    ).all()
+    
+    # Calculate ExerciseSession totals
+    exercise_duration_seconds = sum(session.duration_seconds for session in monthly_exercise_sessions) or 0
+    exercise_duration_minutes = int(exercise_duration_seconds / 60)  # Convert to minutes
+    exercise_calories = sum(float(session.calories_burned or 0.0) for session in monthly_exercise_sessions) or 0.0
+    exercise_sessions = len(monthly_exercise_sessions)
+    exercise_dates = set(session.date for session in monthly_exercise_sessions)
+    
+    # Combine totals from both tables
+    total_duration = workout_duration + exercise_duration_minutes
+    total_calories_burned = workout_calories + exercise_calories
+    total_sessions = workout_sessions + exercise_sessions
+    all_dates = workout_dates.union(exercise_dates)  # Combine date sets for consistency calculation
     
     # Get user goals
     user_obj = User.query.filter_by(username=user).first()
@@ -2091,19 +2553,422 @@ def progress_monthly_summary():
         'calories': {
             'current': monthly_calories,
             'goal': monthly_calorie_goal,
-            'remaining': max(0, monthly_calorie_goal - monthly_calories),
+            'remaining': max(0, monthly_calorie_goal - monthly_calories + total_calories_burned),  # Include exercise
             'percentage': min(1.0, monthly_calories / monthly_calorie_goal) if monthly_calorie_goal > 0 else 0,
             'daily_average': monthly_calories / end_date.day
         },
         'exercise': {
             'total_duration': total_duration,
             'total_calories_burned': total_calories_burned,
-            'sessions': len(monthly_workouts),
+            'sessions': total_sessions,
             'daily_average_duration': total_duration / end_date.day,
-            'consistency': len(set(workout.date for workout in monthly_workouts)) / end_date.day
+            'consistency': len(all_dates) / end_date.day
         },
-        'achievements': _get_monthly_achievements(monthly_calories, monthly_calorie_goal, total_duration, len(monthly_workouts)),
+        'achievements': _get_monthly_achievements(monthly_calories, monthly_calorie_goal, total_duration, total_sessions),
         'trends': _get_monthly_trends(user, start_date, end_date)
+    })
+
+
+def _call_groq_chat(system_prompt: str, user_prompt: str, *, max_tokens: int = 400, temperature: float = 0.4) -> tuple[bool, str]:
+    """
+    Helper to call Groq's chat completion API with a system + user prompt.
+
+    Returns (ok, content). If Groq is not configured or an error occurs,
+    ok will be False and content will contain a human-readable message.
+    """
+    if not GROQ_API_KEY:
+        return False, "Groq API key (GROQ_API_KEY) is not configured on the server."
+
+    try:
+        payload = {
+            "model": GROQ_MODEL,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        resp = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=15)
+        if resp.status_code != 200:
+            return False, f"Groq API error {resp.status_code}: {resp.text}"
+        data = resp.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return False, "Groq API returned no choices."
+        content = choices[0].get("message", {}).get("content", "")
+        if not isinstance(content, str):
+            return False, "Groq API returned unexpected content format."
+        return True, content.strip()
+    except Exception as e:
+        return False, f"Groq API request failed: {e}"
+
+
+@app.route('/ai/summary/daily', methods=['POST'])
+def ai_summary_daily():
+    """
+    AI-powered daily summary for the AI Coach.
+
+    Request JSON:
+      { "user": "<username-or-email>", "date": "YYYY-MM-DD" (optional) }
+    """
+    data = request.get_json(silent=True) or {}
+    identifier = data.get('user') or data.get('username')
+    target_date_str = data.get('date')
+
+    if not identifier:
+        return jsonify({'success': False, 'error': 'user is required'}), 400
+
+    # Resolve user by username or email
+    user_obj = User.query.filter(
+        (User.username == identifier) | (User.email == identifier)
+    ).first()
+    if not user_obj:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    # Determine target date (use Philippines date for consistency with logs)
+    if target_date_str:
+        try:
+            target_date = datetime.fromisoformat(target_date_str).date()
+        except Exception:
+            target_date = get_philippines_date()
+    else:
+        target_date = get_philippines_date()
+
+    # Aggregate today's food logs
+    food_logs = FoodLog.query.filter_by(user=user_obj.username, date=target_date).all()
+    total_calories = sum(float(log.calories or 0.0) for log in food_logs)
+    total_protein = sum(float(log.protein or 0.0) for log in food_logs)
+    total_carbs = sum(float(log.carbs or 0.0) for log in food_logs)
+    total_fat = sum(float(log.fat or 0.0) for log in food_logs)
+    total_fiber = sum(float(log.fiber or 0.0) for log in food_logs)
+
+    # Get a few key foods with meal types
+    top_foods = []
+    for log in food_logs[:5]:
+        top_foods.append({
+            'food_name': log.food_name,
+            'meal_type': log.meal_type,
+            'calories': float(log.calories or 0.0),
+        })
+    
+    # Get meal summary for context
+    todays_meals = _get_todays_meal_summary(food_logs)
+    meal_summary_text = ""
+    if todays_meals:
+        meal_parts = []
+        for meal_type, foods in todays_meals.items():
+            if foods:
+                meal_parts.append(f"{meal_type}: {len(foods)} item(s)")
+        if meal_parts:
+            meal_summary_text = f"Meals logged today: {', '.join(meal_parts)}."
+    
+    # Determine what meal might be next
+    try:
+        hour = datetime.now().hour
+        if hour < 11:
+            next_meal_type_for_summary = 'breakfast'
+        elif hour < 16:
+            next_meal_type_for_summary = 'lunch'
+        elif hour < 20:
+            next_meal_type_for_summary = 'dinner'
+        else:
+            next_meal_type_for_summary = 'snack'
+    except:
+        next_meal_type_for_summary = 'lunch'
+
+    # Aggregate today's exercise (WorkoutLog + ExerciseSession)
+    workouts = WorkoutLog.query.filter_by(user=user_obj.username, date=target_date).all()
+    workout_duration = sum(float(w.duration or 0.0) for w in workouts)
+    workout_calories = sum(float(w.calories_burned or 0.0) for w in workouts)
+
+    sessions = ExerciseSession.query.filter_by(user=user_obj.username, date=target_date).all()
+    session_duration_min = sum(float(s.duration_seconds or 0) for s in sessions) / 60.0
+    session_calories = sum(float(s.calories_burned or 0.0) for s in sessions)
+
+    total_exercise_minutes = workout_duration + session_duration_min
+    total_exercise_calories = workout_calories + session_calories
+
+    # Daily calorie goal (reuse compute_daily_calorie_goal helper)
+    daily_goal = compute_daily_calorie_goal(
+        sex=user_obj.sex,
+        age=int(user_obj.age),
+        weight_kg=float(user_obj.weight_kg),
+        height_cm=float(user_obj.height_cm),
+        activity_level=str(user_obj.activity_level),
+        goal=str(user_obj.goal),
+    )
+
+    remaining = daily_goal - total_calories + total_exercise_calories
+
+    system_prompt = (
+        "You are a friendly, non-judgmental nutrition and exercise coach. "
+        "You DO NOT provide medical advice or diagnose conditions. "
+        "You must respond with STRICTLY VALID JSON using this exact schema:\n"
+        "{\n"
+        '  "summaryText": "short overview in 2-4 sentences",\n'
+        '  "tips": ["short actionable tip 1", "short actionable tip 2"]\n'
+        "}\n"
+        "Do not include any extra text, backticks, or explanations outside this JSON."
+    )
+
+    # Get user's food preferences and onboarding data
+    user_preferences = _parse_user_preferences(user_obj)
+    user_goal = user_obj.goal
+    user_activity_level = user_obj.activity_level
+    
+    # Get a shortlist of foods from CSV for meal suggestions
+    csv_foods_shortlist = _get_foods_from_csv(
+        meal_type=next_meal_type_for_summary,
+        user_preferences=user_preferences,
+        user_goal=user_goal,
+        activity_level=user_activity_level,
+        limit=20
+    )
+    
+    user_prompt_parts = [
+        f"User profile: sex={user_obj.sex}, age={user_obj.age}, "
+        f"height_cm={user_obj.height_cm}, weight_kg={user_obj.weight_kg}, "
+        f"goal={user_obj.goal}, activity_level={user_activity_level}.",
+    ]
+    
+    # Add food preferences if available
+    if user_preferences:
+        user_prompt_parts.append(f"User's food preferences: {', '.join(user_preferences)}.")
+    
+    user_prompt_parts.extend([
+        f"Daily calorie goal: {daily_goal} kcal.",
+        f"Today's date: {target_date.isoformat()}.",
+        f"Food today: total_calories={total_calories:.1f}, "
+        f"protein={total_protein:.1f}g, carbs={total_carbs:.1f}g, "
+        f"fat={total_fat:.1f}g, fiber={total_fiber:.1f}g.",
+        f"Exercise today: minutes={total_exercise_minutes:.1f}, "
+        f"calories_burned={total_exercise_calories:.1f}.",
+        f"Remaining calories (goal - food + exercise): {remaining:.1f}.",
+    ])
+    
+    if meal_summary_text:
+        user_prompt_parts.append(meal_summary_text)
+    
+    user_prompt_parts.append(f"Next likely meal type (based on time): {next_meal_type_for_summary}.")
+    user_prompt_parts.append(f"Top foods logged today (up to 5): {top_foods}.")
+    
+    # Add CSV foods list for meal suggestions
+    if csv_foods_shortlist:
+        user_prompt_parts.append(
+            "IMPORTANT: If suggesting meals, you MUST ONLY suggest foods from this list (these are the ONLY foods available in the app):\n"
+            + "\n".join(f"- {item}" for item in csv_foods_shortlist)
+        )
+    
+    user_prompt_parts.append(
+        "\nSummarize how today is going relative to the goal and provide 1-2 "
+        "specific, kind suggestions the user can realistically follow today or tomorrow. "
+        f"If suggesting meals, you MUST ONLY suggest foods from the list above. "
+        f"Consider the user's preferences ({', '.join(user_preferences) if user_preferences else 'none'}), goal ({user_goal}), and activity level ({user_activity_level})."
+    )
+    
+    user_prompt = "\n".join(user_prompt_parts)
+
+    ok, content = _call_groq_chat(system_prompt, user_prompt, max_tokens=450)
+
+    summary_text = ""
+    tips: list[str] = []
+
+    if ok:
+        try:
+            parsed = json.loads(content)
+            summary_text = str(parsed.get("summaryText") or "").strip()
+            tips_raw = parsed.get("tips") or []
+            if isinstance(tips_raw, list):
+                tips = [str(t).strip() for t in tips_raw if str(t).strip()]
+        except Exception:
+            # Fallback: treat whole content as summary
+            summary_text = content
+            tips = []
+    else:
+        summary_text = (
+            "AI summary is temporarily unavailable. "
+            "You are using this app's built-in calorie and progress tracking as usual."
+        )
+        tips = [content]
+
+    if not summary_text:
+        summary_text = (
+            "I couldn't generate a detailed summary, but keep logging your meals "
+            "and I'll provide more insights soon."
+        )
+
+    return jsonify({
+        'success': True,
+        'user': user_obj.username,
+        'date': target_date.isoformat(),
+        'summaryText': summary_text,
+        'tips': tips,
+    })
+
+
+@app.route('/ai/what-to-eat-next', methods=['POST'])
+def ai_what_to_eat_next():
+    """
+    AI-powered next-meal suggestion for the AI Coach.
+
+    Request JSON:
+      {
+        "user": "<username-or-email>",
+        "next_meal_type": "breakfast|lunch|snack|dinner" (optional)
+      }
+    """
+    data = request.get_json(silent=True) or {}
+    identifier = data.get('user') or data.get('username')
+    next_meal_type = (data.get('next_meal_type') or '').lower().strip()
+
+    if not identifier:
+        return jsonify({'success': False, 'error': 'user is required'}), 400
+
+    # Resolve user
+    user_obj = User.query.filter(
+        (User.username == identifier) | (User.email == identifier)
+    ).first()
+    if not user_obj:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    if not next_meal_type:
+        # Infer meal type from local time (rough heuristic)
+        hour = datetime.now().hour
+        if hour < 11:
+            next_meal_type = 'breakfast'
+        elif hour < 16:
+            next_meal_type = 'lunch'
+        elif hour < 20:
+            next_meal_type = 'dinner'
+        else:
+            next_meal_type = 'snack'
+
+    # Use same aggregates as summary to give context
+    target_date = get_philippines_date()
+    food_logs = FoodLog.query.filter_by(user=user_obj.username, date=target_date).all()
+    total_calories = sum(float(log.calories or 0.0) for log in food_logs)
+    workouts = WorkoutLog.query.filter_by(user=user_obj.username, date=target_date).all()
+    workout_calories = sum(float(w.calories_burned or 0.0) for w in workouts)
+    sessions = ExerciseSession.query.filter_by(user=user_obj.username, date=target_date).all()
+    session_calories = sum(float(s.calories_burned or 0.0) for s in sessions)
+    total_exercise_calories = workout_calories + session_calories
+
+    daily_goal = compute_daily_calorie_goal(
+        sex=user_obj.sex,
+        age=int(user_obj.age),
+        weight_kg=float(user_obj.weight_kg),
+        height_cm=float(user_obj.height_cm),
+        activity_level=str(user_obj.activity_level),
+        goal=str(user_obj.goal),
+    )
+    remaining = daily_goal - total_calories + total_exercise_calories
+
+    # Get user's food preferences and onboarding data
+    user_preferences = _parse_user_preferences(user_obj)
+    user_goal = user_obj.goal
+    user_activity_level = user_obj.activity_level
+    
+    # Build a shortlist of Filipino foods from CSV ONLY, filtered by meal type, preferences, goal, and activity level
+    filipino_shortlist = _get_foods_from_csv(
+        meal_type=next_meal_type,
+        user_preferences=user_preferences,
+        user_goal=user_goal,
+        activity_level=user_activity_level,
+        limit=30
+    )
+
+    filipino_section = ""
+    if filipino_shortlist:
+        filipino_section = (
+            "IMPORTANT: You MUST only suggest foods from this list (these are the ONLY foods available in the app):\n"
+            + "\n".join(f"- {item}" for item in filipino_shortlist)
+        )
+
+    system_prompt = (
+        "You are a helpful nutrition coach focused on Filipino cuisine. "
+        "You DO NOT provide medical advice or strict diets; just gentle, practical ideas.\n"
+        f"IMPORTANT: The user is asking for suggestions for their NEXT meal, which is: {next_meal_type}.\n"
+        f"Only suggest foods that are appropriate for {next_meal_type} (e.g., don't suggest breakfast foods for dinner).\n"
+        "You MUST ONLY suggest foods from the provided Filipino foods list - these are the ONLY foods available in the app.\n"
+        "Always prefer Filipino dishes and ingredients and the user's own saved meals when they fit.\n"
+        "Respond with STRICTLY VALID JSON using this exact schema:\n"
+        "{\n"
+        '  "headline": "short 1-sentence suggestion",\n'
+        '  "suggestions": ["food idea 1", "food idea 2", "optional idea 3"],\n'
+        '  "explanation": "2-4 sentence explanation in simple language"\n'
+        "}\n"
+        "Do not include any text outside this JSON."
+    )
+
+    # Build user prompt with onboarding data
+    user_prompt_parts = [
+        f"User profile: sex={user_obj.sex}, age={user_obj.age}, goal={user_obj.goal}, activity_level={user_activity_level}.",
+    ]
+    
+    # Add food preferences if available
+    if user_preferences:
+        user_prompt_parts.append(f"User's food preferences: {', '.join(user_preferences)}.")
+    
+    user_prompt_parts.extend([
+        f"Today's date: {target_date.isoformat()}.",
+        f"Daily calorie goal: {daily_goal} kcal.",
+        f"Calories eaten so far: {total_calories:.1f} kcal.",
+        f"Exercise calories today: {total_exercise_calories:.1f} kcal.",
+        f"Estimated remaining calories for the day: {remaining:.1f} kcal.",
+        f"Next meal type: {next_meal_type}.",
+    ])
+    
+    if filipino_section:
+        user_prompt_parts.append(filipino_section)
+    
+    user_prompt_parts.append(
+        "When suggesting meals or snacks, you MUST ONLY pick from the Filipino foods shortlist provided above. "
+        "These are the ONLY foods available in the app. "
+        f"Prioritize foods that match the user's preferences ({', '.join(user_preferences) if user_preferences else 'none'}) and goal ({user_goal}). "
+        "Focus on reasonable portion sizes and a balance of protein, vegetables, and carbs. "
+        "If remaining calories are very low or negative, focus on light options or planning for tomorrow rather "
+        "than restriction."
+    )
+    
+    user_prompt = "\n".join(user_prompt_parts)
+
+    ok, content = _call_groq_chat(system_prompt, user_prompt, max_tokens=450)
+
+    headline = ""
+    suggestions: list[str] = []
+    explanation = ""
+
+    if ok:
+        try:
+            parsed = json.loads(content)
+            headline = str(parsed.get("headline") or "").strip()
+            raw_suggestions = parsed.get("suggestions") or []
+            if isinstance(raw_suggestions, list):
+                suggestions = [str(s).strip() for s in raw_suggestions if str(s).strip()]
+            explanation = str(parsed.get("explanation") or "").strip()
+        except Exception:
+            headline = "AI meal ideas"
+            explanation = content
+            suggestions = []
+    else:
+        headline = "AI meal ideas temporarily unavailable"
+        explanation = content
+
+    if not headline:
+        headline = "Here are a few ideas for your next meal."
+
+    return jsonify({
+        'success': True,
+        'user': user_obj.username,
+        'next_meal_type': next_meal_type,
+        'headline': headline,
+        'suggestions': suggestions,
+        'explanation': explanation,
     })
 
 @app.route('/progress/goals', methods=['GET', 'POST'])
@@ -2359,6 +3224,63 @@ def remaining_calories():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# --- Helper Functions for Date Handling ---
+def get_philippines_timezone():
+    """Get Philippines timezone object (Asia/Manila)"""
+    try:
+        if ZoneInfo:
+            return ZoneInfo('Asia/Manila')
+        else:
+            return pytz.timezone('Asia/Manila')
+    except Exception:
+        return None
+
+def get_philippines_date():
+    """Get current date in Philippines timezone (Asia/Manila)"""
+    try:
+        if ZoneInfo:
+            ph_tz = ZoneInfo('Asia/Manila')
+        else:
+            ph_tz = pytz.timezone('Asia/Manila')
+        ph_now = datetime.now(ph_tz)
+        return ph_now.date()
+    except Exception:
+        # Fallback to UTC if timezone fails
+        return date.today()
+
+def parse_date_safe(date_str):
+    """Parse ISO8601 date string and extract date-only without timezone conversion.
+    
+    This function safely extracts the date part (YYYY-MM-DD) from ISO8601 datetime strings
+    without timezone conversion, preventing date shifts when parsing dates from different timezones.
+    
+    Args:
+        date_str: ISO8601 date string (e.g., "2025-11-13T00:00:00.000" or "2025-11-13")
+    
+    Returns:
+        date object or None if parsing fails
+    """
+    if not date_str:
+        return None
+    try:
+        # Extract date part directly (YYYY-MM-DD) without timezone conversion
+        if 'T' in date_str:
+            # Has time component, extract date part only
+            date_part = date_str.split('T')[0]
+        else:
+            # Already date-only string
+            date_part = date_str
+        
+        # Remove any timezone suffix if present (e.g., "2025-11-13+08:00" -> "2025-11-13")
+        if '+' in date_part or date_part.endswith('Z'):
+            date_part = date_part.split('+')[0].split('Z')[0]
+        
+        # Parse as date-only (no timezone conversion)
+        return datetime.strptime(date_part, '%Y-%m-%d').date()
+    except (ValueError, AttributeError) as e:
+        print(f"[ERROR] Error parsing date: {date_str}, error: {e}")
+        return None
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

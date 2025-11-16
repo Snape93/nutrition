@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'user_database.dart';
 import 'theme_service.dart';
-import 'dart:async';
+import 'my_app.dart'; // For routeObserver
 
 class HistoryScreen extends StatefulWidget {
   final String usernameOrEmail;
@@ -16,14 +16,13 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
   List<Map<String, dynamic>> _logs = [];
   bool _isLoading = true;
   String? _error;
   String? userSex;
-  Timer? _refreshTimer;
   bool _isSelectionMode = false;
-  Set<int> _selectedLogIds = {};
+  final Set<int> _selectedLogIds = {};
   bool _isDeleting = false; // For multiple deletions
   bool _isDeletingSingle = false; // For single deletion
   int _deletingCount = 0; // Track count during deletion
@@ -34,21 +33,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
     userSex = widget.initialUserSex;
     _loadLogs();
     _loadUserSex();
-    _startRefreshTimer();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)! as PageRoute);
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    routeObserver.unsubscribe(this);
     super.dispose();
   }
 
-  void _startRefreshTimer() {
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (mounted) {
-        _loadLogs();
-      }
-    });
+  @override
+  void didPush() {
+    // Screen was pushed (navigated to) - refresh data
+    _loadLogs();
+  }
+
+  @override
+  void didPopNext() {
+    // Returning to this screen from another screen - refresh data
+    _loadLogs();
   }
 
   Future<void> _loadLogs() async {
@@ -397,10 +405,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ? [
                 if (_selectedLogIds.length <
                     _logs.where((log) => canDeleteFoodLog(log)).length)
-                  IconButton(
-                    icon: Icon(Icons.select_all, color: primaryColor),
+                  TextButton(
                     onPressed: _selectAllDeletable,
-                    tooltip: 'Select all',
+                    child: Text(
+                      'Select all',
+                      style: TextStyle(color: primaryColor),
+                    ),
                   ),
                 if (_selectedLogIds.isNotEmpty)
                   IconButton(
@@ -415,10 +425,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
               ]
             : [
-                IconButton(
-                  icon: Icon(Icons.checklist, color: primaryColor),
+                TextButton(
                   onPressed: _toggleSelectionMode,
-                  tooltip: 'Select items',
+                  child: Text(
+                    'Select all',
+                    style: TextStyle(color: primaryColor),
+                  ),
                 ),
               ],
       ),

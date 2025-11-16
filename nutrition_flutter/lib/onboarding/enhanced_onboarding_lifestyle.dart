@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'widgets/animated_progress_bar.dart';
 import 'widgets/emoji_selector.dart';
 import 'widgets/sex_specific_theme.dart';
+import '../design_system/app_design_system.dart';
 
 class EnhancedOnboardingLifestyle extends StatefulWidget {
   final String usernameOrEmail;
@@ -89,11 +90,9 @@ class _EnhancedOnboardingLifestyleState
   @override
   Widget build(BuildContext context) {
     final theme = SexSpecificTheme.getThemeFromString(_selectedGender);
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = AppDesignSystem.getScreenHeight(context);
     final isSmallScreen = screenHeight < 700;
     final isVerySmallScreen = screenHeight < 600;
-    final isNarrowScreen = screenWidth < 360;
 
     return SexSpecificBackground(
       gender: _selectedGender,
@@ -121,29 +120,28 @@ class _EnhancedOnboardingLifestyleState
                   // Content
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: EdgeInsets.symmetric(
-                        horizontal:
-                            isNarrowScreen ? 8 : (isSmallScreen ? 12 : 16),
-                        vertical:
-                            isVerySmallScreen ? 6 : (isSmallScreen ? 8 : 12),
+                      padding: AppDesignSystem.getResponsivePaddingExact(
+                        context,
+                        xs: 8,
+                        sm: 12,
+                        md: 16,
                       ),
                       child: Column(
                         children: [
                           // Header - more compact
-                          _buildCompactHeader(
-                            theme,
-                            isSmallScreen,
-                            isVerySmallScreen,
-                          ),
+                          _buildCompactHeader(context, theme),
                           SizedBox(
-                            height:
-                                isVerySmallScreen
-                                    ? 6
-                                    : (isSmallScreen ? 8 : 12),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 6,
+                              sm: 8,
+                              md: 12,
+                            ),
                           ),
 
                           // Activity level selection - more compact
                           _buildCompactEmojiSelector(
+                            context: context,
                             title: 'Activity Level',
                             options: EmojiOptions.getActivityOptions(),
                             selectedValue: _activityLevel,
@@ -153,30 +151,31 @@ class _EnhancedOnboardingLifestyleState
                               });
                             },
                             theme: theme,
-                            isSmallScreen: isSmallScreen,
-                            isVerySmallScreen: isVerySmallScreen,
                           ),
 
                           // Show compliment for Activity Level as soon as it's selected
                           if (_activityLevel != null) ...[
                             _buildActivityLevelCompliment(
+                              context,
                               theme,
-                              isSmallScreen,
-                              isVerySmallScreen,
                             ),
                             SizedBox(
-                              height:
-                                  isVerySmallScreen
-                                      ? 4
-                                      : (isSmallScreen ? 6 : 8),
+                              height: AppDesignSystem.getResponsiveSpacingExact(
+                                context,
+                                xs: 4,
+                                sm: 6,
+                                md: 8,
+                              ),
                             ),
                           ],
 
                           SizedBox(
-                            height:
-                                isVerySmallScreen
-                                    ? 6
-                                    : (isSmallScreen ? 8 : 12),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 6,
+                              sm: 8,
+                              md: 12,
+                            ),
                           ),
 
                           // Mood and Energy - always in one row for small screens, better layout for very small screens
@@ -185,6 +184,7 @@ class _EnhancedOnboardingLifestyleState
                               children: [
                                 Expanded(
                                   child: _buildCompactEmojiSelector(
+                                    context: context,
                                     title: 'Mood',
                                     options:
                                         EmojiOptions.getMoodOptions()
@@ -197,15 +197,21 @@ class _EnhancedOnboardingLifestyleState
                                       });
                                     },
                                     theme: theme,
-                                    isSmallScreen: isSmallScreen,
-                                    isVerySmallScreen: isVerySmallScreen,
                                     crossAxisCount: 1,
                                     hideLabelOnSmallScreen: true,
                                   ),
                                 ),
-                                SizedBox(width: isVerySmallScreen ? 6 : 8),
+                                SizedBox(
+                                  width: AppDesignSystem.getResponsiveSpacingExact(
+                                    context,
+                                    xs: 6,
+                                    sm: 6,
+                                    md: 8,
+                                  ),
+                                ),
                                 Expanded(
                                   child: _buildCompactEmojiSelector(
+                                    context: context,
                                     title: 'Energy',
                                     options: EmojiOptions.getEnergyOptions(),
                                     selectedValue: _energyLevel,
@@ -215,8 +221,6 @@ class _EnhancedOnboardingLifestyleState
                                       });
                                     },
                                     theme: theme,
-                                    isSmallScreen: isSmallScreen,
-                                    isVerySmallScreen: isVerySmallScreen,
                                     crossAxisCount: 1,
                                     hideLabelOnSmallScreen: true,
                                   ),
@@ -257,32 +261,39 @@ class _EnhancedOnboardingLifestyleState
                           ],
 
                           SizedBox(
-                            height:
-                                isVerySmallScreen ? 4 : (isSmallScreen ? 6 : 8),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 4,
+                              sm: 6,
+                              md: 8,
+                            ),
                           ),
 
                           // Compact insights
                           if (_canProceed()) ...[
                             _buildCompactInsights(
+                                context,
                               theme,
-                              isSmallScreen,
-                              isVerySmallScreen,
                             ),
                             SizedBox(
-                              height:
-                                  isVerySmallScreen
-                                      ? 4
-                                      : (isSmallScreen ? 6 : 8),
+                                height: AppDesignSystem.getResponsiveSpacingExact(
+                                  context,
+                                  xs: 4,
+                                  sm: 6,
+                                  md: 8,
+                                ),
                             ),
                           ],
 
                           // Remove navigation buttons from here
                           // Navigation buttons will be placed in bottomNavigationBar
                           SizedBox(
-                            height:
-                                isVerySmallScreen
-                                    ? 6
-                                    : (isSmallScreen ? 8 : 12),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 6,
+                              sm: 8,
+                              md: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -302,9 +313,8 @@ class _EnhancedOnboardingLifestyleState
         bottomNavigationBar: SafeArea(
           minimum: EdgeInsets.only(bottom: 12, left: 12, right: 12),
           child: _buildNavigationButtons(
+            context,
             theme,
-            isSmallScreen,
-            isVerySmallScreen,
           ),
         ),
       ),
@@ -312,13 +322,15 @@ class _EnhancedOnboardingLifestyleState
   }
 
   Widget _buildCompactHeader(
+    BuildContext context,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
     return Container(
-      padding: EdgeInsets.all(
-        isVerySmallScreen ? 8 : (isSmallScreen ? 10 : 12),
+      padding: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 8,
+        sm: 10,
+        md: 12,
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.9),
@@ -336,10 +348,22 @@ class _EnhancedOnboardingLifestyleState
           Text(
             _selectedGender == 'female' ? '🌸' : '⚡',
             style: TextStyle(
-              fontSize: isVerySmallScreen ? 24 : (isSmallScreen ? 28 : 32),
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 24,
+                sm: 28,
+                md: 32,
+              ),
             ),
           ),
-          SizedBox(width: isVerySmallScreen ? 6 : (isSmallScreen ? 8 : 12)),
+          SizedBox(
+            width: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 6,
+              sm: 8,
+              md: 12,
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,20 +371,29 @@ class _EnhancedOnboardingLifestyleState
                 Text(
                   'Activity & Lifestyle',
                   style: TextStyle(
-                    fontSize:
-                        isVerySmallScreen ? 16 : (isSmallScreen ? 18 : 20),
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 16,
+                      sm: 18,
+                      md: 20,
+                    ),
                     fontWeight: FontWeight.bold,
                     color: theme.primaryColor,
                   ),
                 ),
-                if (!isVerySmallScreen) ...[
+                if (AppDesignSystem.getScreenHeight(context) >= 600) ...[
                   Text(
                     SexSpecificMessaging.getEncouragementMessage(
                       _selectedGender,
                       'lifestyle',
                     ),
                     style: TextStyle(
-                      fontSize: isSmallScreen ? 10 : 12,
+                      fontSize: AppDesignSystem.getResponsiveFontSize(
+                        context,
+                        xs: 10,
+                        sm: 10,
+                        md: 12,
+                      ),
                       color: Colors.grey[600],
                     ),
                     maxLines: 1,
@@ -376,35 +409,55 @@ class _EnhancedOnboardingLifestyleState
   }
 
   Widget _buildCompactEmojiSelector({
+    required BuildContext context,
     required String title,
     required List<EmojiOption> options,
     required String? selectedValue,
     required ValueChanged<String> onChanged,
     required SexSpecificTheme theme,
-    required bool isSmallScreen,
-    required bool isVerySmallScreen,
     int? crossAxisCount,
     bool hideLabelOnSmallScreen = false,
   }) {
+    final screenHeight = AppDesignSystem.getScreenHeight(context);
+    final isSmallScreen = screenHeight < 700;
+    final isVerySmallScreen = screenHeight < 600;
+    final labelFontSize = AppDesignSystem.getResponsiveFontSize(
+      context,
+      xs: 8,
+      sm: 9,
+      md: 10,
+    );
+    final gridSpacing = AppDesignSystem.getResponsiveSpacingExact(
+      context,
+      xs: 2,
+      sm: 4,
+      md: 6,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
           style: TextStyle(
-            fontSize: isVerySmallScreen ? 12 : (isSmallScreen ? 14 : 16),
+            fontSize: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 12,
+              sm: 14,
+              md: 16,
+            ),
             fontWeight: FontWeight.bold,
             color: theme.primaryColor,
           ),
         ),
-        SizedBox(height: isVerySmallScreen ? 2 : (isSmallScreen ? 4 : 6)),
+        SizedBox(height: gridSpacing),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount ?? (options.length > 4 ? 3 : 2),
-            crossAxisSpacing: isVerySmallScreen ? 2 : (isSmallScreen ? 4 : 6),
-            mainAxisSpacing: isVerySmallScreen ? 2 : (isSmallScreen ? 4 : 6),
+            crossAxisSpacing: gridSpacing,
+            mainAxisSpacing: gridSpacing,
             childAspectRatio:
                 isVerySmallScreen ? 2.0 : (isSmallScreen ? 1.6 : 1.4),
           ),
@@ -417,8 +470,18 @@ class _EnhancedOnboardingLifestyleState
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: EdgeInsets.symmetric(
-                  vertical: isVerySmallScreen ? 0 : (isSmallScreen ? 2 : 4),
-                  horizontal: isVerySmallScreen ? 2 : (isSmallScreen ? 4 : 6),
+                  vertical: AppDesignSystem.getResponsiveSpacingExact(
+                    context,
+                    xs: 0,
+                    sm: 2,
+                    md: 4,
+                  ),
+                  horizontal: AppDesignSystem.getResponsiveSpacingExact(
+                    context,
+                    xs: 2,
+                    sm: 4,
+                    md: 6,
+                  ),
                 ),
                 decoration: BoxDecoration(
                   color:
@@ -447,17 +510,28 @@ class _EnhancedOnboardingLifestyleState
                     Text(
                       option.emoji,
                       style: TextStyle(
-                        fontSize:
-                            isVerySmallScreen ? 14 : (isSmallScreen ? 16 : 18),
+                        fontSize: AppDesignSystem.getResponsiveFontSize(
+                          context,
+                          xs: 14,
+                          sm: 16,
+                          md: 18,
+                        ),
                       ),
                     ),
                     if (!(hideLabelOnSmallScreen && isVerySmallScreen)) ...[
-                      SizedBox(height: isSmallScreen ? 1 : 2),
+                      SizedBox(
+                        height: AppDesignSystem.getResponsiveSpacingExact(
+                          context,
+                          xs: 1,
+                          sm: 1,
+                          md: 2,
+                        ),
+                      ),
                       Flexible(
                         child: Text(
                           option.label,
                           style: TextStyle(
-                            fontSize: isSmallScreen ? 8 : 10,
+                            fontSize: labelFontSize,
                             fontWeight:
                                 isSelected ? FontWeight.bold : FontWeight.w500,
                             color:
@@ -512,13 +586,15 @@ class _EnhancedOnboardingLifestyleState
   }
 
   Widget _buildCompactInsights(
+    BuildContext context,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
     return Container(
-      padding: EdgeInsets.all(
-        isVerySmallScreen ? 8 : (isSmallScreen ? 10 : 12),
+      padding: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 8,
+        sm: 10,
+        md: 12,
       ),
       decoration: BoxDecoration(
         color: theme.primaryColor.withValues(alpha: 0.1),
@@ -527,13 +603,34 @@ class _EnhancedOnboardingLifestyleState
       ),
       child: Row(
         children: [
-          Icon(Icons.insights, color: theme.primaryColor, size: 18),
-          SizedBox(width: isVerySmallScreen ? 6 : 8),
+          Icon(
+            Icons.insights,
+            color: theme.primaryColor,
+            size: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 16,
+              sm: 18,
+              md: 18,
+            ),
+          ),
+          SizedBox(
+            width: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 6,
+              sm: 6,
+              md: 8,
+            ),
+          ),
           Expanded(
             child: Text(
               _getPersonalizedTip(),
               style: TextStyle(
-                fontSize: isVerySmallScreen ? 9 : (isSmallScreen ? 11 : 12),
+                fontSize: AppDesignSystem.getResponsiveFontSize(
+                  context,
+                  xs: 9,
+                  sm: 11,
+                  md: 12,
+                ),
                 color: Colors.grey[700],
                 height: 1.3,
               ),
@@ -547,18 +644,19 @@ class _EnhancedOnboardingLifestyleState
   }
 
   Widget _buildActivityLevelCompliment(
+    BuildContext context,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
     final selected = EmojiOptions.getActivityOptions().firstWhere(
       (o) => o.value == _activityLevel,
       orElse: () => EmojiOptions.getActivityOptions().first,
     );
-
     return Container(
-      padding: EdgeInsets.all(
-        isVerySmallScreen ? 8 : (isSmallScreen ? 10 : 12),
+      padding: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 8,
+        sm: 10,
+        md: 12,
       ),
       decoration: BoxDecoration(
         color: theme.primaryColor.withValues(alpha: 0.1),
@@ -569,9 +667,23 @@ class _EnhancedOnboardingLifestyleState
         children: [
           Text(
             selected.emoji,
-            style: TextStyle(fontSize: isSmallScreen ? 18 : 22),
+            style: TextStyle(
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 18,
+                sm: 20,
+                md: 22,
+              ),
+            ),
           ),
-          SizedBox(width: isVerySmallScreen ? 6 : 8),
+          SizedBox(
+            width: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 6,
+              sm: 6,
+              md: 8,
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -579,16 +691,33 @@ class _EnhancedOnboardingLifestyleState
                 Text(
                   selected.label,
                   style: TextStyle(
-                    fontSize: isSmallScreen ? 12 : 14,
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 12,
+                      sm: 13,
+                      md: 14,
+                    ),
                     fontWeight: FontWeight.bold,
                     color: theme.primaryColor,
                   ),
                 ),
-                SizedBox(height: isSmallScreen ? 2 : 4),
+                SizedBox(
+                  height: AppDesignSystem.getResponsiveSpacingExact(
+                    context,
+                    xs: 2,
+                    sm: 3,
+                    md: 4,
+                  ),
+                ),
                 Text(
                   selected.description,
                   style: TextStyle(
-                    fontSize: isSmallScreen ? 10 : 12,
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 10,
+                      sm: 11,
+                      md: 12,
+                    ),
                     color: Colors.grey[700],
                   ),
                   maxLines: 2,
@@ -603,10 +732,11 @@ class _EnhancedOnboardingLifestyleState
   }
 
   Widget _buildNavigationButtons(
+    BuildContext context,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
+    final screenHeight = AppDesignSystem.getScreenHeight(context);
+    final isVerySmallScreen = screenHeight < 600;
     return Row(
       children: [
         Expanded(
@@ -616,7 +746,12 @@ class _EnhancedOnboardingLifestyleState
             },
             style: OutlinedButton.styleFrom(
               padding: EdgeInsets.symmetric(
-                vertical: isVerySmallScreen ? 12 : 16,
+                vertical: AppDesignSystem.getResponsiveSpacingExact(
+                  context,
+                  xs: 12,
+                  sm: 14,
+                  md: 16,
+                ),
               ),
               side: BorderSide(color: theme.primaryColor),
               shape: RoundedRectangleBorder(
@@ -626,14 +761,26 @@ class _EnhancedOnboardingLifestyleState
             child: Text(
               'Back',
               style: TextStyle(
-                fontSize: isVerySmallScreen ? 14 : 16,
+                fontSize: AppDesignSystem.getResponsiveFontSize(
+                  context,
+                  xs: 14,
+                  sm: 15,
+                  md: 16,
+                ),
                 fontWeight: FontWeight.bold,
                 color: theme.primaryColor,
               ),
             ),
           ),
         ),
-        SizedBox(width: isVerySmallScreen ? 12 : 16),
+        SizedBox(
+          width: AppDesignSystem.getResponsiveSpacingExact(
+            context,
+            xs: 12,
+            sm: 14,
+            md: 16,
+          ),
+        ),
         Expanded(
           flex: 2,
           child: SexSpecificButton(

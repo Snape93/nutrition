@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'widgets/animated_progress_bar.dart';
 import 'widgets/emoji_selector.dart';
 import 'widgets/sex_specific_theme.dart';
+import '../design_system/app_design_system.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config.dart' as config; // centralized apiBase
@@ -314,11 +315,37 @@ class _EnhancedOnboardingNutritionState
 
       // Proceed directly to home screen after onboarding
       if (mounted) {
+        // Get the correct background color for transition
+        final theme = SexSpecificTheme.getThemeFromString(widget.gender);
+        final backgroundColor = theme.backgroundColor;
+        
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(
-            builder:
-                (context) => HomePage(usernameOrEmail: widget.usernameOrEmail),
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                HomePage(
+                  usernameOrEmail: widget.usernameOrEmail,
+                  initialUserSex: widget.gender, // Pass gender to avoid green flash
+                ),
+            transitionDuration: const Duration(milliseconds: 300),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              // Use SlideTransition to cover old screen completely
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1.0, 0.0), // Slide from right
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeInOut,
+                )),
+                child: Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  color: backgroundColor, // Use theme background color, not green
+                  child: child,
+                ),
+              );
+            },
           ),
           (route) => false,
         );
@@ -354,11 +381,8 @@ class _EnhancedOnboardingNutritionState
   @override
   Widget build(BuildContext context) {
     final theme = SexSpecificTheme.getThemeFromString(widget.gender);
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenHeight < 700;
+    final screenHeight = AppDesignSystem.getScreenHeight(context);
     final isVerySmallScreen = screenHeight < 600;
-    final isNarrowScreen = screenWidth < 360;
 
     return SexSpecificBackground(
       gender: widget.gender,
@@ -384,39 +408,47 @@ class _EnhancedOnboardingNutritionState
                   Expanded(
                     child: SingleChildScrollView(
                       controller: _scrollController,
-                      padding: EdgeInsets.symmetric(
-                        horizontal:
-                            isNarrowScreen ? 8 : (isSmallScreen ? 12 : 16),
-                        vertical:
-                            isVerySmallScreen ? 6 : (isSmallScreen ? 8 : 12),
+                      padding: AppDesignSystem.getResponsivePaddingExact(
+                        context,
+                        xs: 8,
+                        sm: 12,
+                        md: 16,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildHeader(theme, isSmallScreen, isVerySmallScreen),
+                          _buildHeader(context, theme),
                           SizedBox(
-                            height:
-                                isVerySmallScreen
-                                    ? 8
-                                    : (isSmallScreen ? 12 : 16),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 8,
+                              sm: 12,
+                              md: 16,
+                            ),
                           ),
                           Container(
                             key: _foodPrefKey,
                             child: Text(
                               'Select your food preferences',
                               style: TextStyle(
-                                fontSize:
-                                    isVerySmallScreen
-                                        ? 14
-                                        : (isSmallScreen ? 16 : 18),
+                                fontSize: AppDesignSystem.getResponsiveFontSize(
+                                  context,
+                                  xs: 14,
+                                  sm: 16,
+                                  md: 18,
+                                ),
                                 fontWeight: FontWeight.bold,
                                 color: theme.primaryColor,
                               ),
                             ),
                           ),
                           SizedBox(
-                            height:
-                                isVerySmallScreen ? 4 : (isSmallScreen ? 6 : 8),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 4,
+                              sm: 6,
+                              md: 8,
+                            ),
                           ),
                           EmojiSelector(
                             options: EmojiOptions.getFoodPreferenceOptions(),
@@ -434,31 +466,22 @@ class _EnhancedOnboardingNutritionState
                           if (_selectedPreferences.isNotEmpty) ...[
                             SizedBox(
                               height:
-                                  isVerySmallScreen
-                                      ? 4
-                                      : (isSmallScreen ? 6 : 8),
-                            ),
-                            _buildPreferenceInsight(
-                              theme,
-                              isSmallScreen,
-                              isVerySmallScreen,
-                            ),
-                          ],
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              'You can refine preferences later in Settings.',
-                              style: TextStyle(
-                                fontSize: isSmallScreen ? 12 : 14,
-                                color: Colors.grey[600],
+                                  AppDesignSystem.getResponsiveSpacingExact(
+                                context,
+                                xs: 4,
+                                sm: 6,
+                                md: 8,
                               ),
                             ),
-                          ),
+                          _buildPreferenceInsight(context, theme),
+                          ],
                           SizedBox(
-                            height:
-                                isVerySmallScreen
-                                    ? 8
-                                    : (isSmallScreen ? 12 : 16),
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 8,
+                              sm: 12,
+                              md: 16,
+                            ),
                           ),
                           if (_isLoading)
                             Center(child: CircularProgressIndicator()),
@@ -485,7 +508,7 @@ class _EnhancedOnboardingNutritionState
           ),
         ),
         bottomNavigationBar: SafeArea(
-          minimum: EdgeInsets.only(bottom: 12, left: 12, right: 12),
+          minimum: const EdgeInsets.only(bottom: 12, left: 12, right: 12),
           child: Row(
             children: [
               Expanded(
@@ -495,7 +518,12 @@ class _EnhancedOnboardingNutritionState
                   },
                   style: OutlinedButton.styleFrom(
                     padding: EdgeInsets.symmetric(
-                      vertical: isVerySmallScreen ? 12 : 16,
+                      vertical: AppDesignSystem.getResponsiveSpacingExact(
+                        context,
+                        xs: 12,
+                        sm: 14,
+                        md: 16,
+                      ),
                     ),
                     side: BorderSide(color: theme.primaryColor),
                     shape: RoundedRectangleBorder(
@@ -505,14 +533,26 @@ class _EnhancedOnboardingNutritionState
                   child: Text(
                     'Back',
                     style: TextStyle(
-                      fontSize: isVerySmallScreen ? 14 : 16,
+                      fontSize: AppDesignSystem.getResponsiveFontSize(
+                        context,
+                        xs: 14,
+                        sm: 15,
+                        md: 16,
+                      ),
                       fontWeight: FontWeight.bold,
                       color: theme.primaryColor,
                     ),
                   ),
                 ),
               ),
-              SizedBox(width: isVerySmallScreen ? 12 : 16),
+              SizedBox(
+                width: AppDesignSystem.getResponsiveSpacingExact(
+                  context,
+                  xs: 12,
+                  sm: 14,
+                  md: 16,
+                ),
+              ),
               Expanded(
                 flex: 2,
                 child: SexSpecificButton(
@@ -531,13 +571,15 @@ class _EnhancedOnboardingNutritionState
   }
 
   Widget _buildHeader(
+    BuildContext context,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
     return Container(
-      padding: EdgeInsets.all(
-        isVerySmallScreen ? 8 : (isSmallScreen ? 10 : 12),
+      padding: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 8,
+        sm: 10,
+        md: 12,
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.9),
@@ -555,9 +597,21 @@ class _EnhancedOnboardingNutritionState
           Icon(
             Icons.restaurant,
             color: theme.primaryColor,
-            size: isVerySmallScreen ? 24 : (isSmallScreen ? 28 : 32),
+            size: AppDesignSystem.getResponsiveFontSize(
+              context,
+              xs: 24,
+              sm: 28,
+              md: 32,
+            ),
           ),
-          SizedBox(width: isVerySmallScreen ? 6 : (isSmallScreen ? 8 : 12)),
+          SizedBox(
+            width: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 6,
+              sm: 8,
+              md: 12,
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -565,17 +619,26 @@ class _EnhancedOnboardingNutritionState
                 Text(
                   'Food Preferences',
                   style: TextStyle(
-                    fontSize:
-                        isVerySmallScreen ? 16 : (isSmallScreen ? 18 : 20),
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 16,
+                      sm: 18,
+                      md: 20,
+                    ),
                     fontWeight: FontWeight.bold,
                     color: theme.primaryColor,
                   ),
                 ),
-                if (!isVerySmallScreen) ...[
+                if (AppDesignSystem.getScreenHeight(context) >= 600) ...[
                   Text(
                     'Help us personalize your meal plan by sharing your preferences.',
                     style: TextStyle(
-                      fontSize: isSmallScreen ? 10 : 12,
+                      fontSize: AppDesignSystem.getResponsiveFontSize(
+                        context,
+                        xs: 10,
+                        sm: 11,
+                        md: 12,
+                      ),
                       color: Colors.grey[600],
                     ),
                     maxLines: 1,
@@ -593,9 +656,8 @@ class _EnhancedOnboardingNutritionState
   // Note: Free-text fields removed from onboarding for safety and clarity.
 
   Widget _buildPreferenceInsight(
+    BuildContext context,
     SexSpecificTheme theme,
-    bool isSmallScreen,
-    bool isVerySmallScreen,
   ) {
     final selected =
         _selectedPreferences.isNotEmpty
@@ -607,8 +669,11 @@ class _EnhancedOnboardingNutritionState
     if (selected == null) return SizedBox.shrink();
     return Container(
       margin: EdgeInsets.only(top: 4),
-      padding: EdgeInsets.all(
-        isVerySmallScreen ? 8 : (isSmallScreen ? 10 : 12),
+      padding: AppDesignSystem.getResponsivePaddingExact(
+        context,
+        xs: 8,
+        sm: 10,
+        md: 12,
       ),
       decoration: BoxDecoration(
         color: theme.primaryColor.withValues(alpha: 0.1),
@@ -619,9 +684,23 @@ class _EnhancedOnboardingNutritionState
         children: [
           Text(
             selected.emoji,
-            style: TextStyle(fontSize: isSmallScreen ? 18 : 22),
+            style: TextStyle(
+              fontSize: AppDesignSystem.getResponsiveFontSize(
+                context,
+                xs: 18,
+                sm: 20,
+                md: 22,
+              ),
+            ),
           ),
-          SizedBox(width: isVerySmallScreen ? 6 : 8),
+          SizedBox(
+            width: AppDesignSystem.getResponsiveSpacingExact(
+              context,
+              xs: 6,
+              sm: 6,
+              md: 8,
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,16 +708,33 @@ class _EnhancedOnboardingNutritionState
                 Text(
                   selected.label,
                   style: TextStyle(
-                    fontSize: isSmallScreen ? 12 : 14,
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 12,
+                      sm: 13,
+                      md: 14,
+                    ),
                     fontWeight: FontWeight.bold,
                     color: theme.primaryColor,
                   ),
                 ),
-                SizedBox(height: isSmallScreen ? 2 : 4),
+                SizedBox(
+                  height: AppDesignSystem.getResponsiveSpacingExact(
+                    context,
+                    xs: 2,
+                    sm: 3,
+                    md: 4,
+                  ),
+                ),
                 Text(
                   selected.description,
                   style: TextStyle(
-                    fontSize: isSmallScreen ? 10 : 12,
+                    fontSize: AppDesignSystem.getResponsiveFontSize(
+                      context,
+                      xs: 10,
+                      sm: 11,
+                      md: 12,
+                    ),
                     color: Colors.grey[700],
                   ),
                   maxLines: 2,

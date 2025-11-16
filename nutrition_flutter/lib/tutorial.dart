@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home.dart';
 import 'user_database.dart';
+import 'theme_service.dart';
 
 const Color kGreen = Color(0xFF43A047); // Main green
 const Color kLightGreen = Color(0xFFF4FFF4); // Background
@@ -55,9 +56,37 @@ class _TutorialScreenState extends State<TutorialScreen> {
     await UserDatabase().markTutorialAsSeen(widget.usernameOrEmail);
 
     if (!mounted) return;
+    
+    // Get user sex to determine correct background color
+    final userSex = await UserDatabase().getUserSex(widget.usernameOrEmail);
+    final backgroundColor = ThemeService.getBackgroundColor(userSex);
+    
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => HomePage(usernameOrEmail: widget.usernameOrEmail),
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            HomePage(
+              usernameOrEmail: widget.usernameOrEmail,
+              initialUserSex: userSex, // Pass userSex to avoid green flash
+            ),
+        transitionDuration: const Duration(milliseconds: 300),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          // Use SlideTransition to cover old screen completely
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1.0, 0.0), // Slide from right
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOut,
+            )),
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: backgroundColor, // Use correct background color, not green
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }

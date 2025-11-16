@@ -62,11 +62,11 @@ class ExerciseService {
     return _cachedExercises!;
   }
 
-  // Get exercises by category
-  static Future<List<Exercise>> getExercisesByCategory(String category) async {
+  // Get exercises by category with optional user for personalized calories
+  static Future<List<Exercise>> getExercisesByCategory(String category, {String? user}) async {
     // Backend supports category filter
     try {
-      final fromBackend = await _fetchFromBackend(category: category);
+      final fromBackend = await _fetchFromBackend(category: category, user: user);
       debugPrint('EXERCISE DEBUG: category=$category -> ${fromBackend.length}');
       if (fromBackend.isNotEmpty) return fromBackend;
     } catch (e) {
@@ -158,10 +158,13 @@ class ExerciseService {
         .toList();
   }
 
-  // Get exercise by ID
-  static Future<Exercise?> getExerciseById(String id) async {
+  // Get exercise by ID with optional user for personalized calories
+  static Future<Exercise?> getExerciseById(String id, {String? user}) async {
     try {
-      final uri = Uri.parse('$apiBase/exercises/$id');
+      var uri = Uri.parse('$apiBase/exercises/$id');
+      if (user != null && user.isNotEmpty) {
+        uri = uri.replace(queryParameters: {'user': user});
+      }
       final resp = await http.get(uri);
       if (resp.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(resp.body);
@@ -439,10 +442,13 @@ class ExerciseService {
 
   // ------------------ Backend integration ------------------
 
-  static Future<List<Exercise>> _fetchFromBackend({String? category}) async {
+  static Future<List<Exercise>> _fetchFromBackend({String? category, String? user}) async {
     final params = <String, String>{'limit': '10000'};
     if (category != null && category.isNotEmpty) {
       params['category'] = category;
+    }
+    if (user != null && user.isNotEmpty) {
+      params['user'] = user; // Pass user for personalized calories
     }
     final uri = Uri.parse(
       '$apiBase/exercises',
@@ -459,16 +465,21 @@ class ExerciseService {
   }
 
   // Calculate calories from backend given name/id and duration seconds
+  // Now supports personalized calculation based on user's weight
   static Future<double?> calculateCalories({
     String? id,
     String? name,
     required int durationSeconds,
+    String? user, // Username/email for personalized calculation
   }) async {
     try {
       final uri = Uri.parse('$apiBase/exercises/calculate');
       final body = <String, dynamic>{'duration_seconds': durationSeconds};
       if (id != null && id.isNotEmpty) body['exercise_id'] = id;
       if ((name ?? '').isNotEmpty) body['name'] = name;
+      if (user != null && user.isNotEmpty) {
+        body['user'] = user;
+      }
       final resp = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
@@ -492,6 +503,17 @@ class ExerciseService {
     final List<dynamic>? rawInstr = j['instructions'] as List<dynamic>?;
     final instructions =
         rawInstr?.map((e) => e.toString()).toList() ?? <String>[];
+    
+    // Get personalized calories_per_minute if available, otherwise use estimated
+    double? caloriesPerMin;
+    if (j['calories_per_minute'] != null) {
+      // Personalized calories per minute (based on user's weight)
+      caloriesPerMin = (j['calories_per_minute'] as num?)?.toDouble();
+    } else if (j['estimated_calories_per_minute'] != null) {
+      // Fallback to estimated (deprecated, for backward compatibility)
+      caloriesPerMin = (j['estimated_calories_per_minute'] as num?)?.toDouble();
+    }
+    
     return Exercise(
       id: (j['id'] ?? '').toString(),
       name: (j['name'] ?? '').toString(),
@@ -500,6 +522,10 @@ class ExerciseService {
       target: (j['target'] ?? '').toString(),
       gifUrl: (j['gif_url'] ?? '').toString(),
       instructions: instructions,
+      category: j['category']?.toString(),
+      difficulty: j['difficulty']?.toString(),
+      estimatedCaloriesPerMinute: caloriesPerMin,
+      metValue: (j['met_value'] as num?)?.toDouble(),
     );
   }
 

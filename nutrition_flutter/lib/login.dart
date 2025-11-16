@@ -3,11 +3,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'forgot_password.dart';
 import 'home.dart';
 import 'onboarding/onboarding_welcome.dart';
 import 'register.dart';
+import 'theme_service.dart';
 import 'verify_code_screen.dart';
 import 'config.dart';
 
@@ -27,8 +29,133 @@ class _LoginScreenState extends State<LoginScreen> {
   String _message = '';
   bool _isLoading = false;
   bool _obscurePassword = true;
+  
+  // Security lockout variables
+  int _failedAttempts = 0;
+  DateTime? _lockoutUntil;
+  Timer? _countdownTimer;
+  int _remainingSeconds = 0;
+  bool _isLockedOut = false;
+  
+  static const int _maxFailedAttempts = 5;
+  static const int _lockoutDurationMinutes = 5;
+  static const String _failedAttemptsKey = 'login_failed_attempts';
+  static const String _lockoutUntilKey = 'login_lockout_until';
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLockoutStatus();
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkLockoutStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lockoutUntilString = prefs.getString(_lockoutUntilKey);
+    
+    if (lockoutUntilString != null) {
+      final lockoutUntil = DateTime.parse(lockoutUntilString);
+      final now = DateTime.now();
+      
+      if (lockoutUntil.isAfter(now)) {
+        // Still locked out
+        setState(() {
+          _isLockedOut = true;
+          _lockoutUntil = lockoutUntil;
+        });
+        _startCountdown();
+      } else {
+        // Lockout expired, reset
+        await _resetFailedAttempts();
+      }
+    } else {
+      // Load failed attempts count
+      final attempts = prefs.getInt(_failedAttemptsKey) ?? 0;
+      setState(() {
+        _failedAttempts = attempts;
+      });
+    }
+  }
+
+  Future<void> _resetFailedAttempts() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_failedAttemptsKey);
+    await prefs.remove(_lockoutUntilKey);
+    setState(() {
+      _failedAttempts = 0;
+      _isLockedOut = false;
+      _lockoutUntil = null;
+      _remainingSeconds = 0;
+    });
+    _countdownTimer?.cancel();
+  }
+
+  Future<void> _incrementFailedAttempts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final newAttempts = _failedAttempts + 1;
+    await prefs.setInt(_failedAttemptsKey, newAttempts);
+    
+    setState(() {
+      _failedAttempts = newAttempts;
+    });
+    
+    if (newAttempts >= _maxFailedAttempts) {
+      // Lock out for 5 minutes
+      final lockoutUntil = DateTime.now().add(Duration(minutes: _lockoutDurationMinutes));
+      await prefs.setString(_lockoutUntilKey, lockoutUntil.toIso8601String());
+      
+      setState(() {
+        _isLockedOut = true;
+        _lockoutUntil = lockoutUntil;
+      });
+      
+      _startCountdown();
+    }
+  }
+
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_lockoutUntil == null) {
+        timer.cancel();
+        return;
+      }
+      
+      final now = DateTime.now();
+      final remaining = _lockoutUntil!.difference(now);
+      
+      if (remaining.isNegative || remaining.inSeconds <= 0) {
+        // Lockout expired
+        timer.cancel();
+        _resetFailedAttempts();
+      } else {
+        setState(() {
+          _remainingSeconds = remaining.inSeconds;
+        });
+      }
+    });
+  }
+
+  String _formatCountdown(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
 
   Future<void> _login() async {
+    // Check if locked out
+    if (_isLockedOut) {
+      setState(() {
+        _message = 'Too many failed login attempts. Please try again in ${_formatCountdown(_remainingSeconds)}.';
+      });
+      return;
+    }
+    
     if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
       setState(() {
         _message = 'Please fill in all fields';
@@ -67,6 +194,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (backendResponse.statusCode != 200) {
         if (!mounted) return;
+        
+        // Increment failed attempts for non-server errors
+        if (backendResponse.statusCode < 500) {
+          await _incrementFailedAttempts();
+        }
+        
         String msg = backendResponse.statusCode >= 500
             ? 'Server error. Please try again.'
             : 'Invalid username or password';
@@ -78,6 +211,13 @@ class _LoginScreenState extends State<LoginScreen> {
             msg = body['message'];
           }
         } catch (_) {}
+        
+        // Add warning about remaining attempts
+        if (!_isLockedOut && _failedAttempts > 0 && _failedAttempts < _maxFailedAttempts) {
+          final remaining = _maxFailedAttempts - _failedAttempts;
+          msg += '\n${remaining} attempt${remaining > 1 ? 's' : ''} remaining.';
+        }
+        
         setState(() {
           _isLoading = false;
           _message = msg;
@@ -121,6 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final Map responseData = decoded;
       final bool success = responseData['success'] == true;
+      
       if (!success) {
         final String serverMessage =
             (responseData['message'] is String && (responseData['message'] as String).isNotEmpty)
@@ -132,6 +273,12 @@ class _LoginScreenState extends State<LoginScreen> {
         final String? email = responseData['email'] as String?;
         
         if (!mounted) return;
+        
+        // Increment failed attempts (only if not already incremented for status code != 200)
+        // Note: This handles the case where status code is 200 but success is false
+        if (backendResponse.statusCode == 200) {
+          await _incrementFailedAttempts();
+        }
         
         // If email verification required, navigate to verification screen
         if (emailVerificationRequired && email != null) {
@@ -151,17 +298,28 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
         
+        String errorMsg = 'Login failed: $serverMessage';
+        // Add warning about remaining attempts
+        if (!_isLockedOut && _failedAttempts > 0 && _failedAttempts < _maxFailedAttempts) {
+          final remaining = _maxFailedAttempts - _failedAttempts;
+          errorMsg += '\n${remaining} attempt${remaining > 1 ? 's' : ''} remaining.';
+        }
+        
         setState(() {
           _isLoading = false;
-          _message = 'Login failed: $serverMessage';
+          _message = errorMsg;
         });
         return;
       }
+      
+      // Reset failed attempts on successful login
+      await _resetFailedAttempts();
 
       // Check if user has completed onboarding/tutorial from backend
       final dynamic userDataDyn = responseData['user'];
       final Map? userData = userDataDyn is Map ? userDataDyn : null;
       final bool hasSeenTutorial = (userData?['has_seen_tutorial'] == true);
+      final String? userSex = userData?['sex'] as String?; // Get user sex from login response
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -171,12 +329,36 @@ class _LoginScreenState extends State<LoginScreen> {
       // Navigate to appropriate screen
       try {
         if (hasSeenTutorial) {
+          // Get background color for transition
+          final backgroundColor = ThemeService.getBackgroundColor(userSex);
+          
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(
-              builder:
-                  (context) =>
-                      HomePage(usernameOrEmail: _usernameController.text),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  HomePage(
+                    usernameOrEmail: _usernameController.text,
+                    initialUserSex: userSex, // Pass userSex to avoid green flash
+                  ),
+              transitionDuration: const Duration(milliseconds: 300),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                // Use SlideTransition to cover old screen completely
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1.0, 0.0), // Slide from right
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeInOut,
+                  )),
+                  child: Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    color: backgroundColor, // Use correct background color, not green
+                    child: child,
+                  ),
+                );
+              },
             ),
           );
         } else {
@@ -233,12 +415,6 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset(
-                    'design/logo.png',
-                    height: 100,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(height: 24),
                   Card(
                     elevation: 8,
                     shape: RoundedRectangleBorder(
@@ -248,6 +424,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.all(24.0),
                       child: Column(
                         children: [
+                          Image.asset(
+                            'design/logo.png',
+                            height: 100,
+                            fit: BoxFit.contain,
+                          ),
+                          const SizedBox(height: 16),
                           Text(
                             'Welcome Back',
                             style: TextStyle(
@@ -255,6 +437,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               fontWeight: FontWeight.bold,
                               color: const Color(0xFF388E3C),
                             ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Sign in to continue your nutrition journey',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 24),
                           TextField(
@@ -325,13 +516,25 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                           ),
+                          if (_isLockedOut) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Locked. Retry in ${_formatCountdown(_remainingSeconds)}.',
+                              style: TextStyle(
+                                color: Colors.red[700],
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           _isLoading
                               ? const Center(child: CircularProgressIndicator())
                               : SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton(
-                                    onPressed: _isLoading ? null : _login,
+                                    onPressed: (_isLoading || _isLockedOut) ? null : _login,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF4CAF50),
                                       foregroundColor: Colors.white,
@@ -351,11 +554,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                     child: const Text('Sign In'),
                                   ),
                                 ),
-                          if (_message.isNotEmpty) ...[
+                          if (_message.isNotEmpty && !_isLockedOut) ...[
                             const SizedBox(height: 16),
                             Text(
                               _message,
                               style: const TextStyle(color: Colors.red),
+                              textAlign: TextAlign.center,
                             ),
                           ],
                           const SizedBox(height: 16),

@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 
+/// Screen category enum for device classification
+enum ScreenCategory {
+  smallPhone, // < 360px width
+  phone,      // 360-600px width
+  tablet,     // 600-900px width
+  desktop,    // > 900px width
+}
+
 /// Professional design system for the nutrition app
 /// This centralizes all design decisions to prevent overfitting and ensure consistency
 class AppDesignSystem {
@@ -292,6 +300,75 @@ class AppDesignSystem {
   // RESPONSIVE HELPERS
   // ============================================================================
 
+  /// Get screen category for debugging and conditional logic
+  static ScreenCategory getScreenCategory(BuildContext context) {
+    try {
+      final width = MediaQuery.of(context).size.width;
+      if (width < 360) return ScreenCategory.smallPhone;
+      if (width < 600) return ScreenCategory.phone;
+      if (width < 900) return ScreenCategory.tablet;
+      return ScreenCategory.desktop;
+    } catch (e) {
+      // Fallback to phone if MediaQuery fails
+      return ScreenCategory.phone;
+    }
+  }
+
+  /// Get screen category as string (for debugging)
+  static String getScreenCategoryString(BuildContext context) {
+    final category = getScreenCategory(context);
+    switch (category) {
+      case ScreenCategory.smallPhone:
+        return 'smallPhone';
+      case ScreenCategory.phone:
+        return 'phone';
+      case ScreenCategory.tablet:
+        return 'tablet';
+      case ScreenCategory.desktop:
+        return 'desktop';
+    }
+  }
+
+  /// Check if device is a phone
+  static bool isPhone(BuildContext context) {
+    final category = getScreenCategory(context);
+    return category == ScreenCategory.smallPhone || category == ScreenCategory.phone;
+  }
+
+  /// Check if device is a tablet or larger
+  static bool isTablet(BuildContext context) {
+    final category = getScreenCategory(context);
+    return category == ScreenCategory.tablet || category == ScreenCategory.desktop;
+  }
+
+  /// Check if device is in landscape orientation
+  static bool isLandscape(BuildContext context) {
+    try {
+      final orientation = MediaQuery.of(context).orientation;
+      return orientation == Orientation.landscape;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Get screen width (safe access)
+  static double getScreenWidth(BuildContext context) {
+    try {
+      return MediaQuery.of(context).size.width;
+    } catch (e) {
+      return 360.0; // Default fallback
+    }
+  }
+
+  /// Get screen height (safe access)
+  static double getScreenHeight(BuildContext context) {
+    try {
+      return MediaQuery.of(context).size.height;
+    } catch (e) {
+      return 640.0; // Default fallback
+    }
+  }
+
   /// Get responsive font size
   static double getResponsiveFontSize(
     BuildContext context, {
@@ -300,11 +377,16 @@ class AppDesignSystem {
     double md = 16.0,
     double lg = 18.0,
   }) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    if (screenWidth < 360) return xs;
-    if (screenWidth < 600) return sm;
-    if (screenWidth < 900) return md;
-    return lg;
+    try {
+      final screenWidth = MediaQuery.of(context).size.width;
+      if (screenWidth < 360) return xs;
+      if (screenWidth < 600) return sm;
+      if (screenWidth < 900) return md;
+      return lg;
+    } catch (e) {
+      // Fallback to medium size
+      return sm;
+    }
   }
 
   /// Get responsive padding
@@ -313,25 +395,203 @@ class AppDesignSystem {
     double horizontal = spaceMD,
     double vertical = spaceLG,
   }) {
-    final responsiveHorizontal = getResponsiveSpacing(
-      context,
-      xs: horizontal * 0.75,
-      sm: horizontal,
-      md: horizontal * 1.25,
-      lg: horizontal * 1.5,
-    );
+    try {
+      final responsiveHorizontal = getResponsiveSpacing(
+        context,
+        xs: horizontal * 0.75,
+        sm: horizontal,
+        md: horizontal * 1.25,
+        lg: horizontal * 1.5,
+      );
 
-    final responsiveVertical = getResponsiveSpacing(
-      context,
-      xs: vertical * 0.75,
-      sm: vertical,
-      md: vertical * 1.25,
-      lg: vertical * 1.5,
-    );
+      final responsiveVertical = getResponsiveSpacing(
+        context,
+        xs: vertical * 0.75,
+        sm: vertical,
+        md: vertical * 1.25,
+        lg: vertical * 1.5,
+      );
 
+      return EdgeInsets.symmetric(
+        horizontal: responsiveHorizontal,
+        vertical: responsiveVertical,
+      );
+    } catch (e) {
+      // Fallback to default values
+      return EdgeInsets.symmetric(
+        horizontal: horizontal,
+        vertical: vertical,
+      );
+    }
+  }
+
+  /// Get responsive padding with exact value matching
+  /// Use this when you need to match specific values from old hard-coded logic
+  /// 
+  /// Example:
+  /// ```dart
+  /// // Old: isVerySmallScreen ? 8 : (isSmallScreen ? 12 : 16)
+  /// // New:
+  /// padding: AppDesignSystem.getResponsivePaddingExact(
+  ///   context,
+  ///   xs: 8,   // < 360px (matches isNarrowScreen ? 8)
+  ///   sm: 12,  // 360-600px (matches isSmallScreen ? 12)
+  ///   md: 16,  // 600-900px (matches default 16)
+  ///   lg: 20,  // > 900px (optional, for tablets)
+  /// )
+  /// ```
+  static EdgeInsets getResponsivePaddingExact(
+    BuildContext context, {
+    double? xs,  // < 360px
+    double? sm,  // 360-600px
+    double? md,  // 600-900px
+    double? lg,  // > 900px
+    double horizontal = spaceMD,
+    double vertical = spaceLG,
+  }) {
+    try {
+      final width = MediaQuery.of(context).size.width;
+      double h, v;
+
+      if (width < 360) {
+        h = xs ?? (horizontal * 0.75);
+        v = xs ?? (vertical * 0.75);
+      } else if (width < 600) {
+        h = sm ?? horizontal;
+        v = sm ?? vertical;
+      } else if (width < 900) {
+        h = md ?? (horizontal * 1.25);
+        v = md ?? (vertical * 1.25);
+      } else {
+        h = lg ?? (horizontal * 1.5);
+        v = lg ?? (vertical * 1.5);
+      }
+
+      return EdgeInsets.symmetric(horizontal: h, vertical: v);
+    } catch (e) {
+      // Fallback to defaults
+      return EdgeInsets.symmetric(
+        horizontal: horizontal,
+        vertical: vertical,
+      );
+    }
+  }
+
+  /// Get responsive spacing with exact value matching
+  /// Use this when you need to match specific spacing values from old hard-coded logic
+  /// 
+  /// Example:
+  /// ```dart
+  /// // Old: isVerySmallScreen ? 16 : (isSmallScreen ? 20 : 24)
+  /// // New:
+  /// SizedBox(
+  ///   height: AppDesignSystem.getResponsiveSpacingExact(
+  ///     context,
+  ///     xs: 16,  // < 600px (matches isVerySmallScreen ? 16)
+  ///     sm: 20,  // 600-700px (matches isSmallScreen ? 20)
+  ///     md: 24,  // > 700px (matches default 24)
+  ///   ),
+  /// )
+  /// ```
+  static double getResponsiveSpacingExact(
+    BuildContext context, {
+    double? xs,  // < 360px
+    double? sm,  // 360-600px
+    double? md,  // 600-900px
+    double? lg,  // > 900px
+    double defaultValue = spaceMD,
+  }) {
+    try {
+      final width = MediaQuery.of(context).size.width;
+      if (width < 360) return xs ?? (defaultValue * 0.75);
+      if (width < 600) return sm ?? defaultValue;
+      if (width < 900) return md ?? (defaultValue * 1.25);
+      return lg ?? (defaultValue * 1.5);
+    } catch (e) {
+      // Fallback to default value
+      return defaultValue;
+    }
+  }
+
+  /// Get responsive padding for screen edges (common use case)
+  static EdgeInsets getScreenPadding(BuildContext context) {
+    return getResponsivePadding(
+      context,
+      horizontal: spaceMD,
+      vertical: spaceMD,
+    );
+  }
+
+  /// Standardized padding for compact numeric inputs (height/weight fields)
+  static EdgeInsets getNumericInputPadding(BuildContext context) {
     return EdgeInsets.symmetric(
-      horizontal: responsiveHorizontal,
-      vertical: responsiveVertical,
+      horizontal: getResponsiveSpacingExact(
+        context,
+        xs: spaceSM + 2,
+        sm: spaceMD,
+        md: spaceMD + 2,
+        lg: spaceLG,
+      ),
+      vertical: getResponsiveSpacingExact(
+        context,
+        xs: 12,
+        sm: 14,
+        md: 16,
+        lg: 18,
+      ),
+    );
+  }
+
+  /// Minimum constraints to keep numeric inputs legible on very small devices
+  static BoxConstraints getNumericInputConstraints(BuildContext context) {
+    return BoxConstraints(
+      minHeight: getResponsiveSpacingExact(
+        context,
+        xs: 44,
+        sm: 48,
+        md: 52,
+        lg: 56,
+      ),
+    );
+  }
+
+  /// Get responsive padding for cards/containers (common use case)
+  static EdgeInsets getCardPadding(BuildContext context) {
+    return getResponsivePadding(
+      context,
+      horizontal: spaceMD,
+      vertical: spaceMD,
+    );
+  }
+
+  /// Get responsive padding for input fields (common use case)
+  static EdgeInsets getInputPadding(BuildContext context) {
+    return getResponsivePadding(
+      context,
+      horizontal: spaceMD,
+      vertical: spaceSM,
+    );
+  }
+
+  /// Get responsive spacing between sections (common use case)
+  static double getSectionSpacing(BuildContext context) {
+    return getResponsiveSpacing(
+      context,
+      xs: spaceMD,
+      sm: spaceLG,
+      md: spaceXL,
+      lg: spaceXXL,
+    );
+  }
+
+  /// Get responsive spacing between elements (common use case)
+  static double getElementSpacing(BuildContext context) {
+    return getResponsiveSpacing(
+      context,
+      xs: spaceSM,
+      sm: spaceMD,
+      md: spaceLG,
+      lg: spaceXL,
     );
   }
 }
