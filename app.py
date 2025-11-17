@@ -956,7 +956,10 @@ def _import_exercises_from_csv_path(csv_path: str) -> tuple[int, int]:
 
 # Initialize the nutrition model (with error handling)
 try:
-    nutrition_model = NutritionModel()
+    # Use absolute path for model file
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(base_dir, 'model', 'best_regression_model.joblib')
+    nutrition_model = NutritionModel(model_path=model_path)
     print("[SUCCESS] Nutrition model initialized")
 except Exception as e:
     print(f"[WARNING] Nutrition model initialization failed: {e}")
