@@ -152,6 +152,14 @@ try:
 except Exception:
     pass
 
+# Log Groq AI configuration status
+if GROQ_API_KEY:
+    print(f"[INFO] Groq AI configured: Model={GROQ_MODEL}, URL={GROQ_API_URL}")
+    print(f"[INFO] AI Coach features enabled (daily summary, meal suggestions, chat)")
+else:
+    print(f"[WARN] Groq API key not configured. AI Coach features will be unavailable.")
+    print(f"[WARN] Set GROQ_API_KEY environment variable to enable AI features.")
+
 db = SQLAlchemy(app)
 
 # Flask 3 removed before_first_request; guard warm-up with a flag in before_request
