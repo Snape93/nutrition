@@ -5,6 +5,7 @@ import pandas as pd
 from nutrition_model import NutritionModel
 import os
 import json
+import sys
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text, func
 from datetime import datetime, date, timedelta
@@ -104,6 +105,37 @@ if config_name not in config:
     
 print(f"[INFO] Using config: {config_name} (FLASK_ENV={os.environ.get('FLASK_ENV', 'not set')}, Railway={is_railway})")
 app.config.from_object(config[config_name])
+
+# Validate required environment variables for production
+if config_name == 'production' or is_railway:
+    required_vars = {
+        'NEON_DATABASE_URL': 'Database connection string (get from https://neon.tech)',
+        'SECRET_KEY': 'Flask secret key for session security (generate with: python -c "import secrets; print(secrets.token_hex(32))")',
+        'GMAIL_USERNAME': 'Gmail address for sending emails',
+        'GMAIL_APP_PASSWORD': 'Gmail App Password (enable 2FA and generate at https://myaccount.google.com/apppasswords)'
+    }
+    
+    missing_vars = []
+    for var_name, description in required_vars.items():
+        value = os.environ.get(var_name)
+        if not value or value.strip() == '':
+            missing_vars.append(f"  - {var_name}: {description}")
+    
+    if missing_vars:
+        error_msg = "\n" + "="*80 + "\n"
+        error_msg += "ERROR: Missing required environment variables for production!\n"
+        error_msg += "="*80 + "\n"
+        error_msg += "The following environment variables must be set in Railway:\n\n"
+        error_msg += "\n".join(missing_vars)
+        error_msg += "\n\n"
+        error_msg += "To fix this:\n"
+        error_msg += "1. Go to Railway Dashboard → Your Project → Variables tab\n"
+        error_msg += "2. Add each missing variable with its value\n"
+        error_msg += "3. Redeploy the service\n"
+        error_msg += "="*80 + "\n"
+        print(error_msg, file=sys.stderr)
+        # Don't crash - let Railway show the error in logs
+        # But make it very clear what's wrong
 
 # Log which database URI is being used (without credentials)
 try:
@@ -931,11 +963,26 @@ except Exception as e:
     print("[INFO] App will continue but ML features may not work")
     nutrition_model = None
 
-# Initialize database tables (with error handling)
+# Initialize database tables (with proper error handling)
+db_initialized = False
 try:
+    # Check if database URL is set
+    db_url = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    if not db_url or db_url.strip() == '':
+        raise ValueError("SQLALCHEMY_DATABASE_URI is not set. NEON_DATABASE_URL environment variable is required.")
+    
     with app.app_context():
+        # Test database connection
+        try:
+            db.session.execute(text('SELECT 1'))
+            db.session.commit()
+            print("[SUCCESS] Database connection verified")
+        except Exception as conn_err:
+            raise ConnectionError(f"Failed to connect to database: {conn_err}. Check your NEON_DATABASE_URL.")
+        
         db.create_all()
         print("[SUCCESS] Database tables initialized successfully")
+        db_initialized = True
         
         # Auto-import exercises from CSV if database is empty or has few exercises
         try:
@@ -960,9 +1007,19 @@ try:
             print(f"[WARNING] Exercise import failed: {e}")
             # Continue - exercises can be imported later
 except Exception as e:
-    print(f"[ERROR] Database initialization failed: {e}")
-    print("[ERROR] App may not work correctly without database connection")
-    # Don't crash - let it try to start and show error in logs
+    error_msg = "\n" + "="*80 + "\n"
+    error_msg += "CRITICAL ERROR: Database initialization failed!\n"
+    error_msg += "="*80 + "\n"
+    error_msg += f"Error: {str(e)}\n\n"
+    error_msg += "The app cannot function without a working database connection.\n"
+    error_msg += "Please ensure NEON_DATABASE_URL is correctly set in Railway.\n"
+    error_msg += "="*80 + "\n"
+    print(error_msg, file=sys.stderr)
+    # In production, we should fail fast - but let Railway show the error first
+    if config_name == 'production' or is_railway:
+        # Don't crash immediately - let Railway logs show the error
+        # But make it very clear the app won't work
+        pass
 
 # Load Filipino food dataset at startup (robust path + encoding)
 try:

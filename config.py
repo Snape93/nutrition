@@ -65,12 +65,11 @@ class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
     # Require Neon PostgreSQL for production
-    # Don't raise error during class definition - check at runtime
     neon_url = os.environ.get('NEON_DATABASE_URL')
-    if not neon_url:
-        # Log warning but don't crash - allows Railway to start and show proper error
-        import sys
-        print("[WARNING] NEON_DATABASE_URL not set - database features will not work", file=sys.stderr)
+    if not neon_url or neon_url.strip() == '':
+        # In production, this is a critical error - but check at runtime in app.py
+        # Don't raise here to allow app.py to show a better error message
+        pass
     SQLALCHEMY_DATABASE_URI = _normalize_sqlalchemy_uri(neon_url or '')
 
 class TestingConfig(Config):
