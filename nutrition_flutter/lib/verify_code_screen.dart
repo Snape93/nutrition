@@ -143,7 +143,7 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
           'email': _emailController.text.trim(),
           'code': code,
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 30));
 
       final responseData = json.decode(response.body);
 
@@ -196,7 +196,7 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
         body: jsonEncode({
           'email': _emailController.text.trim(),
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 30));
 
       final responseData = json.decode(response.body);
 
@@ -277,7 +277,7 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
           'old_email': widget.email,
           'new_email': newEmail,
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 30));
 
       final responseData = json.decode(response.body);
 

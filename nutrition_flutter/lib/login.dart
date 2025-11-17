@@ -201,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
               'password': _passwordController.text.trim(),
             }),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 30));
 
       http.Response backendResponse = await doRequest();
 

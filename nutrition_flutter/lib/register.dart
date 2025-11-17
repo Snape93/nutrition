@@ -124,7 +124,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(backendData),
             )
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 30));
 
         debugPrint(
           'DEBUG: Registration response status: ${backendResponse.statusCode}',

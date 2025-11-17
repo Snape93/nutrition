@@ -153,7 +153,7 @@ class _PasswordChangeVerificationScreenState
               'code': code,
             }),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 30));
 
       final responseData = json.decode(response.body);
 
@@ -224,7 +224,7 @@ class _PasswordChangeVerificationScreenState
                 '${config.apiBase}/user/${widget.usernameOrEmail}/password/resend-code'),
             headers: {'Content-Type': 'application/json'},
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 30));
 
       final responseData = json.decode(response.body);
 
@@ -318,7 +318,7 @@ class _PasswordChangeVerificationScreenState
                 '${config.apiBase}/user/${widget.usernameOrEmail}/password/cancel-change'),
             headers: {'Content-Type': 'application/json'},
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         if (!mounted) return;
