@@ -959,6 +959,11 @@ try:
     # Use absolute path for model file
     base_dir = os.path.dirname(os.path.abspath(__file__))
     model_path = os.path.join(base_dir, 'model', 'best_regression_model.joblib')
+    print(f"[DEBUG] Looking for model at: {model_path}")
+    print(f"[DEBUG] Model file exists: {os.path.exists(model_path)}")
+    if os.path.exists(model_path):
+        file_size = os.path.getsize(model_path) / (1024 * 1024)  # Size in MB
+        print(f"[DEBUG] Model file size: {file_size:.2f} MB")
     nutrition_model = NutritionModel(model_path=model_path)
     print("[SUCCESS] Nutrition model initialized")
 except Exception as e:
@@ -1028,6 +1033,7 @@ except Exception as e:
 try:
     # Try multiple possible locations for the CSV file
     base_dir = os.path.dirname(os.path.abspath(__file__))  # Root directory
+    print(f"[DEBUG] Base directory: {base_dir}")
     possible_paths = [
         os.path.join(base_dir, 'nutrition_flutter', 'lib', 'Filipino_Food_Nutrition_Dataset.csv'),  # nutrition_flutter/lib/ folder
         os.path.join(base_dir, 'data', 'Filipino_Food_Nutrition_Dataset.csv'),  # data/ folder
@@ -1035,10 +1041,24 @@ try:
         os.path.join(os.path.dirname(__file__), 'Filipino_Food_Nutrition_Dataset.csv'),  # Same dir as app.py
     ]
     
+    # Debug: List files in data directory
+    data_dir = os.path.join(base_dir, 'data')
+    if os.path.exists(data_dir):
+        print(f"[DEBUG] Contents of data/ directory:")
+        try:
+            for item in os.listdir(data_dir):
+                item_path = os.path.join(data_dir, item)
+                if os.path.isfile(item_path):
+                    size = os.path.getsize(item_path) / 1024  # KB
+                    print(f"  - {item} ({size:.2f} KB)")
+        except Exception as e:
+            print(f"  [ERROR] Could not list data directory: {e}")
+    
     FOOD_CSV_PATH = None
     for path in possible_paths:
         if os.path.exists(path):
             FOOD_CSV_PATH = path
+            print(f"[DEBUG] Found CSV at: {path}")
             break
     
     if FOOD_CSV_PATH and os.path.exists(FOOD_CSV_PATH):
@@ -1049,7 +1069,8 @@ try:
         # Minimal fallback DataFrame
         print(f"[WARNING] Filipino food CSV not found. Tried paths:")
         for path in possible_paths:
-            print(f"  - {path} (exists: {os.path.exists(path)})")
+            exists = os.path.exists(path)
+            print(f"  - {path} (exists: {exists})")
         print(f"[WARNING] Using empty dataset - search will not work!")
         food_df = pd.DataFrame(columns=['Food Name','Calories','Protein (g)','Carbs (g)','Fat (g)','Fiber (g)','Sodium (mg)'])
 except Exception as e:
