@@ -108,5 +108,10 @@ flutter_icons:
   android: true
   ios: true
   image_path: "design/logo.png"
-  adaptive_icon_background: "#FFFFFF"
+  # Use green background to match apple theme and prevent cropping
+  adaptive_icon_background: "#4CAF50"
   adaptive_icon_foreground: "design/logo.png"
+  # Add padding to prevent icon from being cropped (20% safe area)
+  adaptive_icon_padding: 20
+  # Remove alpha channel for iOS to prevent transparency issues
+  remove_alpha_ios: true
