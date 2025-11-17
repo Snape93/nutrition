@@ -216,11 +216,11 @@ class HealthService {
         return {
           'success': false,
           'error':
-              'Health Connect opened. Please grant permissions to "Nutrition App" and return here.',
+              'Health Connect opened. Please grant permissions to "Nutritionist App" and return here.',
           'errorCode': 'PERMISSION_PENDING',
           'action': 'check_permissions_after_grant',
           'instruction':
-              '1. In Health Connect, find "Nutrition App"\n2. Grant the permissions you want\n3. Return to this app and try connecting again',
+              '1. In Health Connect, find "Nutritionist App"\n2. Grant the permissions you want\n3. Return to this app and try connecting again',
         };
       } else {
         // Fallback: Try to open Health Connect settings
@@ -231,11 +231,11 @@ class HealthService {
           return {
             'success': false,
             'error':
-                'Health Connect settings opened. Please add "Nutrition App" and grant permissions.',
+                'Health Connect settings opened. Please add "Nutritionist App" and grant permissions.',
             'errorCode': 'SETTINGS_OPENED',
             'action': 'add_app_in_settings',
             'instruction':
-                '1. In Health Connect settings, add "Nutrition App"\n2. Grant the permissions you want\n3. Return to this app and try connecting again',
+                '1. In Health Connect settings, add "Nutritionist App"\n2. Grant the permissions you want\n3. Return to this app and try connecting again',
           };
         } else {
           return {
@@ -245,7 +245,7 @@ class HealthService {
             'errorCode': 'CANNOT_OPEN',
             'action': 'manual_setup',
             'instruction':
-                '1. Open Health Connect app manually\n2. Go to Settings → App permissions\n3. Add "Nutrition App" and grant permissions\n4. Return here and try connecting again',
+                '1. Open Health Connect app manually\n2. Go to Settings → App permissions\n3. Add "Nutritionist App" and grant permissions\n4. Return here and try connecting again',
           };
         }
       }

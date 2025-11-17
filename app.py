@@ -4450,6 +4450,13 @@ def request_password_change(username):
         if pending_email:
             return jsonify({'error': 'Cannot change password while email change is pending'}), 409
         
+        # Check if user has an email address set
+        if not user.email or not user.email.strip():
+            return jsonify({
+                'error': 'No email set',
+                'message': 'You must have an email address set on your account to change your password. Please use the "Change Email" feature to set your email address first.'
+            }), 400
+        
         # Generate verification code
         verification_code = generate_verification_code()
         verification_expires_at = datetime.utcnow() + timedelta(minutes=15)
@@ -4613,6 +4620,13 @@ def resend_password_change_code(username):
         
         if not user:
             return jsonify({'error': 'User not found'}), 404
+        
+        # Check if user has an email address set
+        if not user.email or not user.email.strip():
+            return jsonify({
+                'error': 'No email set',
+                'message': 'You must have an email address set on your account to change your password. Please use the "Change Email" feature to set your email address first.'
+            }), 400
         
         # Find pending password change
         pending_change = PendingPasswordChange.query.filter_by(user_id=user.id).first()

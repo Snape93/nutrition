@@ -114,7 +114,7 @@ class RedmiWatchSetupGuide extends StatelessWidget {
             // Step 4
             _buildSetupStep(
               stepNumber: 4,
-              title: 'Connect in Nutrition App',
+              title: 'Connect in Nutritionist App',
               description:
                   'Return to this app and connect to Health Connect to start syncing your fitness data.',
               icon: Icons.link,

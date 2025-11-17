@@ -92,7 +92,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Nutrition App',
+      title: 'Nutritionist App',
       debugShowCheckedModeBanner: false,
       theme: ThemeService.getThemeForSex(userSex),
       home: LandingScreen(onUserSexChanged: updateUserSex),

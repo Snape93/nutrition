@@ -35,7 +35,7 @@ def send_verification_email(email: str, code: str, username: str = None) -> bool
         
         # Create message
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Nutrition App - Email Verification Code'
+        msg['Subject'] = 'Nutritionist App - Email Verification Code'
         msg['From'] = mail_username
         msg['To'] = email
         
@@ -45,7 +45,7 @@ def send_verification_email(email: str, code: str, username: str = None) -> bool
         
         text_body = f"""Hi {name},
 
-Thank you for registering with Nutrition App!
+Thank you for registering with Nutritionist App!
 
 Your verification code is: {code}
 
@@ -56,7 +56,7 @@ If you didn't create an account, please ignore this email.
 Need help? Contact our support team.
 
 Best regards,
-Nutrition App Team"""
+Nutritionist App Team"""
 
         html_body = f"""<!DOCTYPE html>
 <html>
@@ -73,18 +73,18 @@ Nutrition App Team"""
 <body>
     <div class="container">
         <div class="header">
-            <h1>Nutrition App</h1>
+            <h1>Nutritionist App</h1>
         </div>
         <div class="content">
             <p>Hi {name},</p>
-            <p>Thank you for registering with Nutrition App!</p>
+            <p>Thank you for registering with Nutritionist App!</p>
             <p>Your verification code is:</p>
             <div class="code">{code}</div>
             <p>This code will expire in <strong>{expiration_minutes} minutes</strong>.</p>
             <p>If you didn't create an account, please ignore this email.</p>
             <div class="footer">
                 <p>Need help? Contact our support team.</p>
-                <p>Best regards,<br>Nutrition App Team</p>
+                <p>Best regards,<br>Nutritionist App Team</p>
             </div>
         </div>
     </div>
@@ -142,7 +142,7 @@ def send_email_change_verification(new_email: str, code: str, old_email: str = N
         
         # Create message
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Nutrition App - Verify Your New Email Address'
+        msg['Subject'] = 'Nutritionist App - Verify Your New Email Address'
         msg['From'] = mail_username
         msg['To'] = new_email
         
@@ -153,7 +153,7 @@ def send_email_change_verification(new_email: str, code: str, old_email: str = N
         
         text_body = f"""Hi {name},
 
-You requested to change your email address for your Nutrition App account.
+You requested to change your email address for your Nutritionist App account.
 
 {old_email_text}New email address: {new_email}
 
@@ -166,7 +166,7 @@ If you didn't request this email change, please ignore this email and secure you
 Need help? Contact our support team.
 
 Best regards,
-Nutrition App Team"""
+Nutritionist App Team"""
 
         html_body = f"""<!DOCTYPE html>
 <html>
@@ -184,11 +184,11 @@ Nutrition App Team"""
 <body>
     <div class="container">
         <div class="header">
-            <h1>Nutrition App</h1>
+            <h1>Nutritionist App</h1>
         </div>
         <div class="content">
             <p>Hi {name},</p>
-            <p>You requested to change your email address for your Nutrition App account.</p>
+            <p>You requested to change your email address for your Nutritionist App account.</p>
             {f'<p><strong>Current email:</strong> {old_email}</p>' if old_email else ''}
             <p><strong>New email address:</strong> {new_email}</p>
             <p>Your verification code is:</p>
@@ -199,7 +199,7 @@ Nutrition App Team"""
             </div>
             <div class="footer">
                 <p>Need help? Contact our support team.</p>
-                <p>Best regards,<br>Nutrition App Team</p>
+                <p>Best regards,<br>Nutritionist App Team</p>
             </div>
         </div>
     </div>
@@ -251,7 +251,7 @@ def send_account_deletion_verification(email: str, code: str, username: str = No
         
         # Create message
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Nutrition App - Confirm Account Deletion'
+        msg['Subject'] = 'Nutritionist App - Confirm Account Deletion'
         msg['From'] = mail_username
         msg['To'] = email
         
@@ -263,7 +263,7 @@ def send_account_deletion_verification(email: str, code: str, username: str = No
 
 ⚠️ WARNING: Account Deletion Request
 
-You requested to permanently delete your Nutrition App account.
+You requested to permanently delete your Nutritionist App account.
 
 This action will permanently delete ALL your data:
 • Food logs
@@ -282,7 +282,7 @@ This code will expire in {expiration_minutes} minutes.
 ⚠️ IMPORTANT: If you didn't request this account deletion, please ignore this email and secure your account immediately. Contact our support team if you believe your account has been compromised.
 
 Best regards,
-Nutrition App Team"""
+Nutritionist App Team"""
 
         html_body = f"""<!DOCTYPE html>
 <html>
@@ -308,7 +308,7 @@ Nutrition App Team"""
             <p>Hi {name},</p>
             <div class="warning">
                 <p><strong>⚠️ WARNING: Account Deletion Request</strong></p>
-                <p>You requested to permanently delete your Nutrition App account.</p>
+                <p>You requested to permanently delete your Nutritionist App account.</p>
             </div>
             <div class="data-list">
                 <p><strong>This action will permanently delete ALL your data:</strong></p>
@@ -329,7 +329,7 @@ Nutrition App Team"""
                 <p><strong>⚠️ IMPORTANT:</strong> If you didn't request this account deletion, please ignore this email and secure your account immediately. Contact our support team if you believe your account has been compromised.</p>
             </div>
             <div class="footer">
-                <p>Best regards,<br>Nutrition App Team</p>
+                <p>Best regards,<br>Nutritionist App Team</p>
             </div>
         </div>
     </div>
@@ -395,7 +395,7 @@ def send_email_change_notification(old_email: str, new_email: str, username: str
 
 Hi {name},
 
-We received a request to change the email address for your Nutrition App account.
+We received a request to change the email address for your Nutritionist App account.
 
 Current Email: {old_email}
 New Email Requested: {new_email}
@@ -420,7 +420,7 @@ To cancel this email change:
 Need help? Contact our support team.
 
 Best regards,
-Nutrition App Team
+Nutritionist App Team
 
 ---
 This is a security notification. No verification code is required from this email address.
@@ -453,7 +453,7 @@ The verification code has been sent to your new email address: {new_email}
         </div>
         <div class="content">
             <p>Hi {name},</p>
-            <p>We received a request to change the email address for your Nutrition App account.</p>
+            <p>We received a request to change the email address for your Nutritionist App account.</p>
             
             <div class="details">
                 <p><strong>Current Email:</strong> {old_email}</p>
@@ -493,7 +493,7 @@ The verification code has been sent to your new email address: {new_email}
                 <p><strong>Important:</strong> This is a security notification. No verification code is required from this email address.</p>
                 <p>The verification code has been sent to your new email address: <strong>{new_email}</strong></p>
                 <p>Need help? Contact our support team.</p>
-                <p>Best regards,<br>Nutrition App Team</p>
+                <p>Best regards,<br>Nutritionist App Team</p>
             </div>
         </div>
     </div>
@@ -545,7 +545,7 @@ def send_password_change_verification(email: str, code: str, username: str = Non
         
         # Create message
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Nutrition App - Verify Your Password Change'
+        msg['Subject'] = 'Nutritionist App - Verify Your Password Change'
         msg['From'] = mail_username
         msg['To'] = email
         
@@ -555,7 +555,7 @@ def send_password_change_verification(email: str, code: str, username: str = Non
         
         text_body = f"""Hi {name},
 
-You requested to change your password for your Nutrition App account.
+You requested to change your password for your Nutritionist App account.
 
 Your verification code is: {code}
 
@@ -564,7 +564,7 @@ This code will expire in {expiration_minutes} minutes.
 ⚠️ IMPORTANT: If you didn't request this password change, please ignore this email and secure your account immediately. Contact our support team if you believe your account has been compromised.
 
 Best regards,
-Nutrition App Team"""
+Nutritionist App Team"""
 
         html_body = f"""<!DOCTYPE html>
 <html>
@@ -586,7 +586,7 @@ Nutrition App Team"""
         </div>
         <div class="content">
             <p>Hi {name},</p>
-            <p>You requested to change your password for your Nutrition App account.</p>
+            <p>You requested to change your password for your Nutritionist App account.</p>
             <p>Your verification code is:</p>
             <div class="code">{code}</div>
             <p>This code will expire in <strong>{expiration_minutes} minutes</strong>.</p>
@@ -594,7 +594,7 @@ Nutrition App Team"""
                 <p><strong>⚠️ IMPORTANT:</strong> If you didn't request this password change, please ignore this email and secure your account immediately. Contact our support team if you believe your account has been compromised.</p>
             </div>
             <div class="footer">
-                <p>Best regards,<br>Nutrition App Team</p>
+                <p>Best regards,<br>Nutritionist App Team</p>
             </div>
         </div>
     </div>
@@ -646,7 +646,7 @@ def send_password_reset_verification(email: str, code: str, username: str = None
         
         # Create message
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Nutrition App - Reset Your Password'
+        msg['Subject'] = 'Nutritionist App - Reset Your Password'
         msg['From'] = mail_username
         msg['To'] = email
         
@@ -656,7 +656,7 @@ def send_password_reset_verification(email: str, code: str, username: str = None
         
         text_body = f"""Hi {name},
 
-You requested to reset your password for your Nutrition App account.
+You requested to reset your password for your Nutritionist App account.
 
 Your verification code is: {code}
 
@@ -667,7 +667,7 @@ After resetting your password, all your active sessions will be invalidated and 
 ⚠️ IMPORTANT: If you didn't request this password reset, please ignore this email and secure your account immediately. Contact our support team if you believe your account has been compromised.
 
 Best regards,
-Nutrition App Team"""
+Nutritionist App Team"""
 
         html_body = f"""<!DOCTYPE html>
 <html>
@@ -690,7 +690,7 @@ Nutrition App Team"""
         </div>
         <div class="content">
             <p>Hi {name},</p>
-            <p>You requested to reset your password for your Nutrition App account.</p>
+            <p>You requested to reset your password for your Nutritionist App account.</p>
             <p>Your verification code is:</p>
             <div class="code">{code}</div>
             <p>This code will expire in <strong>{expiration_minutes} minutes</strong>.</p>
@@ -701,7 +701,7 @@ Nutrition App Team"""
                 <p><strong>⚠️ IMPORTANT:</strong> If you didn't request this password reset, please ignore this email and secure your account immediately. Contact our support team if you believe your account has been compromised.</p>
             </div>
             <div class="footer">
-                <p>Best regards,<br>Nutrition App Team</p>
+                <p>Best regards,<br>Nutritionist App Team</p>
             </div>
         </div>
     </div>
