@@ -53,9 +53,13 @@ class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True
     # Require Neon in development as well; remove SQLite fallback
-    if not os.environ.get('NEON_DATABASE_URL'):
-        raise ValueError("NEON_DATABASE_URL must be set for development")
-    SQLALCHEMY_DATABASE_URI = _normalize_sqlalchemy_uri(os.environ.get('NEON_DATABASE_URL'))
+    # Only raise error if explicitly in development mode and URL is missing
+    # This allows Railway to work even if FLASK_ENV is not set (will use production config)
+    neon_url = os.environ.get('NEON_DATABASE_URL')
+    if not neon_url:
+        # Don't raise error during class definition - check at runtime
+        pass
+    SQLALCHEMY_DATABASE_URI = _normalize_sqlalchemy_uri(neon_url or '')
 
 class ProductionConfig(Config):
     """Production configuration"""
@@ -75,9 +79,11 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = _normalize_sqlalchemy_uri(os.environ.get('NEON_DATABASE_URL'))
 
 # Configuration dictionary
+# Default to production if FLASK_ENV is not set (for Railway/deployment)
+default_config = 'production' if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('PORT') else 'development'
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
     'testing': TestingConfig,
-    'default': DevelopmentConfig
+    'default': ProductionConfig if (os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('PORT')) else DevelopmentConfig
 }

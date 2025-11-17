@@ -93,10 +93,16 @@ else:
     })
 
 # Configure app based on environment
-config_name = (os.environ.get('FLASK_ENV', 'development') or 'development').strip().lower()
+# Auto-detect Railway environment (Railway sets PORT environment variable)
+is_railway = os.environ.get('PORT') is not None or os.environ.get('RAILWAY_ENVIRONMENT') is not None
+default_env = 'production' if is_railway else 'development'
+
+config_name = (os.environ.get('FLASK_ENV') or default_env).strip().lower()
 if config_name not in config:
     print(f"[WARN] Unknown FLASK_ENV '{config_name}', falling back to 'default'")
     config_name = 'default'
+    
+print(f"[INFO] Using config: {config_name} (FLASK_ENV={os.environ.get('FLASK_ENV', 'not set')}, Railway={is_railway})")
 app.config.from_object(config[config_name])
 
 # Log which database URI is being used (without credentials)
