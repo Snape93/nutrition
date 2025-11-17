@@ -27,7 +27,6 @@ class _SingleDatePickerState extends State<SingleDatePicker>
   late DateTime? _selectedDate;
   late AnimationController _animationController;
   late Animation<double> _slideAnimation;
-  String? _errorMessage;
 
   @override
   void initState() {
@@ -69,9 +68,6 @@ class _SingleDatePickerState extends State<SingleDatePicker>
     
     // If lastDate is before firstDate, we can't show the picker
     if (lastDate.isBefore(firstDate)) {
-      setState(() {
-        _errorMessage = 'No valid date range available. Please check your date constraints.';
-      });
       return;
     }
     
@@ -109,7 +105,6 @@ class _SingleDatePickerState extends State<SingleDatePicker>
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
-        _errorMessage = null;
       });
       _validateAndView();
     }
@@ -120,36 +115,24 @@ class _SingleDatePickerState extends State<SingleDatePicker>
       return;
     }
 
-    // Validate: date must be >= min date
-    if (widget.minDate != null && _selectedDate!.isBefore(widget.minDate!)) {
-      setState(() {
-        _errorMessage =
-            'Date cannot be before ${_formatDate(widget.minDate!)}';
-      });
-      return;
+    DateTime validatedDate = _selectedDate!;
+
+    if (widget.minDate != null && validatedDate.isBefore(widget.minDate!)) {
+      validatedDate = widget.minDate!;
     }
 
-    // Validate: date must be <= max date
-    if (widget.maxDate != null && _selectedDate!.isAfter(widget.maxDate!)) {
-      setState(() {
-        _errorMessage =
-            'Date cannot be after ${_formatDate(widget.maxDate!)}';
-      });
-      return;
+    if (widget.maxDate != null && validatedDate.isAfter(widget.maxDate!)) {
+      validatedDate = widget.maxDate!;
     }
 
-    // All validations passed
     setState(() {
-      _errorMessage = null;
+      _selectedDate = validatedDate;
     });
-    widget.onDateSelected(_selectedDate!);
+    widget.onDateSelected(validatedDate);
   }
 
   void _viewDate() {
     if (_selectedDate == null) {
-      setState(() {
-        _errorMessage = 'Please select a date';
-      });
       return;
     }
     _validateAndView();
@@ -158,7 +141,6 @@ class _SingleDatePickerState extends State<SingleDatePicker>
   void _cancel() {
     setState(() {
       _selectedDate = widget.selectedDate;
-      _errorMessage = null;
     });
   }
 
@@ -225,29 +207,27 @@ class _SingleDatePickerState extends State<SingleDatePicker>
                 date: _selectedDate,
                 onTap: () => _selectDate(context),
               ),
-              // Error message
-              if (_errorMessage != null) ...[
-                SizedBox(height: AppDesignSystem.spaceSM),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 16,
-                      color: AppDesignSystem.error,
-                    ),
-                    SizedBox(width: AppDesignSystem.spaceXS),
-                    Expanded(
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppDesignSystem.error,
-                        ),
+              SizedBox(height: AppDesignSystem.spaceXS),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: widget.primaryColor,
+                  ),
+                  SizedBox(width: AppDesignSystem.spaceXS),
+                  Expanded(
+                    child: Text(
+                      'Track Back is limited to the last 2 days.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppDesignSystem.onSurfaceVariant,
                       ),
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
               // Buttons
               SizedBox(height: AppDesignSystem.spaceMD),
               Row(
@@ -277,9 +257,7 @@ class _SingleDatePickerState extends State<SingleDatePicker>
                   ),
                   SizedBox(width: AppDesignSystem.spaceSM),
                   ElevatedButton(
-                    onPressed: _errorMessage == null && _selectedDate != null
-                        ? _viewDate
-                        : null,
+                    onPressed: _selectedDate != null ? _viewDate : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: widget.primaryColor,
                       foregroundColor: Colors.white,

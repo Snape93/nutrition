@@ -11,6 +11,7 @@ import 'account_deletion_verification_screen.dart';
 import 'password_change_verification_screen.dart';
 import 'design_system/app_design_system.dart';
 import 'widgets/password_strength_widget.dart';
+import 'utils/connectivity_notification_helper.dart';
 
 class AccountSettings extends StatefulWidget {
   final String usernameOrEmail;
@@ -316,6 +317,12 @@ class _AccountSettingsState extends State<AccountSettings> {
       return;
     }
 
+    // Check connectivity before attempting password change
+    final isConnected = await ConnectivityNotificationHelper.checkAndNotifyIfDisconnected(context);
+    if (!isConnected) {
+      return;
+    }
+
     setState(() {
       _isChangingPassword = true;
     });
@@ -499,6 +506,12 @@ class _AccountSettingsState extends State<AccountSettings> {
     if (_currentEmail != null &&
         _currentEmail!.toLowerCase() == newEmail.toLowerCase()) {
       _showErrorDialog('New email must be different from your current email');
+      return;
+    }
+
+    // Check connectivity before attempting email change
+    final isConnected = await ConnectivityNotificationHelper.checkAndNotifyIfDisconnected(context);
+    if (!isConnected) {
       return;
     }
 
@@ -848,6 +861,12 @@ class _AccountSettingsState extends State<AccountSettings> {
     );
 
     if (confirmed == true) {
+      // Check connectivity before attempting account deletion
+      final isConnected = await ConnectivityNotificationHelper.checkAndNotifyIfDisconnected(context);
+      if (!isConnected) {
+        return;
+      }
+
       setState(() {
         _isSaving = true; // Keep _isSaving for account deletion
       });

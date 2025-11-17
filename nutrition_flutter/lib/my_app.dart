@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'landing.dart';
 import 'theme_service.dart';
@@ -8,6 +9,8 @@ import 'onboarding/enhanced_onboarding_lifestyle.dart';
 import 'onboarding/enhanced_onboarding_nutrition.dart';
 import 'onboarding/onboarding_complete.dart';
 import 'test_health_widget.dart';
+import 'services/connectivity_service.dart';
+import 'utils/connectivity_notification_helper.dart';
 
 // Add RouteObserver for navigation
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
@@ -21,6 +24,60 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String? userSex;
+  StreamSubscription<bool>? _connectivitySubscription;
+  bool _wasConnected = true;
+  bool _isInitialLoad = true; // Track initial app load
+
+  @override
+  void initState() {
+    super.initState();
+    // Wait a bit before starting to listen (to avoid initial check notifications)
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _isInitialLoad = false;
+        });
+      }
+    });
+    
+    // Listen to connectivity changes
+    _connectivitySubscription = ConnectivityService.instance.connectivityStream.listen(
+      (isConnected) {
+        if (mounted && !_isInitialLoad) {
+          // Only show notifications after initial load period
+          // Only show notification if status changed
+          if (!_wasConnected && isConnected) {
+            // Connection restored during app usage
+            final context = navigatorKey.currentContext;
+            if (context != null) {
+              ConnectivityNotificationHelper.showConnectionRestoredSnackBar(context);
+            }
+          } else if (_wasConnected && !isConnected) {
+            // Connection lost during app usage
+            final context = navigatorKey.currentContext;
+            if (context != null) {
+              ConnectivityNotificationHelper.showConnectionLostSnackBar(
+                context,
+                onRetry: () async {
+                  final connected = await ConnectivityService.instance.hasInternetConnection(forceRefresh: true);
+                  if (connected && context.mounted) {
+                    ConnectivityNotificationHelper.showConnectionRestoredSnackBar(context);
+                  }
+                },
+              );
+            }
+          }
+          _wasConnected = isConnected;
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
+  }
 
   void updateUserSex(String? sex) {
     setState(() {
@@ -28,9 +85,13 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  // Global navigator key for showing notifications from anywhere
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Nutrition App',
       debugShowCheckedModeBanner: false,
       theme: ThemeService.getThemeForSex(userSex),

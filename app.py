@@ -93,7 +93,10 @@ else:
     })
 
 # Configure app based on environment
-config_name = os.environ.get('FLASK_ENV', 'development')
+config_name = (os.environ.get('FLASK_ENV', 'development') or 'development').strip().lower()
+if config_name not in config:
+    print(f"[WARN] Unknown FLASK_ENV '{config_name}', falling back to 'default'")
+    config_name = 'default'
 app.config.from_object(config[config_name])
 
 # Log which database URI is being used (without credentials)
@@ -6502,6 +6505,10 @@ def ai_coach_chat():
         "The Weight metric shows current weight, average weight, and goal weight.\n"
         "- Streak Tracking: The app tracks streaks for calories and exercise. Users can see their current streaks "
         "in the Progress screen (visible in Daily view). This shows how many consecutive days they've met their goals.\n"
+        "- STREAK LOGIC: A streak continues when the user meets OR exceeds their daily calorie goal. "
+        "Meeting the goal (calories >= goal) counts as a successful day. Exceeding the goal (calories > goal) "
+        "also counts as a successful day and does NOT break the streak. The streak only breaks if the user "
+        "does NOT meet their goal (calories < goal) on a given day. Always explain this correctly to users.\n"
         "- Multiple Metrics: The Progress screen allows users to switch between different metrics: "
         "Calories (default), Exercise (minutes), and Weight (kg). Each metric shows relevant data and progress.\n"
         "- Bar Graphs: Historical data is visualized using bar graphs in the Progress screen. "
@@ -8222,6 +8229,52 @@ def check_streak_continuity(streak, target_date=None):
     else:
         return False, f"Streak broken - {days_since_last} days since last activity"
 
+def _normalize_to_date(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value))
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+def auto_reset_streak_if_inactive(streak, target_date=None):
+    """
+    Ensure streak is reset if user hasn't met goal for more than one full day.
+    Returns True when the streak was modified.
+    """
+    if target_date is None:
+        target_date = get_philippines_date()
+    elif isinstance(target_date, datetime):
+        target_date = target_date.date()
+
+    if not isinstance(target_date, date):
+        target_date = get_philippines_date()
+
+    last_activity_date = _normalize_to_date(streak.last_activity_date)
+
+    if last_activity_date is None:
+        if streak.current_streak != 0:
+            streak.current_streak = 0
+            streak.streak_start_date = None
+            streak.updated_at = datetime.utcnow()
+            return True
+        return False
+
+    days_since_last = (target_date - last_activity_date).days
+
+    # Break streak only when at least one full day without meeting the goal has passed
+    if days_since_last > 1 and streak.current_streak != 0:
+        streak.current_streak = 0
+        streak.streak_start_date = None
+        streak.updated_at = datetime.utcnow()
+        return True
+
+    return False
+
 def update_streak(user, streak_type, met_goal, activity_date=None, exercise_minutes=0):
     """Update streak based on whether goal was met or exceeded
     Uses Philippines timezone for date calculations.
@@ -8307,10 +8360,28 @@ def update_streak(user, streak_type, met_goal, activity_date=None, exercise_minu
             streak.streak_start_date = activity_date
             streak.last_activity_date = activity_date
     else:
-        # Goal not met AND not exceeded - break streak
-        streak.current_streak = 0
-        streak.streak_start_date = None
-        # Keep last_activity_date for history
+        # Goal not met - need to check if we should recalculate or break streak
+        # If this is the most recent day in the streak, recalculate from history
+        # Otherwise, break the streak
+        if dates_match and streak.current_streak > 0:
+            # User deleted logs from the most recent day - recalculate streak from history
+            # This prevents losing the entire streak when accidentally deleting logs
+            new_streak_count, last_met_date, streak_start = recalculate_streak_from_history(
+                user, streak_type, activity_date - timedelta(days=1)
+            )
+            
+            streak.current_streak = new_streak_count
+            streak.last_activity_date = last_met_date
+            streak.streak_start_date = streak_start
+            
+            # Update longest streak if current exceeds it
+            if streak.current_streak > streak.longest_streak:
+                streak.longest_streak = streak.current_streak
+        else:
+            # Goal not met on a different day or no existing streak - break streak
+            streak.current_streak = 0
+            streak.streak_start_date = None
+            # Keep last_activity_date for history
     
     streak.updated_at = datetime.utcnow()
     db.session.commit()
@@ -8361,6 +8432,69 @@ def check_exercise_goal_met(user, target_date=None, minimum_minutes=15):
     total_minutes = (total_seconds / 60) + (workout_duration or 0)
     return total_minutes >= minimum_minutes
 
+def recalculate_streak_from_history(user, streak_type, up_to_date=None):
+    """
+    Recalculate streak by checking historical data day by day.
+    This is used when logs are deleted to restore the correct streak count.
+    
+    Args:
+        user: Username
+        streak_type: 'calories' or 'exercise'
+        up_to_date: Date to recalculate up to (defaults to yesterday if not provided)
+    
+    Returns:
+        Tuple of (new_streak_count, last_activity_date, streak_start_date)
+    """
+    if up_to_date is None:
+        up_to_date = get_philippines_date() - timedelta(days=1)  # Default to yesterday
+    elif isinstance(up_to_date, datetime):
+        up_to_date = up_to_date.date()
+    
+    if not isinstance(up_to_date, date):
+        up_to_date = get_philippines_date() - timedelta(days=1)
+    
+    streak_count = 0
+    last_met_date = None
+    streak_start_date = None
+    
+    # Go backwards day by day, counting consecutive days where goal was met
+    current_date = up_to_date
+    max_days_to_check = 365  # Limit to prevent infinite loops
+    days_checked = 0
+    
+    while days_checked < max_days_to_check:
+        # Check if goal was met on this date
+        if streak_type == 'calories':
+            # Get goal for this specific date (may have changed over time)
+            user_obj = User.query.filter_by(username=user).first()
+            if not user_obj:
+                break
+            
+            calorie_goal = _get_goal_for_date(user, current_date)
+            daily_calories = db.session.query(db.func.sum(FoodLog.calories)).filter_by(
+                user=user, date=current_date
+            ).scalar() or 0
+            
+            met_goal = daily_calories >= calorie_goal
+        else:  # exercise
+            streak = get_or_create_streak(user, streak_type)
+            minimum_minutes = streak.minimum_exercise_minutes if streak else 15
+            met_goal = check_exercise_goal_met(user, current_date, minimum_minutes)
+        
+        if met_goal:
+            streak_count += 1
+            last_met_date = current_date if last_met_date is None else last_met_date
+            streak_start_date = current_date  # This will be the oldest date as we go backwards
+        else:
+            # Streak broken, stop counting
+            break
+        
+        # Move to previous day
+        current_date = current_date - timedelta(days=1)
+        days_checked += 1
+    
+    return streak_count, last_met_date, streak_start_date
+
 # --- Streak API Endpoints ---
 @app.route('/api/streaks', methods=['GET'])
 def get_streaks():
@@ -8404,7 +8538,10 @@ def get_streaks():
         
         result = []
         today_ph = get_philippines_date()  # Use PH timezone for all date calculations
+        streaks_updated = False
         for streak in streaks:
+            if auto_reset_streak_if_inactive(streak, today_ph):
+                streaks_updated = True
             days_since_start = None
             if streak.streak_start_date:
                 days_since_start = (today_ph - streak.streak_start_date).days
@@ -8430,7 +8567,8 @@ def get_streaks():
                 'created_at': streak.created_at.isoformat() if streak.created_at else None,
                 'updated_at': streak.updated_at.isoformat() if streak.updated_at else None,
             })
-        
+        if streaks_updated:
+            db.session.commit()
         return jsonify({'success': True, 'streaks': result}), 200
     except Exception as e:
         db.session.rollback()
@@ -8526,7 +8664,7 @@ def check_streak():
         if not user:
             return jsonify({'success': False, 'error': 'user is required'}), 400
         
-        today = date.today()
+        today = get_philippines_date()
         needs_update = False
         will_increment = False
         
@@ -8534,11 +8672,14 @@ def check_streak():
         types_to_check = [streak_type] if streak_type else ['calories', 'exercise']
         
         result = {}
+        streaks_updated = False
         for stype in types_to_check:
             if stype not in ['calories', 'exercise']:
                 continue
             
             streak = get_or_create_streak(user, stype)
+            if auto_reset_streak_if_inactive(streak, today):
+                streaks_updated = True
             
             # Check if activity logged today
             if stype == 'calories':
@@ -8559,7 +8700,8 @@ def check_streak():
                 'met_goal': met_goal,
                 'last_activity_date': streak.last_activity_date.isoformat() if streak.last_activity_date else None,
             }
-        
+        if streaks_updated:
+            db.session.commit()
         return jsonify({
             'success': True,
             'results': result

@@ -37,6 +37,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadUserSex() async {
     final sex = await UserDatabase().getUserSex(widget.usernameOrEmail);
+    if (!mounted) {
+      return;
+    }
     setState(() {
       userSex = sex;
     });
@@ -106,23 +109,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showLogoutDialog() {
+    final navigator = Navigator.of(context);
     showDialog(
       context: context,
       builder:
-          (context) => AlertDialog(
+          (dialogContext) => AlertDialog(
             title: Text('Logout', style: TextStyle(color: primaryColor)),
             content: const Text('Are you sure you want to logout?'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.of(dialogContext).pop(),
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
-                onPressed: () {
-                  // Close dialog
-                  Navigator.of(context).pop();
-                  // Navigate to Landing and clear the entire stack to prevent back navigation into the app
-                  Navigator.of(context).pushAndRemoveUntil(
+                onPressed: () async {
+                  Navigator.of(dialogContext).pop();
+                  if (!mounted) return;
+
+                  navigator.pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => LandingScreen()),
                     (route) => false,
                   );
@@ -201,7 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 );
               },
-              activeColor: primaryColor,
+              activeThumbColor: primaryColor,
             ),
           ),
 

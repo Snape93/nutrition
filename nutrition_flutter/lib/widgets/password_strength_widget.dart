@@ -90,22 +90,22 @@ PasswordStrengthResult calculatePasswordStrength(String password) {
 
   String strength;
   bool isValid;
-  
+
+  final isStrongPassword = score == 5;
+
+  // Strong: all 5 requirements met (length, uppercase, lowercase, number, special)
+  if (isStrongPassword) {
+    strength = 'strong';
+    isValid = true;
+  }
   // Weak: less than 3 core requirements (length, uppercase, number) OR score <= 2
-  // Note: Special character is not required for medium strength
-  if (coreRequirementsMet < 3 || score <= 2) {
+  else if (coreRequirementsMet < 3 || score <= 2) {
     strength = 'weak';
     isValid = false;
-  } 
-  // Medium: has length, uppercase, and number (3 core requirements) AND score >= 3
-  // Can be medium even without special character
-  else if (coreRequirementsMet >= 3 && score >= 3) {
-    strength = 'medium';
-    isValid = true;
-  } 
-  // Strong: all 5 requirements met (length, uppercase, lowercase, number, special) AND score == 5
+  }
+  // Medium: meets at least 3 core requirements and score >= 3 (covers remaining cases)
   else {
-    strength = 'strong';
+    strength = 'medium';
     isValid = true;
   }
 
