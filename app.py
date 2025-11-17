@@ -936,29 +936,33 @@ try:
     with app.app_context():
         db.create_all()
         print("[SUCCESS] Database tables initialized successfully")
+        
+        # Auto-import exercises from CSV if database is empty or has few exercises
+        try:
+            exercise_count = Exercise.query.count()
+            if exercise_count < 50:  # If less than 50 exercises, import from CSV
+                print(f"[INFO] Found {exercise_count} exercises in database. Importing from CSV...")
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                csv_paths = [
+                    os.path.join(base_dir, 'data', 'exercises.csv'),
+                    os.path.join(base_dir, 'exercises.csv'),
+                ]
+                for csv_path in csv_paths:
+                    if os.path.exists(csv_path):
+                        added, updated = _import_exercises_from_csv_path(csv_path)
+                        print(f"[SUCCESS] Imported exercises from {csv_path}: {added} added, {updated} updated")
+                        break
+                else:
+                    print(f"[WARNING] Exercises CSV not found. Tried paths: {csv_paths}")
+            else:
+                print(f"[INFO] Database already has {exercise_count} exercises. Skipping import.")
+        except Exception as e:
+            print(f"[WARNING] Exercise import failed: {e}")
+            # Continue - exercises can be imported later
 except Exception as e:
     print(f"[ERROR] Database initialization failed: {e}")
     print("[ERROR] App may not work correctly without database connection")
     # Don't crash - let it try to start and show error in logs
-    
-    # Auto-import exercises from CSV if database is empty or has few exercises
-    exercise_count = Exercise.query.count()
-    if exercise_count < 50:  # If less than 50 exercises, import from CSV
-        print(f"[INFO] Found {exercise_count} exercises in database. Importing from CSV...")
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        csv_paths = [
-            os.path.join(base_dir, 'data', 'exercises.csv'),
-            os.path.join(base_dir, 'exercises.csv'),
-        ]
-        for csv_path in csv_paths:
-            if os.path.exists(csv_path):
-                added, updated = _import_exercises_from_csv_path(csv_path)
-                print(f"[SUCCESS] Imported exercises from {csv_path}: {added} added, {updated} updated")
-                break
-        else:
-            print(f"[WARNING] Exercises CSV not found. Tried paths: {csv_paths}")
-    else:
-        print(f"[INFO] Database already has {exercise_count} exercises. Skipping import.")
 
 # Load Filipino food dataset at startup (robust path + encoding)
 try:
