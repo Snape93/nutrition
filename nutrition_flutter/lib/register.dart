@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'utils/connectivity_notification_helper.dart';
 import 'widgets/password_strength_widget.dart';
+import 'services/railway_service.dart';
 
 // Use centralized apiBase from config.dart
 
@@ -118,13 +119,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         debugPrint('DEBUG: Attempting registration to: $apiBase/register');
         debugPrint('DEBUG: Registration data: $backendData');
 
-        final backendResponse = await http
-            .post(
-              Uri.parse('$apiBase/register'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode(backendData),
-            )
-            .timeout(const Duration(seconds: 30));
+        // Use Railway service with retry logic for free tier wake-up
+        final backendResponse = await RailwayService.executeWithRetry(
+          request: () => http.post(
+            Uri.parse('$apiBase/register'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(backendData),
+          ),
+          maxRetries: 2,
+          initialTimeout: const Duration(seconds: 30),
+          wakeUpFirst: true,
+        );
 
         debugPrint(
           'DEBUG: Registration response status: ${backendResponse.statusCode}',
@@ -215,9 +220,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         _isLoading = false;
       });
-      debugPrint('DEBUG: Registration timeout - server not responding');
+      debugPrint('DEBUG: Registration timeout after retries - server not responding');
+      
+      // Check if server is reachable
+      final isReachable = await RailwayService.isServerReachable();
+      String errorMsg;
+      if (!isReachable) {
+        errorMsg = 'Cannot connect to server. Please check your internet connection and try again.';
+      } else {
+        errorMsg = 'Server is taking too long to respond. This may happen if the server is waking up. Please try again in a few seconds.';
+      }
+      
+      _showErrorDialog(errorMsg);
+    } on http.ClientException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      debugPrint('DEBUG: Network error: $e');
       _showErrorDialog(
-        'Server is not responding. Please check if Flask server is running on $apiBase',
+        'Network error: Unable to connect to server. Please check your internet connection and try again.',
       );
     } catch (e) {
       if (!mounted) return;
@@ -227,7 +249,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       debugPrint('DEBUG: Registration error: $e');
       debugPrint('DEBUG: Error type: ${e.runtimeType}');
       _showErrorDialog(
-        'Network error: $e\n\nMake sure Flask server is running on $apiBase',
+        'An error occurred: ${e.toString()}\n\nPlease try again or contact support if the problem persists.',
       );
     }
   }

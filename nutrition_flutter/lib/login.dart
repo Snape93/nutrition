@@ -13,6 +13,7 @@ import 'theme_service.dart';
 import 'verify_code_screen.dart';
 import 'config.dart';
 import 'utils/connectivity_notification_helper.dart';
+import 'services/railway_service.dart';
 
 // Use centralized apiBase from config.dart
 
@@ -191,24 +192,23 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     try {
-      // Use backend API for authentication
-      Future<http.Response> doRequest() => http
-          .post(
-            Uri.parse('$apiBase/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'username_or_email': _usernameController.text.trim(),
-              'password': _passwordController.text.trim(),
-            }),
-          )
-          .timeout(const Duration(seconds: 30));
+      // Use Railway service with retry logic for free tier wake-up
+      final backendResponse = await RailwayService.executeWithRetry(
+        request: () => http.post(
+          Uri.parse('$apiBase/login'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'username_or_email': _usernameController.text.trim(),
+            'password': _passwordController.text.trim(),
+          }),
+        ),
+        maxRetries: 2,
+        initialTimeout: const Duration(seconds: 30),
+        wakeUpFirst: true,
+      );
 
-      http.Response backendResponse = await doRequest();
-
-      // Auto-retry once on 5xx or network hiccup
-      if (backendResponse.statusCode >= 500) {
-        backendResponse = await doRequest();
-      }
+      // Note: Retry logic is now handled by RailwayService
+      // Only retry on 5xx errors if needed
 
       // Debug logging
       debugPrint('Login response status: ${backendResponse.statusCode}');
