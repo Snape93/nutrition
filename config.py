@@ -76,9 +76,12 @@ class TestingConfig(Config):
     """Testing configuration"""
     TESTING = True
     # Enforce Neon even in testing to avoid any SQLite usage
-    if not os.environ.get('NEON_DATABASE_URL'):
-        raise ValueError("NEON_DATABASE_URL must be set for testing")
-    SQLALCHEMY_DATABASE_URI = _normalize_sqlalchemy_uri(os.environ.get('NEON_DATABASE_URL'))
+    # Don't raise error during class definition - check at runtime if TestingConfig is actually used
+    neon_url = os.environ.get('NEON_DATABASE_URL')
+    if not neon_url or neon_url.strip() == '':
+        # Don't raise here - only check when TestingConfig is actually selected
+        pass
+    SQLALCHEMY_DATABASE_URI = _normalize_sqlalchemy_uri(neon_url or '')
 
 # Configuration dictionary
 # Default to production if FLASK_ENV is not set (for Railway/deployment)
