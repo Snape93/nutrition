@@ -922,13 +922,24 @@ def _import_exercises_from_csv_path(csv_path: str) -> tuple[int, int]:
         db.session.rollback()
     return added, updated
 
-# Initialize the nutrition model
-nutrition_model = NutritionModel()
+# Initialize the nutrition model (with error handling)
+try:
+    nutrition_model = NutritionModel()
+    print("[SUCCESS] Nutrition model initialized")
+except Exception as e:
+    print(f"[WARNING] Nutrition model initialization failed: {e}")
+    print("[INFO] App will continue but ML features may not work")
+    nutrition_model = None
 
-# Initialize database tables
-with app.app_context():
-    db.create_all()
-    print("[SUCCESS] Database tables initialized successfully")
+# Initialize database tables (with error handling)
+try:
+    with app.app_context():
+        db.create_all()
+        print("[SUCCESS] Database tables initialized successfully")
+except Exception as e:
+    print(f"[ERROR] Database initialization failed: {e}")
+    print("[ERROR] App may not work correctly without database connection")
+    # Don't crash - let it try to start and show error in logs
     
     # Auto-import exercises from CSV if database is empty or has few exercises
     exercise_count = Exercise.query.count()

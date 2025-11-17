@@ -65,10 +65,13 @@ class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
     # Require Neon PostgreSQL for production
-    if os.environ.get('FLASK_ENV') != 'testing':
-        if not os.environ.get('NEON_DATABASE_URL'):
-            raise ValueError("NEON_DATABASE_URL environment variable must be set for production")
-    SQLALCHEMY_DATABASE_URI = _normalize_sqlalchemy_uri(os.environ.get('NEON_DATABASE_URL'))
+    # Don't raise error during class definition - check at runtime
+    neon_url = os.environ.get('NEON_DATABASE_URL')
+    if not neon_url:
+        # Log warning but don't crash - allows Railway to start and show proper error
+        import sys
+        print("[WARNING] NEON_DATABASE_URL not set - database features will not work", file=sys.stderr)
+    SQLALCHEMY_DATABASE_URI = _normalize_sqlalchemy_uri(neon_url or '')
 
 class TestingConfig(Config):
     """Testing configuration"""
