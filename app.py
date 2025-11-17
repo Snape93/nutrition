@@ -1599,10 +1599,11 @@ def delete_exercise_session(session_id):
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
+    model_status = nutrition_model.is_model_loaded() if nutrition_model else False
     return jsonify({
         'status': 'healthy',
         'message': 'Nutrition API is running',
-        'model_loaded': nutrition_model.is_model_loaded()
+        'model_loaded': model_status
     })
 
 @app.route('/debug/db', methods=['GET'])
