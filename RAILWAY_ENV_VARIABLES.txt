@@ -1,0 +1,19 @@
+Copy and paste these into Railway → Variables:
+
+SECRET_KEY=bbc58109f8c55315934146dcc0a83751f97050889f03d907cf3012133136eceb
+
+NEON_DATABASE_URL=postgresql://neondb_owner:npg_9OjQXmcEB3Vn@ep-curly-tooth-a17bgdzr-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+
+GMAIL_USERNAME=team.nutritionapp@gmail.com
+
+GMAIL_APP_PASSWORD=dbapoawpycutkiln
+
+FLASK_ENV=production
+
+ALLOWED_ORIGINS=*
+
+---
+
+Start Command (Settings → Deploy):
+gunicorn app:app --bind 0.0.0.0:$PORT
+

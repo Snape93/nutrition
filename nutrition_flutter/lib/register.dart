@@ -7,7 +7,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'utils/connectivity_notification_helper.dart';
 import 'widgets/password_strength_widget.dart';
-import 'widgets/animated_logo_widget.dart';
 
 // Use centralized apiBase from config.dart
 
@@ -675,8 +674,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                                 if (_isLoading) ...[
                                   const SizedBox(height: 20),
-                                  const AnimatedLogoWidget(
-                                    size: 90,
+                                  const SizedBox(
+                                    height: 48,
+                                    width: 48,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 4,
+                                      valueColor: AlwaysStoppedAnimation(
+                                        Color(0xFF4CAF50),
+                                      ),
+                                    ),
                                   ),
                                 ],
                                 if (_message.isNotEmpty) ...[
