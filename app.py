@@ -4365,7 +4365,7 @@ def cancel_email_change(username):
         return jsonify({'error': f'Failed to cancel email change: {str(e)}'}), 500
 
 @app.route('/user/<username>/email/check-config', methods=['GET'])
-def check_email_config():
+def check_email_config(username):
     """Check if email service is configured (for debugging)"""
     try:
         import os
@@ -4378,7 +4378,7 @@ def check_email_config():
             'email_service_configured': is_configured,
             'gmail_username_set': bool(gmail_username),
             'gmail_password_set': bool(gmail_password),
-            'message': 'Email service is configured' if is_configured else 'Email service is NOT configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in .env'
+            'message': 'Email service is configured' if is_configured else 'Email service is NOT configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in Railway Variables'
         }), 200
     except Exception as e:
         print(f"[ERROR] Email config check failed: {e}")
