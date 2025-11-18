@@ -1,9 +1,10 @@
-"""Email service for sending verification emails via Gmail SMTP"""
+"""Email service for sending verification emails via Resend API (or SMTP fallback)"""
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 import os
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -19,6 +20,61 @@ def _get_smtp_timeout():
 
 
 SMTP_TIMEOUT = _get_smtp_timeout()
+
+def _send_email_via_resend_api(from_email: str, to_email: str, subject: str, html_content: str, text_content: str) -> bool:
+    """
+    Send email via Resend API (works on Railway).
+    
+    Args:
+        from_email: Sender email address
+        to_email: Recipient email address
+        subject: Email subject
+        html_content: HTML email body
+        text_content: Plain text email body
+        
+    Returns:
+        True if email sent successfully, False otherwise
+    """
+    try:
+        api_key = os.environ.get('RESEND_API_KEY')
+        if not api_key:
+            print("[ERROR] RESEND_API_KEY not configured. Set RESEND_API_KEY in Railway Variables.")
+            return False
+        
+        api_url = "https://api.resend.com/emails"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "from": f"Nutrition App <{from_email}>",
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+            "text": text_content
+        }
+        
+        print(f"[INFO] Sending email via Resend API to {to_email}...")
+        response = requests.post(api_url, json=payload, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"[SUCCESS] Email sent via Resend API. ID: {result.get('id', 'N/A')}")
+            return True
+        else:
+            error_msg = response.text
+            print(f"[ERROR] Resend API failed: Status {response.status_code}, Error: {error_msg}")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Resend API request failed: {e}")
+        return False
+    except Exception as e:
+        print(f"[ERROR] Unexpected error with Resend API: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 def _send_email_via_smtp(msg, mail_server: str, mail_username: str, mail_password: str) -> bool:
     """
@@ -76,7 +132,7 @@ def _send_email_via_smtp(msg, mail_server: str, mail_username: str, mail_passwor
 
 def send_verification_email(email: str, code: str, username: str = None) -> bool:
     """
-    Send verification code email to user via Gmail SMTP.
+    Send verification code email to user via Resend API (or SMTP fallback).
     
     Args:
         email: Recipient email address
@@ -87,26 +143,14 @@ def send_verification_email(email: str, code: str, username: str = None) -> bool
         True if email sent successfully, False otherwise
     """
     try:
-        # Get email configuration from environment variables
-        mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-        mail_port = int(os.environ.get('MAIL_PORT', '587'))
-        mail_username = os.environ.get('GMAIL_USERNAME')
-        mail_password = os.environ.get('GMAIL_APP_PASSWORD')
-        
-        # Check if email is configured
-        if not mail_username or not mail_password:
-            print("[ERROR] Gmail SMTP credentials not configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in .env")
-            return False
-        
-        # Create message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Nutritionist App - Email Verification Code'
-        msg['From'] = mail_username
-        msg['To'] = email
+        # Get email configuration
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
         # Email body
         name = username or 'there'
         expiration_minutes = 15
+        
+        subject = 'Nutritionist App - Email Verification Code'
         
         text_body = f"""Hi {name},
 
@@ -156,18 +200,12 @@ Nutritionist App Team"""
 </body>
 </html>"""
         
-        # Attach both plain text and HTML versions
-        part1 = MIMEText(text_body, 'plain')
-        part2 = MIMEText(html_body, 'html')
-        msg.attach(part1)
-        msg.attach(part2)
-        
-        # Send email with fallback support
-        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        # Send email using Resend API or SMTP fallback
+        success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Verification email sent to {email}")
         else:
-            print(f"[ERROR] Failed to send verification email to {email} after trying both ports")
+            print(f"[ERROR] Failed to send verification email to {email}")
         return success
         
     except Exception as e:
@@ -175,6 +213,50 @@ Nutritionist App Team"""
         import traceback
         traceback.print_exc()
         return False
+
+def _send_email_with_fallback(from_email: str, to_email: str, subject: str, html_body: str, text_body: str) -> bool:
+    """
+    Send email using Resend API (preferred) or SMTP fallback.
+    
+    Args:
+        from_email: Sender email address
+        to_email: Recipient email address
+        subject: Email subject
+        html_body: HTML email content
+        text_body: Plain text email content
+        
+    Returns:
+        True if email sent successfully, False otherwise
+    """
+    # Try Resend API first (works on Railway)
+    if os.environ.get('RESEND_API_KEY'):
+        success = _send_email_via_resend_api(from_email, to_email, subject, html_body, text_body)
+        if success:
+            return True
+        else:
+            print(f"[WARN] Resend API failed, trying SMTP fallback...")
+    
+    # Fallback to SMTP (for local development)
+    mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+    mail_password = os.environ.get('GMAIL_APP_PASSWORD')
+    
+    if not from_email or not mail_password:
+        print("[ERROR] Email not configured. Set RESEND_API_KEY (for Railway) or GMAIL_USERNAME/GMAIL_APP_PASSWORD (for local)")
+        return False
+    
+    # Create SMTP message
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = from_email
+    msg['To'] = to_email
+    
+    part1 = MIMEText(text_body, 'plain')
+    part2 = MIMEText(html_body, 'html')
+    msg.attach(part1)
+    msg.attach(part2)
+    
+    # Send via SMTP
+    return _send_email_via_smtp(msg, mail_server, from_email, mail_password)
 
 def generate_verification_code() -> str:
     """Generate a random 6-digit verification code"""
@@ -195,22 +277,10 @@ def send_email_change_verification(new_email: str, code: str, old_email: str = N
         True if email sent successfully, False otherwise
     """
     try:
-        # Get email configuration from environment variables
-        mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-        mail_port = int(os.environ.get('MAIL_PORT', '587'))
-        mail_username = os.environ.get('GMAIL_USERNAME')
-        mail_password = os.environ.get('GMAIL_APP_PASSWORD')
+        # Get email configuration
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
-        # Check if email is configured
-        if not mail_username or not mail_password:
-            print("[ERROR] Gmail SMTP credentials not configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in .env")
-            return False
-        
-        # Create message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Nutritionist App - Verify Your New Email Address'
-        msg['From'] = mail_username
-        msg['To'] = new_email
+        subject = 'Nutritionist App - Verify Your New Email Address'
         
         # Email body
         name = username or 'there'
@@ -272,18 +342,12 @@ Nutritionist App Team"""
 </body>
 </html>"""
         
-        # Attach both plain text and HTML versions
-        part1 = MIMEText(text_body, 'plain')
-        part2 = MIMEText(html_body, 'html')
-        msg.attach(part1)
-        msg.attach(part2)
-        
-        # Send email with fallback support
-        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        # Send email using Resend API or SMTP fallback
+        success = _send_email_with_fallback(mail_username, new_email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Email change verification email sent to {new_email}")
         else:
-            print(f"[ERROR] Failed to send email change verification email to {new_email} after trying both ports")
+            print(f"[ERROR] Failed to send email change verification email to {new_email}")
         return success
         
     except Exception as e:
@@ -305,22 +369,10 @@ def send_account_deletion_verification(email: str, code: str, username: str = No
         True if email sent successfully, False otherwise
     """
     try:
-        # Get email configuration from environment variables
-        mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-        mail_port = int(os.environ.get('MAIL_PORT', '587'))
-        mail_username = os.environ.get('GMAIL_USERNAME')
-        mail_password = os.environ.get('GMAIL_APP_PASSWORD')
+        # Get email configuration
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
-        # Check if email is configured
-        if not mail_username or not mail_password:
-            print("[ERROR] Gmail SMTP credentials not configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in .env")
-            return False
-        
-        # Create message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Nutritionist App - Confirm Account Deletion'
-        msg['From'] = mail_username
-        msg['To'] = email
+        subject = 'Nutritionist App - Confirm Account Deletion'
         
         # Email body
         name = username or 'there'
@@ -403,18 +455,12 @@ Nutritionist App Team"""
 </body>
 </html>"""
         
-        # Attach both plain text and HTML versions
-        part1 = MIMEText(text_body, 'plain')
-        part2 = MIMEText(html_body, 'html')
-        msg.attach(part1)
-        msg.attach(part2)
-        
-        # Send email with fallback support
-        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        # Send email using Resend API or SMTP fallback
+        success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Account deletion verification email sent to {email}")
         else:
-            print(f"[ERROR] Failed to send account deletion verification email to {email} after trying both ports")
+            print(f"[ERROR] Failed to send account deletion verification email to {email}")
         return success
         
     except Exception as e:
@@ -438,22 +484,10 @@ def send_email_change_notification(old_email: str, new_email: str, username: str
         True if email sent successfully, False otherwise
     """
     try:
-        # Get email configuration from environment variables
-        mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-        mail_port = int(os.environ.get('MAIL_PORT', '587'))
-        mail_username = os.environ.get('GMAIL_USERNAME')
-        mail_password = os.environ.get('GMAIL_APP_PASSWORD')
+        # Get email configuration
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
-        # Check if email is configured
-        if not mail_username or not mail_password:
-            print("[ERROR] Gmail SMTP credentials not configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in .env")
-            return False
-        
-        # Create message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = '🔒 Security Alert: Email Change Requested for Your Account'
-        msg['From'] = mail_username
-        msg['To'] = old_email
+        subject = '🔒 Security Alert: Email Change Requested for Your Account'
         
         # Email body
         name = username or 'there'
@@ -568,18 +602,12 @@ The verification code has been sent to your new email address: {new_email}
 </body>
 </html>"""
         
-        # Attach both plain text and HTML versions
-        part1 = MIMEText(text_body, 'plain')
-        part2 = MIMEText(html_body, 'html')
-        msg.attach(part1)
-        msg.attach(part2)
-        
-        # Send email with fallback support
-        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        # Send email using Resend API or SMTP fallback
+        success = _send_email_with_fallback(mail_username, old_email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Email change notification sent to {old_email}")
         else:
-            print(f"[ERROR] Failed to send email change notification to {old_email} after trying both ports")
+            print(f"[ERROR] Failed to send email change notification to {old_email}")
         return success
         
     except Exception as e:
@@ -601,22 +629,10 @@ def send_password_change_verification(email: str, code: str, username: str = Non
         True if email sent successfully, False otherwise
     """
     try:
-        # Get email configuration from environment variables
-        mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-        mail_port = int(os.environ.get('MAIL_PORT', '587'))
-        mail_username = os.environ.get('GMAIL_USERNAME')
-        mail_password = os.environ.get('GMAIL_APP_PASSWORD')
+        # Get email configuration
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
-        # Check if email is configured
-        if not mail_username or not mail_password:
-            print("[ERROR] Gmail SMTP credentials not configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in .env")
-            return False
-        
-        # Create message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Nutritionist App - Verify Your Password Change'
-        msg['From'] = mail_username
-        msg['To'] = email
+        subject = 'Nutritionist App - Verify Your Password Change'
         
         # Email body
         name = username or 'there'
@@ -670,18 +686,12 @@ Nutritionist App Team"""
 </body>
 </html>"""
         
-        # Attach both plain text and HTML versions
-        part1 = MIMEText(text_body, 'plain')
-        part2 = MIMEText(html_body, 'html')
-        msg.attach(part1)
-        msg.attach(part2)
-        
-        # Send email with fallback support
-        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        # Send email using Resend API or SMTP fallback
+        success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Password change verification email sent to {email}")
         else:
-            print(f"[ERROR] Failed to send password change verification email to {email} after trying both ports")
+            print(f"[ERROR] Failed to send password change verification email to {email}")
         return success
         
     except Exception as e:
@@ -703,22 +713,10 @@ def send_password_reset_verification(email: str, code: str, username: str = None
         True if email sent successfully, False otherwise
     """
     try:
-        # Get email configuration from environment variables
-        mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-        mail_port = int(os.environ.get('MAIL_PORT', '587'))
-        mail_username = os.environ.get('GMAIL_USERNAME')
-        mail_password = os.environ.get('GMAIL_APP_PASSWORD')
+        # Get email configuration
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
-        # Check if email is configured
-        if not mail_username or not mail_password:
-            print("[ERROR] Gmail SMTP credentials not configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in .env")
-            return False
-        
-        # Create message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Nutritionist App - Reset Your Password'
-        msg['From'] = mail_username
-        msg['To'] = email
+        subject = 'Nutritionist App - Reset Your Password'
         
         # Email body
         name = username or 'there'
@@ -778,18 +776,12 @@ Nutritionist App Team"""
 </body>
 </html>"""
         
-        # Attach both plain text and HTML versions
-        part1 = MIMEText(text_body, 'plain')
-        part2 = MIMEText(html_body, 'html')
-        msg.attach(part1)
-        msg.attach(part2)
-        
-        # Send email with fallback support
-        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        # Send email using Resend API or SMTP fallback
+        success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Password reset verification email sent to {email}")
         else:
-            print(f"[ERROR] Failed to send password reset verification email to {email} after trying both ports")
+            print(f"[ERROR] Failed to send password reset verification email to {email}")
         return success
         
     except Exception as e:
