@@ -47,8 +47,13 @@ def _send_email_via_resend_api(from_email: str, to_email: str, subject: str, htm
             "Content-Type": "application/json"
         }
         
+        # Use Resend's test domain for unverified domains, or verified domain if available
+        # For testing: use onboarding@resend.dev (no verification needed)
+        # For production: verify your domain in Resend and use your verified email
+        resend_from_email = os.environ.get('RESEND_FROM_EMAIL', 'onboarding@resend.dev')
+        
         payload = {
-            "from": f"Nutrition App <{from_email}>",
+            "from": f"Nutrition App <{resend_from_email}>",
             "to": [to_email],
             "subject": subject,
             "html": html_content,
