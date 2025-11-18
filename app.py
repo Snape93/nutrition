@@ -4831,7 +4831,7 @@ def request_account_deletion(username):
         return jsonify({
             'success': True,
             'message': 'Verification code sent to your email',
-            'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC,
+            'expires_at': verification_expires_at.isoformat() + 'Z',  # Add Z to indicate UTC
             'warning': 'This action cannot be undone'
         }), 200
         
