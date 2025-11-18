@@ -74,13 +74,15 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
     // Use expires_at from backend if available, otherwise default to 15 minutes
     if (widget.expiresAt != null) {
       try {
-        _expiresAt = DateTime.parse(widget.expiresAt!);
+        // Parse as UTC (backend sends UTC with 'Z' suffix)
+        final parsed = DateTime.parse(widget.expiresAt!);
+        _expiresAt = parsed.isUtc ? parsed : parsed.toUtc();
       } catch (e) {
         debugPrint('Error parsing expires_at: $e');
-        _expiresAt = DateTime.now().add(const Duration(minutes: 15));
+        _expiresAt = DateTime.now().toUtc().add(const Duration(minutes: 15));
       }
     } else {
-      _expiresAt = DateTime.now().add(const Duration(minutes: 15));
+      _expiresAt = DateTime.now().toUtc().add(const Duration(minutes: 15));
     }
     _updateExpirationCountdown();
     _expirationTimer?.cancel();
@@ -97,7 +99,8 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
 
   void _updateExpirationCountdown() {
     if (_expiresAt != null) {
-      final now = DateTime.now();
+      // Compare UTC times to avoid timezone issues
+      final now = DateTime.now().toUtc();
       final difference = _expiresAt!.difference(now);
       setState(() {
         _expirationCountdown = difference.inSeconds;

@@ -2786,7 +2786,7 @@ def register_user():
             'verification_required': True,
             'email': email,
             'username': username,
-            'expires_at': verification_expires_at.isoformat()
+            'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC + 'Z'  # Add Z to indicate UTC
         }), 201
         
     except Exception as e:
@@ -3096,7 +3096,7 @@ def resend_verification_code():
             'message': 'Verification code sent successfully',
             'resend_count': pending_reg.resend_count,
             'max_resends': 5,
-            'expires_at': verification_expires_at.isoformat()
+            'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC
         }), 200
         
     except Exception as e:
@@ -3219,7 +3219,7 @@ def change_pending_email():
             'success': True,
             'message': 'Email changed successfully. Verification code sent to new email.',
             'new_email': new_email,
-            'expires_at': verification_expires_at.isoformat()
+            'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC
         }), 200
         
     except Exception as e:
@@ -3413,7 +3413,7 @@ def request_password_reset():
                 'success': True,
                 'message': 'Verification code has been sent to your email',
                 'email': masked_email,
-                'expires_at': verification_expires_at.isoformat()
+                'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC
             }), 200
         
     except Exception as e:
@@ -3496,7 +3496,7 @@ def verify_password_reset_code():
         return jsonify({
             'success': True,
             'message': 'Verification code is valid. You can now set your new password.',
-            'expires_at': pending_reset.verification_expires_at.isoformat()
+            'expires_at': pending_reset.verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC
         }), 200
         
     except Exception as e:
@@ -3667,7 +3667,7 @@ def resend_password_reset_code():
             'success': True,
             'message': 'If an account exists, a verification code has been resent',
             'email': masked_email,
-            'expires_at': (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+            'expires_at': (datetime.utcnow() + timedelta(minutes=15)).isoformat() + 'Z'  # Add Z to indicate UTC
         }), 200
         
     except Exception as e:
@@ -4165,7 +4165,7 @@ def request_email_change(username):
             'success': True,
             'message': 'Verification code sent to new email address',
             'new_email': new_email,
-            'expires_at': verification_expires_at.isoformat()
+            'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC
         }), 200
         
     except Exception as e:
@@ -4295,7 +4295,7 @@ def resend_email_change_code(username):
         return jsonify({
             'success': True,
             'message': 'Verification code resent',
-            'expires_at': verification_expires_at.isoformat()
+            'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC
         }), 200
         
     except Exception as e:
@@ -4330,7 +4330,7 @@ def get_email_change_status(username):
         return jsonify({
             'has_pending': True,
             'new_email': pending_change.new_email,
-            'expires_at': pending_change.verification_expires_at.isoformat(),
+            'expires_at': pending_change.verification_expires_at.isoformat() + 'Z',  # Add Z to indicate UTC
             'can_resend': pending_change.resend_count < 3
         }), 200
         
@@ -4572,7 +4572,7 @@ def request_password_change(username):
             'success': True,
             'message': 'Verification code sent to your email',
             'email': user.email,
-            'expires_at': verification_expires_at.isoformat()
+            'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC
         }), 200
         
     except Exception as e:
@@ -4731,7 +4731,7 @@ def resend_password_change_code(username):
         return jsonify({
             'success': True,
             'message': 'Verification code resent',
-            'expires_at': verification_expires_at.isoformat()
+            'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC
         }), 200
         
     except Exception as e:
@@ -4831,7 +4831,7 @@ def request_account_deletion(username):
         return jsonify({
             'success': True,
             'message': 'Verification code sent to your email',
-            'expires_at': verification_expires_at.isoformat(),
+            'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC,
             'warning': 'This action cannot be undone'
         }), 200
         
@@ -4974,7 +4974,7 @@ def resend_account_deletion_code(username):
         return jsonify({
             'success': True,
             'message': 'Verification code resent',
-            'expires_at': verification_expires_at.isoformat()
+            'expires_at': verification_expires_at.isoformat() + 'Z'  # Add Z to indicate UTC
         }), 200
         
     except Exception as e:
