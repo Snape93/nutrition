@@ -9,6 +9,71 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+
+def _get_smtp_timeout():
+    """Resolve SMTP timeout (seconds) with safe fallback."""
+    try:
+        return float(os.environ.get('SMTP_TIMEOUT_SECONDS', '15'))
+    except (TypeError, ValueError):
+        return 15.0
+
+
+SMTP_TIMEOUT = _get_smtp_timeout()
+
+def _send_email_via_smtp(msg, mail_server: str, mail_username: str, mail_password: str) -> bool:
+    """
+    Send email via SMTP with fallback to port 465 (SSL) if port 587 (TLS) fails.
+    
+    Args:
+        msg: MIMEMultipart message object
+        mail_server: SMTP server address
+        mail_username: SMTP username
+        mail_password: SMTP password
+        
+    Returns:
+        True if email sent successfully, False otherwise
+    """
+    # Try port 587 (TLS) first
+    try:
+        print(f"[INFO] Attempting SMTP connection to {mail_server}:587 (TLS)...")
+        with smtplib.SMTP(mail_server, 587, timeout=SMTP_TIMEOUT) as server:
+            server.starttls()
+            server.login(mail_username, mail_password)
+            server.send_message(msg)
+        print(f"[SUCCESS] Email sent via port 587 (TLS)")
+        return True
+    except (OSError, ConnectionError, smtplib.SMTPException) as e:
+        error_msg = str(e)
+        error_code = getattr(e, 'errno', None)
+        
+        # Check if it's a network error (port 587 blocked)
+        if error_code == 101 or 'Network is unreachable' in error_msg or 'Connection refused' in error_msg:
+            print(f"[WARN] Port 587 (TLS) failed: {error_msg}. Trying port 465 (SSL) as fallback...")
+            
+            # Try port 465 (SSL) as fallback
+            try:
+                print(f"[INFO] Attempting SMTP connection to {mail_server}:465 (SSL)...")
+                import ssl
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(mail_server, 465, timeout=SMTP_TIMEOUT, context=context) as server:
+                    server.login(mail_username, mail_password)
+                    server.send_message(msg)
+                print(f"[SUCCESS] Email sent via port 465 (SSL)")
+                return True
+            except Exception as ssl_error:
+                print(f"[ERROR] Port 465 (SSL) also failed: {ssl_error}")
+                print(f"[ERROR] Both SMTP ports (587 and 465) failed. Network may be blocking SMTP connections.")
+                return False
+        else:
+            # Other errors (authentication, etc.)
+            print(f"[ERROR] SMTP connection failed: {error_msg}")
+            return False
+    except Exception as e:
+        print(f"[ERROR] Unexpected error sending email: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def send_verification_email(email: str, code: str, username: str = None) -> bool:
     """
     Send verification code email to user via Gmail SMTP.
@@ -97,17 +162,18 @@ Nutritionist App Team"""
         msg.attach(part1)
         msg.attach(part2)
         
-        # Send email
-        with smtplib.SMTP(mail_server, mail_port) as server:
-            server.starttls()
-            server.login(mail_username, mail_password)
-            server.send_message(msg)
-        
-        print(f"[SUCCESS] Verification email sent to {email}")
-        return True
+        # Send email with fallback support
+        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        if success:
+            print(f"[SUCCESS] Verification email sent to {email}")
+        else:
+            print(f"[ERROR] Failed to send verification email to {email} after trying both ports")
+        return success
         
     except Exception as e:
         print(f"[ERROR] Failed to send verification email to {email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def generate_verification_code() -> str:
@@ -212,17 +278,18 @@ Nutritionist App Team"""
         msg.attach(part1)
         msg.attach(part2)
         
-        # Send email
-        with smtplib.SMTP(mail_server, mail_port) as server:
-            server.starttls()
-            server.login(mail_username, mail_password)
-            server.send_message(msg)
-        
-        print(f"[SUCCESS] Email change verification email sent to {new_email}")
-        return True
+        # Send email with fallback support
+        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        if success:
+            print(f"[SUCCESS] Email change verification email sent to {new_email}")
+        else:
+            print(f"[ERROR] Failed to send email change verification email to {new_email} after trying both ports")
+        return success
         
     except Exception as e:
         print(f"[ERROR] Failed to send email change verification email to {new_email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def send_account_deletion_verification(email: str, code: str, username: str = None) -> bool:
@@ -342,17 +409,18 @@ Nutritionist App Team"""
         msg.attach(part1)
         msg.attach(part2)
         
-        # Send email
-        with smtplib.SMTP(mail_server, mail_port) as server:
-            server.starttls()
-            server.login(mail_username, mail_password)
-            server.send_message(msg)
-        
-        print(f"[SUCCESS] Account deletion verification email sent to {email}")
-        return True
+        # Send email with fallback support
+        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        if success:
+            print(f"[SUCCESS] Account deletion verification email sent to {email}")
+        else:
+            print(f"[ERROR] Failed to send account deletion verification email to {email} after trying both ports")
+        return success
         
     except Exception as e:
         print(f"[ERROR] Failed to send account deletion verification email to {email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def send_email_change_notification(old_email: str, new_email: str, username: str = None, timestamp: str = None) -> bool:
@@ -506,17 +574,18 @@ The verification code has been sent to your new email address: {new_email}
         msg.attach(part1)
         msg.attach(part2)
         
-        # Send email
-        with smtplib.SMTP(mail_server, mail_port) as server:
-            server.starttls()
-            server.login(mail_username, mail_password)
-            server.send_message(msg)
-        
-        print(f"[SUCCESS] Email change notification sent to {old_email}")
-        return True
+        # Send email with fallback support
+        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        if success:
+            print(f"[SUCCESS] Email change notification sent to {old_email}")
+        else:
+            print(f"[ERROR] Failed to send email change notification to {old_email} after trying both ports")
+        return success
         
     except Exception as e:
         print(f"[ERROR] Failed to send email change notification to {old_email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def send_password_change_verification(email: str, code: str, username: str = None) -> bool:
@@ -607,17 +676,18 @@ Nutritionist App Team"""
         msg.attach(part1)
         msg.attach(part2)
         
-        # Send email
-        with smtplib.SMTP(mail_server, mail_port) as server:
-            server.starttls()
-            server.login(mail_username, mail_password)
-            server.send_message(msg)
-        
-        print(f"[SUCCESS] Password change verification email sent to {email}")
-        return True
+        # Send email with fallback support
+        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        if success:
+            print(f"[SUCCESS] Password change verification email sent to {email}")
+        else:
+            print(f"[ERROR] Failed to send password change verification email to {email} after trying both ports")
+        return success
         
     except Exception as e:
         print(f"[ERROR] Failed to send password change verification email to {email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def send_password_reset_verification(email: str, code: str, username: str = None) -> bool:
@@ -714,16 +784,17 @@ Nutritionist App Team"""
         msg.attach(part1)
         msg.attach(part2)
         
-        # Send email
-        with smtplib.SMTP(mail_server, mail_port) as server:
-            server.starttls()
-            server.login(mail_username, mail_password)
-            server.send_message(msg)
-        
-        print(f"[SUCCESS] Password reset verification email sent to {email}")
-        return True
+        # Send email with fallback support
+        success = _send_email_via_smtp(msg, mail_server, mail_username, mail_password)
+        if success:
+            print(f"[SUCCESS] Password reset verification email sent to {email}")
+        else:
+            print(f"[ERROR] Failed to send password reset verification email to {email} after trying both ports")
+        return success
         
     except Exception as e:
         print(f"[ERROR] Failed to send password reset verification email to {email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
