@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import requests
 import re
 import time
+import threading
 from config import config
 from werkzeug.security import generate_password_hash, check_password_hash
 import csv
@@ -2515,6 +2516,24 @@ def calculate_daily_goal():
         }
     })
 
+def _send_verification_email_async(email: str, code: str, username: str | None):
+    """Send verification email in a background thread so HTTP response isn't blocked."""
+    if not email:
+        return
+
+    def _task():
+        try:
+            success = send_verification_email(email, code, username)
+            if success:
+                print(f"[ASYNC] Verification email sent to {email}")
+            else:
+                print(f"[WARN] Verification email dispatch failed for {email}. User may need to request a resend.")
+        except Exception as err:
+            print(f"[ERROR] Async verification email failed for {email}: {err}")
+
+    threading.Thread(target=_task, daemon=True).start()
+
+
 @app.route('/register', methods=['POST'])
 def register_user():
     """Register a new user with complete profile data"""
@@ -2757,15 +2776,9 @@ def register_user():
         
         print(f"[SUCCESS] Pending registration created: {username}, Email: {email}")
         
-        # Send verification email
+        # Send verification email in the background so we don't block the HTTP response
         if email:
-            email_sent = send_verification_email(email, verification_code, username)
-            if not email_sent:
-                print(f"[WARN] Failed to send verification email to {email}")
-                return jsonify({
-                    'success': False,
-                    'error': 'Failed to send verification email. Please try again.'
-                }), 500
+            _send_verification_email_async(email, verification_code, username)
         
         return jsonify({
             'success': True,
@@ -4354,18 +4367,56 @@ def cancel_email_change(username):
 @app.route('/user/<username>/email/check-config', methods=['GET'])
 def check_email_config():
     """Check if email service is configured (for debugging)"""
-    import os
-    gmail_username = os.environ.get('GMAIL_USERNAME')
-    gmail_password = os.environ.get('GMAIL_APP_PASSWORD')
-    
-    is_configured = bool(gmail_username and gmail_password)
-    
-    return jsonify({
-        'email_service_configured': is_configured,
-        'gmail_username_set': bool(gmail_username),
-        'gmail_password_set': bool(gmail_password),
-        'message': 'Email service is configured' if is_configured else 'Email service is NOT configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in .env'
-    }), 200
+    try:
+        import os
+        gmail_username = os.environ.get('GMAIL_USERNAME')
+        gmail_password = os.environ.get('GMAIL_APP_PASSWORD')
+        
+        is_configured = bool(gmail_username and gmail_password)
+        
+        return jsonify({
+            'email_service_configured': is_configured,
+            'gmail_username_set': bool(gmail_username),
+            'gmail_password_set': bool(gmail_password),
+            'message': 'Email service is configured' if is_configured else 'Email service is NOT configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in .env'
+        }), 200
+    except Exception as e:
+        print(f"[ERROR] Email config check failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': str(e),
+            'email_service_configured': False,
+            'gmail_username_set': False,
+            'gmail_password_set': False
+        }), 500
+
+@app.route('/api/email/check-config', methods=['GET'])
+def check_email_config_simple():
+    """Simple email config check endpoint (no username required)"""
+    try:
+        import os
+        gmail_username = os.environ.get('GMAIL_USERNAME')
+        gmail_password = os.environ.get('GMAIL_APP_PASSWORD')
+        
+        is_configured = bool(gmail_username and gmail_password)
+        
+        return jsonify({
+            'email_service_configured': is_configured,
+            'gmail_username_set': bool(gmail_username),
+            'gmail_password_set': bool(gmail_password),
+            'message': 'Email service is configured' if is_configured else 'Email service is NOT configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD in Railway Variables'
+        }), 200
+    except Exception as e:
+        print(f"[ERROR] Email config check failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': str(e),
+            'email_service_configured': False,
+            'gmail_username_set': False,
+            'gmail_password_set': False
+        }), 500
 
 @app.route('/user/<username>/email', methods=['PUT'])
 def change_user_email(username):
