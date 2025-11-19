@@ -84,11 +84,14 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = _normalize_sqlalchemy_uri(neon_url or '')
 
 # Configuration dictionary
-# Default to production if FLASK_ENV is not set (for Railway/deployment)
-default_config = 'production' if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('PORT') else 'development'
+# Default to production if FLASK_ENV is not set (for Railway/Render/deployment)
+# Render sets RENDER environment variable and PORT
+# Railway sets RAILWAY_ENVIRONMENT and PORT
+is_production_env = os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER') or os.environ.get('PORT')
+default_config = 'production' if is_production_env else 'development'
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
     'testing': TestingConfig,
-    'default': ProductionConfig if (os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('PORT')) else DevelopmentConfig
+    'default': ProductionConfig if is_production_env else DevelopmentConfig
 }

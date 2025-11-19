@@ -4,13 +4,13 @@ A comprehensive nutrition and fitness tracking application with Flutter mobile a
 
 ## 🚀 Deployment Status
 
-**Backend:** Deployed on Railway  
+**Backend:** Deployed on Railway / Render (configurable)  
 **Database:** Neon PostgreSQL  
 **Mobile App:** Android APK/AAB available
 
 ## 📋 Quick Links
 
-- **Backend API:** Check Railway dashboard for your deployed URL
+- **Backend API:** Check your deployment platform dashboard for your deployed URL
 - **Documentation:** See deployment guides in the repository
 - **GitHub Repository:** https://github.com/Snape93/nutrition
 
@@ -28,20 +28,25 @@ A comprehensive nutrition and fitness tracking application with Flutter mobile a
 
 ## 📚 Deployment Documentation
 
+### Railway Deployment
 - `DEPLOY_TO_RAILWAY_NOW.md` - Step-by-step Railway deployment guide
 - `RAILWAY_CRASH_FIX.md` - Troubleshooting deployment issues
 - `railway_deploy.md` - General Railway deployment guide
 - `RAILWAY_ENV_VARIABLES.txt` - Required environment variables
 
+### Render Deployment
+- `DEPLOY_TO_RENDER.md` - Complete Render deployment guide
+- `RENDER_QUICK_START.md` - Quick 5-minute Render deployment guide
+
 ## ✅ Post-Deployment Checklist
 
 After deploying, verify:
 
-- [ ] Backend is accessible at Railway URL
-- [ ] Health endpoint works: `https://your-app.railway.app/api/health`
+- [ ] Backend is accessible at your deployment URL (Railway/Render)
+- [ ] Health endpoint works: `https://your-app.railway.app/api/health` or `https://your-app.onrender.com/api/health`
 - [ ] Database connection is working
 - [ ] Email service is configured (Gmail)
-- [ ] All environment variables are set in Railway
+- [ ] All environment variables are set in your deployment platform
 - [ ] Mobile app is configured with correct API URL
 
 ## 🔧 Environment Variables
@@ -67,7 +72,8 @@ Build scripts available:
 
 ## 🐛 Troubleshooting
 
-See `RAILWAY_CRASH_FIX.md` for common deployment issues and solutions.
+- **Railway:** See `RAILWAY_CRASH_FIX.md` for common deployment issues and solutions
+- **Render:** See `DEPLOY_TO_RENDER.md` troubleshooting section for Render-specific issues
 
 ## 📝 License
 

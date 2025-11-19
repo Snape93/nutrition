@@ -95,20 +95,22 @@ else:
     })
 
 # Configure app based on environment
-# Auto-detect Railway environment (Railway sets PORT environment variable)
-is_railway = os.environ.get('PORT') is not None or os.environ.get('RAILWAY_ENVIRONMENT') is not None
-default_env = 'production' if is_railway else 'development'
+# Auto-detect deployment environment (Railway/Render sets PORT environment variable)
+# Render sets RENDER environment variable, Railway sets RAILWAY_ENVIRONMENT
+is_production_deploy = os.environ.get('PORT') is not None or os.environ.get('RAILWAY_ENVIRONMENT') is not None or os.environ.get('RENDER') is not None
+default_env = 'production' if is_production_deploy else 'development'
 
 config_name = (os.environ.get('FLASK_ENV') or default_env).strip().lower()
 if config_name not in config:
     print(f"[WARN] Unknown FLASK_ENV '{config_name}', falling back to 'default'")
     config_name = 'default'
     
-print(f"[INFO] Using config: {config_name} (FLASK_ENV={os.environ.get('FLASK_ENV', 'not set')}, Railway={is_railway})")
+deploy_platform = 'Render' if os.environ.get('RENDER') else ('Railway' if os.environ.get('RAILWAY_ENVIRONMENT') else 'Local')
+print(f"[INFO] Using config: {config_name} (FLASK_ENV={os.environ.get('FLASK_ENV', 'not set')}, Platform={deploy_platform})")
 app.config.from_object(config[config_name])
 
 # Validate required environment variables for production
-if config_name == 'production' or is_railway:
+if config_name == 'production' or is_production_deploy:
     required_vars = {
         'NEON_DATABASE_URL': 'Database connection string (get from https://neon.tech)',
         'SECRET_KEY': 'Flask secret key for session security (generate with: python -c "import secrets; print(secrets.token_hex(32))")',
@@ -126,16 +128,19 @@ if config_name == 'production' or is_railway:
         error_msg = "\n" + "="*80 + "\n"
         error_msg += "ERROR: Missing required environment variables for production!\n"
         error_msg += "="*80 + "\n"
-        error_msg += "The following environment variables must be set in Railway:\n\n"
+        error_msg += f"The following environment variables must be set in {deploy_platform}:\n\n"
         error_msg += "\n".join(missing_vars)
         error_msg += "\n\n"
         error_msg += "To fix this:\n"
-        error_msg += "1. Go to Railway Dashboard → Your Project → Variables tab\n"
+        if deploy_platform == 'Render':
+            error_msg += "1. Go to Render Dashboard → Your Service → Environment tab\n"
+        else:
+            error_msg += "1. Go to Railway Dashboard → Your Project → Variables tab\n"
         error_msg += "2. Add each missing variable with its value\n"
         error_msg += "3. Redeploy the service\n"
         error_msg += "="*80 + "\n"
         print(error_msg, file=sys.stderr)
-        # Don't crash - let Railway show the error in logs
+        # Don't crash - let the platform show the error in logs
         # But make it very clear what's wrong
 
 # Log which database URI is being used (without credentials)
@@ -1029,12 +1034,12 @@ except Exception as e:
     error_msg += "="*80 + "\n"
     error_msg += f"Error: {str(e)}\n\n"
     error_msg += "The app cannot function without a working database connection.\n"
-    error_msg += "Please ensure NEON_DATABASE_URL is correctly set in Railway.\n"
+    error_msg += f"Please ensure NEON_DATABASE_URL is correctly set in {deploy_platform}.\n"
     error_msg += "="*80 + "\n"
     print(error_msg, file=sys.stderr)
-    # In production, we should fail fast - but let Railway show the error first
-    if config_name == 'production' or is_railway:
-        # Don't crash immediately - let Railway logs show the error
+    # In production, we should fail fast - but let the platform show the error first
+    if config_name == 'production' or is_production_deploy:
+        # Don't crash immediately - let the platform logs show the error
         # But make it very clear the app won't work
         pass
 
@@ -1719,6 +1724,9 @@ def debug_db_info():
 def predict_calories():
     """Predict calories for a food item"""
     try:
+        if not nutrition_model:
+            return jsonify({'error': 'Nutrition model not available'}), 503
+        
         data = request.get_json()
         
         if not data:
@@ -1754,6 +1762,9 @@ def predict_calories():
 def predict_nutrition():
     """Predict comprehensive nutrition information"""
     try:
+        if not nutrition_model:
+            return jsonify({'error': 'Nutrition model not available'}), 503
+        
         data = request.get_json()
         
         if not data:
@@ -1795,6 +1806,9 @@ def predict_nutrition():
 def recommend_meals():
     """Generate meal recommendations based on user profile"""
     try:
+        if not nutrition_model:
+            return jsonify({'error': 'Nutrition model not available'}), 503
+        
         data = request.get_json()
         
         if not data:
@@ -6113,8 +6127,12 @@ def _call_groq_chat(system_prompt: str, user_prompt: str, *, max_tokens: int = 4
         if not isinstance(content, str):
             return False, "Groq API returned unexpected content format."
         return True, content.strip()
-    except Exception as e:
+    except requests.exceptions.Timeout:
+        return False, "Groq API request timed out. Please try again."
+    except requests.exceptions.RequestException as e:
         return False, f"Groq API request failed: {e}"
+    except Exception as e:
+        return False, f"Groq API error: {e}"
 
 
 @app.route('/ai/summary/daily', methods=['POST'])
@@ -6550,8 +6568,12 @@ def _call_groq_chat_messages(messages: list[dict], *, max_tokens: int = 500, tem
         if not isinstance(content, str):
             return False, "Groq API returned unexpected content format."
         return True, content.strip()
-    except Exception as e:
+    except requests.exceptions.Timeout:
+        return False, "Groq API request timed out. Please try again."
+    except requests.exceptions.RequestException as e:
         return False, f"Groq API request failed: {e}"
+    except Exception as e:
+        return False, f"Groq API error: {e}"
 
 
 @app.route('/ai/coach/chat', methods=['POST'])
@@ -7414,24 +7436,56 @@ def foods_recommend():
                     foods_to_score = all_food_names
                     print(f'DEBUG: [Food Recommendations] Using ALL {len(foods_to_score)} foods from database (no meal type filtering)')
             else:
-                # Fallback: Get recommendations from nutrition model if food_df not available
-                rec = nutrition_model.recommend_meals(
-                    user_gender=user_obj.sex or 'male',
-                    user_age=int(user_obj.age),
-                    user_weight=float(user_obj.weight_kg),
-                    user_height=float(user_obj.height_cm),
-                    user_activity_level=str(user_obj.activity_level),
-                    user_goal=str(user_obj.goal),
-                    dietary_preferences=all_preferences,
-                    medical_history=medical_history
-                )
-                # Combine foods from all meal types
-                all_meal_foods = []
-                for meal in ['breakfast', 'lunch', 'dinner', 'snacks']:
-                    meal_foods = rec.get('meal_plan', {}).get(meal, {}).get('foods', [])
-                    all_meal_foods.extend(meal_foods)
-                foods_to_score = list(set(all_meal_foods))  # Remove duplicates
-                print(f'DEBUG: [Food Recommendations] Using {len(foods_to_score)} foods from nutrition model (fallback)')
+                # Fallback: Try to get CSV data again, or use nutrition model as last resort
+                # First, try to reload CSV from common paths
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                possible_paths = [
+                    os.path.join(base_dir, 'data', 'Filipino_Food_Nutrition_Dataset.csv'),
+                    os.path.join(base_dir, 'nutrition_flutter', 'lib', 'Filipino_Food_Nutrition_Dataset.csv'),
+                    os.path.join(base_dir, 'Filipino_Food_Nutrition_Dataset.csv'),
+                ]
+                
+                csv_loaded = False
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        try:
+                            fallback_df = pd.read_csv(path, encoding='utf-8')
+                            if not fallback_df.empty:
+                                all_food_names = fallback_df['Food Name'].astype(str).dropna().unique().tolist()
+                                if len(all_food_names) > 100:
+                                    foods_to_score = random.sample(all_food_names, 100)
+                                else:
+                                    foods_to_score = all_food_names
+                                print(f'DEBUG: [Food Recommendations] Loaded {len(foods_to_score)} foods from CSV fallback at {path}')
+                                csv_loaded = True
+                                break
+                        except Exception as e:
+                            print(f'DEBUG: [Food Recommendations] Failed to load CSV from {path}: {e}')
+                            continue
+                
+                # Only use nutrition model (12 hardcoded foods) as absolute last resort
+                if not csv_loaded:
+                    if not nutrition_model:
+                        foods_to_score = []
+                        print('DEBUG: [Food Recommendations] No CSV or nutrition model available, using empty list')
+                    else:
+                        rec = nutrition_model.recommend_meals(
+                            user_gender=user_obj.sex or 'male',
+                            user_age=int(user_obj.age),
+                            user_weight=float(user_obj.weight_kg),
+                            user_height=float(user_obj.height_cm),
+                            user_activity_level=str(user_obj.activity_level),
+                            user_goal=str(user_obj.goal),
+                            dietary_preferences=all_preferences,
+                            medical_history=medical_history
+                        )
+                        # Combine foods from all meal types
+                        all_meal_foods = []
+                        for meal in ['breakfast', 'lunch', 'dinner', 'snacks']:
+                            meal_foods = rec.get('meal_plan', {}).get(meal, {}).get('foods', [])
+                            all_meal_foods.extend(meal_foods)
+                        foods_to_score = list(set(all_meal_foods))  # Remove duplicates
+                        print(f'DEBUG: [Food Recommendations] WARNING: Using only {len(foods_to_score)} hardcoded foods from nutrition model (CSV not available)')
         except Exception as e:
             # Final fallback: empty list
             foods_to_score = []
@@ -7452,6 +7506,9 @@ def foods_recommend():
         foods = foods_to_score
 
         # Derive daily calorie needs (used for scoring, not filtering)
+        if not nutrition_model:
+            return jsonify({'error': 'Nutrition model not available', 'recommended': []}), 503
+        
         daily = nutrition_model._calculate_daily_needs(
             user_obj.sex or 'male', int(user_obj.age), float(user_obj.weight_kg), float(user_obj.height_cm), str(user_obj.activity_level)
         )
@@ -8056,6 +8113,9 @@ def foods_search_model():
                 'goal': 'maintain',
             }
 
+        if not nutrition_model:
+            return jsonify({'foods': []}), 200
+        
         pn = nutrition_model.predict_nutrition(
             food_name=query,
             serving_size=100,
