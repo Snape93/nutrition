@@ -54,11 +54,11 @@ class FoodLogScreenState extends State<FoodLogScreen> {
   String? _recommendationError;
 
   // Filter state management
-  Set<String> _selectedFilters = {}; // Stores active filter selections
+  final Set<String> _selectedFilters = {}; // Stores active filter selections
   bool _showFilters = true; // Toggle to show/hide filter section
 
   // Cache management for recommendations
-  Map<String, CacheEntry> _recommendationsCache = {};
+  final Map<String, CacheEntry> _recommendationsCache = {};
 
   @override
   void initState() {
@@ -90,8 +90,12 @@ class FoodLogScreenState extends State<FoodLogScreen> {
   void dispose() {
     _searchController.dispose();
     // Dispose all food controllers
-    _servingControllers.values.forEach((controller) => controller.dispose());
-    _quantityControllers.values.forEach((controller) => controller.dispose());
+    for (var controller in _servingControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _quantityControllers.values) {
+      controller.dispose();
+    }
     _servingControllers.clear();
     _quantityControllers.clear();
     super.dispose();
@@ -638,12 +642,12 @@ class FoodLogScreenState extends State<FoodLogScreen> {
           _nutritionInfoMap.clear();
           _foodDetailsMap.clear();
           // Dispose all controllers
-          _servingControllers.values.forEach(
-            (controller) => controller.dispose(),
-          );
-          _quantityControllers.values.forEach(
-            (controller) => controller.dispose(),
-          );
+          for (var controller in _servingControllers.values) {
+            controller.dispose();
+          }
+          for (var controller in _quantityControllers.values) {
+            controller.dispose();
+          }
           _servingControllers.clear();
           _quantityControllers.clear();
         });
@@ -924,7 +928,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                                       ),
                                     ),
                                     subtitle: Text(
-                                      '${currentServingSize} × ${currentQuantity.toStringAsFixed(currentQuantity.truncateToDouble() == currentQuantity ? 0 : 1)} = ${foodCalories.toInt()} kcal',
+                                      '$currentServingSize × ${currentQuantity.toStringAsFixed(currentQuantity.truncateToDouble() == currentQuantity ? 0 : 1)} = ${foodCalories.toInt()} kcal',
                                       style: TextStyle(
                                         fontSize: isVerySmallScreen ? 12 : 13,
                                         color: Colors.grey[600],
@@ -1090,7 +1094,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                                     ],
                                   ),
                                 );
-                              }).toList(),
+                              }),
                               SizedBox(height: isVerySmallScreen ? 10 : 16),
                             ],
                             TextField(
@@ -1313,7 +1317,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                                   SizedBox(width: 8),
                                   Expanded(
                                     child: DropdownButtonFormField<String>(
-                                      value: _selectedMeal,
+                                      initialValue: _selectedMeal,
                                       decoration: InputDecoration(
                                         labelText:
                                             'Meal Type (applies to all foods)',
@@ -1991,7 +1995,14 @@ class FoodLogScreenState extends State<FoodLogScreen> {
               color: Colors.black.withValues(alpha: 0.3),
               child: Center(
                 child: Container(
-                  padding: EdgeInsets.all(isVerySmallScreen ? 24 : 32),
+                  constraints: BoxConstraints(
+                    maxWidth: screenWidth * 0.85,
+                    maxHeight: screenHeight * 0.3,
+                  ),
+                  margin: EdgeInsets.symmetric(
+                    horizontal: isNarrowScreen ? 16 : 24,
+                  ),
+                  padding: EdgeInsets.all(isVerySmallScreen ? 20 : 28),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
@@ -2005,6 +2016,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       SizedBox(
                         width: isVerySmallScreen ? 50 : 60,
@@ -2017,12 +2029,19 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                         ),
                       ),
                       SizedBox(height: isVerySmallScreen ? 16 : 20),
-                      Text(
-                        'Logging food...',
-                        style: TextStyle(
-                          fontSize: isVerySmallScreen ? 16 : 18,
-                          fontWeight: FontWeight.w600,
-                          color: _primaryColor,
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Logging food...',
+                            style: TextStyle(
+                              fontSize: isVerySmallScreen ? 16 : 18,
+                              fontWeight: FontWeight.w600,
+                              color: _primaryColor,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                          ),
                         ),
                       ),
                     ],
@@ -2036,6 +2055,11 @@ class FoodLogScreenState extends State<FoodLogScreen> {
   }
 
   void _showFoodLogSuccessDialog(double totalCalories, int foodCount) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isVerySmallScreen = screenHeight < 600;
+    final isNarrowScreen = screenWidth < 360;
+
     showDialog(
       context: context,
       barrierColor: Colors.black54,
@@ -2045,7 +2069,14 @@ class FoodLogScreenState extends State<FoodLogScreen> {
             backgroundColor: Colors.transparent,
             elevation: 0,
             child: Container(
-              padding: const EdgeInsets.all(32),
+              constraints: BoxConstraints(
+                maxWidth: screenWidth * 0.9,
+                maxHeight: screenHeight * 0.8,
+              ),
+              margin: EdgeInsets.symmetric(
+                horizontal: isNarrowScreen ? 16 : 24,
+              ),
+              padding: EdgeInsets.all(isVerySmallScreen ? 20 : 28),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
@@ -2057,121 +2088,149 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                   ),
                 ],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Success icon with animation
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: _primaryColor.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.check_circle,
-                      color: _primaryColor,
-                      size: 50,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Title
-                  Text(
-                    'Meal Logged Successfully!',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: _primaryColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  // Calories info
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _backgroundColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _primaryColor.withValues(alpha: 0.3),
-                        width: 2,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Success icon with animation
+                    Container(
+                      width: isVerySmallScreen ? 60 : 80,
+                      height: isVerySmallScreen ? 60 : 80,
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check_circle,
+                        color: _primaryColor,
+                        size: isVerySmallScreen ? 40 : 50,
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.local_fire_department,
-                          color: _primaryColor,
-                          size: 28,
+                    SizedBox(height: isVerySmallScreen ? 16 : 24),
+                    // Title
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Meal Logged Successfully!',
+                          style: TextStyle(
+                            fontSize: isVerySmallScreen ? 20 : 24,
+                            fontWeight: FontWeight.bold,
+                            color: _primaryColor,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              totalCalories.toStringAsFixed(0),
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: _primaryColor,
-                              ),
+                      ),
+                    ),
+                    SizedBox(height: isVerySmallScreen ? 12 : 16),
+                    // Calories info
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isNarrowScreen ? 16 : 24,
+                        vertical: isVerySmallScreen ? 12 : 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _backgroundColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _primaryColor.withValues(alpha: 0.3),
+                          width: 2,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.local_fire_department,
+                            color: _primaryColor,
+                            size: isVerySmallScreen ? 24 : 28,
+                          ),
+                          SizedBox(width: isNarrowScreen ? 8 : 12),
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    totalCalories.toStringAsFixed(0),
+                                    style: TextStyle(
+                                      fontSize: isVerySmallScreen ? 24 : 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: _primaryColor,
+                                    ),
+                                  ),
+                                ),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    'calories logged',
+                                    style: TextStyle(
+                                      fontSize: isVerySmallScreen ? 12 : 14,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              'calories logged',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Food count info
-                  Text(
-                    foodCount == 1
-                        ? '1 food item added to your log'
-                        : '$foodCount food items added to your log',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  // Close button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop(); // Close dialog
-                        Navigator.pop(
-                          context,
-                          true,
-                        ); // Return to previous screen
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                          ),
+                        ],
                       ),
-                      child: const Text(
-                        'Done',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                    ),
+                    SizedBox(height: isVerySmallScreen ? 16 : 24),
+                    // Food count info
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          foodCount == 1
+                              ? '1 food item added to your log'
+                              : '$foodCount food items added to your log',
+                          style: TextStyle(
+                            fontSize: isVerySmallScreen ? 14 : 16,
+                            color: Colors.grey[700],
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: isVerySmallScreen ? 24 : 32),
+                    // Close button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog
+                          Navigator.pop(
+                            context,
+                            true,
+                          ); // Return to previous screen
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            vertical: isVerySmallScreen ? 12 : 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Done',
+                          style: TextStyle(
+                            fontSize: isVerySmallScreen ? 14 : 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

@@ -594,4 +594,266 @@ class AppDesignSystem {
       lg: spaceXL,
     );
   }
+
+  // ============================================================================
+  // RESPONSIVE TEXT STYLES
+  // ============================================================================
+
+  /// Get responsive text style for display large
+  static TextStyle getResponsiveDisplayLarge(BuildContext context) {
+    return displayLarge.copyWith(
+      fontSize: getResponsiveFontSize(
+        context,
+        xs: 24,
+        sm: 28,
+        md: 32,
+        lg: 36,
+      ),
+    );
+  }
+
+  /// Get responsive text style for display medium
+  static TextStyle getResponsiveDisplayMedium(BuildContext context) {
+    return displayMedium.copyWith(
+      fontSize: getResponsiveFontSize(
+        context,
+        xs: 20,
+        sm: 24,
+        md: 28,
+        lg: 32,
+      ),
+    );
+  }
+
+  /// Get responsive text style for display small
+  static TextStyle getResponsiveDisplaySmall(BuildContext context) {
+    return displaySmall.copyWith(
+      fontSize: getResponsiveFontSize(
+        context,
+        xs: 18,
+        sm: 20,
+        md: 24,
+        lg: 28,
+      ),
+    );
+  }
+
+  /// Get responsive text style for headline large
+  static TextStyle getResponsiveHeadlineLarge(BuildContext context) {
+    return headlineLarge.copyWith(
+      fontSize: getResponsiveFontSize(
+        context,
+        xs: 18,
+        sm: 20,
+        md: 22,
+        lg: 24,
+      ),
+    );
+  }
+
+  /// Get responsive text style for headline medium
+  static TextStyle getResponsiveHeadlineMedium(BuildContext context) {
+    return headlineMedium.copyWith(
+      fontSize: getResponsiveFontSize(
+        context,
+        xs: 16,
+        sm: 18,
+        md: 20,
+        lg: 22,
+      ),
+    );
+  }
+
+  /// Get responsive text style for headline small
+  static TextStyle getResponsiveHeadlineSmall(BuildContext context) {
+    return headlineSmall.copyWith(
+      fontSize: getResponsiveFontSize(
+        context,
+        xs: 14,
+        sm: 16,
+        md: 18,
+        lg: 20,
+      ),
+    );
+  }
+
+  /// Get responsive text style for title large
+  static TextStyle getResponsiveTitleLarge(BuildContext context) {
+    return titleLarge.copyWith(
+      fontSize: getResponsiveFontSize(
+        context,
+        xs: 14,
+        sm: 15,
+        md: 16,
+        lg: 18,
+      ),
+    );
+  }
+
+  /// Get responsive text style for body large
+  static TextStyle getResponsiveBodyLarge(BuildContext context) {
+    return bodyLarge.copyWith(
+      fontSize: getResponsiveFontSize(
+        context,
+        xs: 14,
+        sm: 15,
+        md: 16,
+        lg: 18,
+      ),
+    );
+  }
+
+  /// Get responsive text style for body medium
+  static TextStyle getResponsiveBodyMedium(BuildContext context) {
+    return bodyMedium.copyWith(
+      fontSize: getResponsiveFontSize(
+        context,
+        xs: 12,
+        sm: 13,
+        md: 14,
+        lg: 16,
+      ),
+    );
+  }
+
+  /// Get responsive text style for body small
+  static TextStyle getResponsiveBodySmall(BuildContext context) {
+    return bodySmall.copyWith(
+      fontSize: getResponsiveFontSize(
+        context,
+        xs: 10,
+        sm: 11,
+        md: 12,
+        lg: 14,
+      ),
+    );
+  }
+
+  // ============================================================================
+  // RESPONSIVE DIMENSIONS
+  // ============================================================================
+
+  /// Get responsive icon size
+  static double getResponsiveIconSize(
+    BuildContext context, {
+    double xs = 16.0,
+    double sm = 20.0,
+    double md = 24.0,
+    double lg = 28.0,
+  }) {
+    return getResponsiveFontSize(context, xs: xs, sm: sm, md: md, lg: lg);
+  }
+
+  /// Get responsive image height
+  static double getResponsiveImageHeight(
+    BuildContext context, {
+    double xs = 80.0,
+    double sm = 100.0,
+    double md = 120.0,
+    double lg = 140.0,
+  }) {
+    try {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final screenHeight = MediaQuery.of(context).size.height;
+      // Use smaller of width/height for very small screens
+      if (screenHeight < 600 || screenWidth < 360) return xs;
+      if (screenWidth < 600) return sm;
+      if (screenWidth < 900) return md;
+      return lg;
+    } catch (e) {
+      return sm;
+    }
+  }
+
+  /// Get responsive button height
+  static double getResponsiveButtonHeight(
+    BuildContext context, {
+    double xs = 44.0,
+    double sm = 48.0,
+    double md = 52.0,
+    double lg = 56.0,
+  }) {
+    try {
+      final screenWidth = MediaQuery.of(context).size.width;
+      if (screenWidth < 360) return xs;
+      if (screenWidth < 600) return sm;
+      if (screenWidth < 900) return md;
+      return lg;
+    } catch (e) {
+      return sm;
+    }
+  }
+
+  /// Get responsive container width (as percentage of screen)
+  static double getResponsiveContainerWidth(
+    BuildContext context, {
+    double percentage = 0.9,
+    double? maxWidth,
+    double? minWidth,
+  }) {
+    try {
+      final screenWidth = MediaQuery.of(context).size.width;
+      double width = screenWidth * percentage;
+      if (maxWidth != null && width > maxWidth) width = maxWidth;
+      if (minWidth != null && width < minWidth) width = minWidth;
+      return width;
+    } catch (e) {
+      return 360.0 * percentage;
+    }
+  }
+
+  /// Get responsive container height (as percentage of screen)
+  static double getResponsiveContainerHeight(
+    BuildContext context, {
+    double percentage = 0.5,
+    double? maxHeight,
+    double? minHeight,
+  }) {
+    try {
+      final screenHeight = MediaQuery.of(context).size.height;
+      double height = screenHeight * percentage;
+      if (maxHeight != null && height > maxHeight) height = maxHeight;
+      if (minHeight != null && height < minHeight) height = minHeight;
+      return height;
+    } catch (e) {
+      return 640.0 * percentage;
+    }
+  }
+
+  /// Get responsive border radius
+  static double getResponsiveBorderRadius(
+    BuildContext context, {
+    double xs = radiusSM,
+    double sm = radiusMD,
+    double md = radiusLG,
+    double lg = radiusXL,
+  }) {
+    try {
+      final screenWidth = MediaQuery.of(context).size.width;
+      if (screenWidth < 360) return xs;
+      if (screenWidth < 600) return sm;
+      if (screenWidth < 900) return md;
+      return lg;
+    } catch (e) {
+      return sm;
+    }
+  }
+
+  /// Check if screen is very small (height < 600)
+  static bool isVerySmallScreen(BuildContext context) {
+    try {
+      return MediaQuery.of(context).size.height < 600;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Check if screen is narrow (width < 360)
+  static bool isNarrowScreen(BuildContext context) {
+    try {
+      return MediaQuery.of(context).size.width < 360;
+    } catch (e) {
+      return false;
+    }
+  }
 }

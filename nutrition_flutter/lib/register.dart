@@ -7,7 +7,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'utils/connectivity_notification_helper.dart';
 import 'widgets/password_strength_widget.dart';
-import 'services/railway_service.dart';
+import 'design_system/app_design_system.dart';
 
 // Use centralized apiBase from config.dart
 
@@ -119,17 +119,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         debugPrint('DEBUG: Attempting registration to: $apiBase/register');
         debugPrint('DEBUG: Registration data: $backendData');
 
-        // Use Railway service with retry logic for free tier wake-up
-        final backendResponse = await RailwayService.executeWithRetry(
-          request: () => http.post(
-            Uri.parse('$apiBase/register'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(backendData),
-          ),
-          maxRetries: 2,
-          initialTimeout: const Duration(seconds: 30),
-          wakeUpFirst: true,
-        );
+        final backendResponse = await http
+            .post(
+              Uri.parse('$apiBase/register'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(backendData),
+            )
+            .timeout(const Duration(seconds: 30));
 
         debugPrint(
           'DEBUG: Registration response status: ${backendResponse.statusCode}',
@@ -222,8 +218,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
       debugPrint('DEBUG: Registration timeout after retries - server not responding');
       
-      // Check if server is reachable
-      final isReachable = await RailwayService.isServerReachable();
+      final isReachable = await _isServerReachable();
       String errorMsg;
       if (!isReachable) {
         errorMsg = 'Cannot connect to server. Please check your internet connection and try again.';
@@ -251,6 +246,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _showErrorDialog(
         'An error occurred: ${e.toString()}\n\nPlease try again or contact support if the problem persists.',
       );
+    }
+  }
+
+  Future<bool> _isServerReachable({Duration timeout = const Duration(seconds: 5)}) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$apiBase/health'))
+          .timeout(timeout);
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -299,34 +305,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       size: 48,
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  const Text(
+                  SizedBox(height: AppDesignSystem.getResponsiveSpacingExact(
+                    context,
+                    xs: 16,
+                    sm: 18,
+                    md: 20,
+                    lg: 24,
+                  )),
+                  Text(
                     'Age Requirement',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF388E3C),
+                    style: AppDesignSystem.getResponsiveHeadlineMedium(context).copyWith(
+                      color: const Color(0xFF388E3C),
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
+                  SizedBox(height: AppDesignSystem.getResponsiveSpacingExact(
+                    context,
+                    xs: 10,
+                    sm: 12,
+                    md: 14,
+                    lg: 16,
+                  )),
+                  Text(
                     'You must be at least 21 years old to use this application. Please verify your date of birth and try again.',
-                    style: TextStyle(fontSize: 16, color: Colors.black87),
+                    style: AppDesignSystem.getResponsiveBodyLarge(context).copyWith(
+                      color: Colors.black87,
+                    ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: AppDesignSystem.getResponsiveSpacingExact(
+                    context,
+                    xs: 20,
+                    sm: 22,
+                    md: 24,
+                    lg: 28,
+                  )),
                   SizedBox(
                     width: double.infinity,
+                    height: AppDesignSystem.getResponsiveButtonHeight(context),
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(
+                            AppDesignSystem.getResponsiveBorderRadius(
+                              context,
+                              xs: AppDesignSystem.radiusSM,
+                              sm: AppDesignSystem.radiusMD,
+                            ),
+                          ),
                         ),
-                        textStyle: const TextStyle(
-                          fontSize: 16,
+                        textStyle: AppDesignSystem.getResponsiveTitleLarge(context).copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -360,6 +390,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isNarrowScreen = AppDesignSystem.isNarrowScreen(context);
+    
     return Scaffold(
       body: Stack(
         children: [
@@ -379,7 +411,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Center(
               child: SingleChildScrollView(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  padding: AppDesignSystem.getResponsivePadding(
+                    context,
+                    horizontal: isNarrowScreen ? 20.0 : 24.0,
+                    vertical: AppDesignSystem.spaceLG,
+                  ),
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -387,37 +423,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       children: [
                         Image.asset(
                           'design/logo.png',
-                          height: 100,
+                          height: AppDesignSystem.getResponsiveImageHeight(
+                            context,
+                            xs: 80,
+                            sm: 90,
+                            md: 100,
+                            lg: 110,
+                          ),
                           fit: BoxFit.contain,
                         ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: AppDesignSystem.getResponsiveSpacingExact(
+                          context,
+                          xs: 20,
+                          sm: 22,
+                          md: 24,
+                          lg: 28,
+                        )),
                         Card(
                           elevation: 8,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(
+                              AppDesignSystem.getResponsiveBorderRadius(
+                                context,
+                                xs: 20,
+                                sm: 22,
+                                md: 24,
+                                lg: 28,
+                              ),
+                            ),
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.all(24.0),
+                            padding: AppDesignSystem.getResponsivePadding(
+                              context,
+                              horizontal: AppDesignSystem.spaceLG,
+                              vertical: AppDesignSystem.spaceLG,
+                            ),
                             child: Column(
                               children: [
                                 Text(
                                   'Create Account',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
+                                  style: AppDesignSystem.getResponsiveDisplaySmall(context).copyWith(
                                     color: const Color(0xFF388E3C),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                SizedBox(height: AppDesignSystem.spaceSM),
                                 Text(
                                   'Join us and start your healthy journey',
-                                  style: TextStyle(
-                                    fontSize: 14,
+                                  style: AppDesignSystem.getResponsiveBodyMedium(context).copyWith(
                                     color: Colors.grey[600],
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-                                const SizedBox(height: 24),
+                                SizedBox(height: AppDesignSystem.getResponsiveSpacingExact(
+                                  context,
+                                  xs: 20,
+                                  sm: 22,
+                                  md: 24,
+                                  lg: 28,
+                                )),
                                 TextFormField(
                                   key: const Key('registerUsernameField'),
                                   controller: _usernameController,
@@ -716,29 +779,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                                 ],
                                 const SizedBox(height: 16),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 4,
+                                  runSpacing: 4,
                                   children: [
-                                    const Text('Already have an account? '),
+                                    const Text('Already have an account?'),
                                     TextButton(
-                                      onPressed:
-                                          _isLoading
-                                              ? null
-                                              : () {
-                                                Navigator.of(
-                                                  context,
-                                                ).pushReplacement(
-                                                  MaterialPageRoute(
-                                                    builder:
-                                                        (context) =>
-                                                            const LoginScreen(),
-                                                  ),
-                                                );
-                                              },
+                                      onPressed: _isLoading
+                                          ? null
+                                          : () {
+                                              Navigator.of(context)
+                                                  .pushReplacement(
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      const LoginScreen(),
+                                                ),
+                                              );
+                                            },
                                       style: TextButton.styleFrom(
-                                        foregroundColor: const Color(
-                                          0xFF4CAF50,
-                                        ),
+                                        foregroundColor:
+                                            const Color(0xFF4CAF50),
                                       ),
                                       child: const Text('Log in'),
                                     ),

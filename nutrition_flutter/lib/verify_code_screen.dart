@@ -390,8 +390,42 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
     );
   }
 
+  Widget _buildEmailDeliveryHelpCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text(
+            'Need help getting the code?',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Our mail provider temporarily rejected the request. Wait a minute, tap '
+            'Resend again, or email team.nutritionapp@gmail.com so we can verify you manually.',
+            style: TextStyle(fontSize: 13, color: Colors.black87),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool emailDeliveryIssue = _errorMessage.toLowerCase().contains('failed to send verification email') ||
+        _errorMessage.toLowerCase().contains('smtp');
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -554,6 +588,7 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
                                     Icons.timer_outlined,
@@ -563,14 +598,20 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                                         : Colors.blue[700],
                                   ),
                                   const SizedBox(width: 6),
-                                  Text(
-                                    'Code expires in: ${_formatCountdown(_expirationCountdown)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: _expirationCountdown < 300
-                                          ? Colors.orange[700]
-                                          : Colors.blue[700],
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        'Code expires in: ${_formatCountdown(_expirationCountdown)}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: _expirationCountdown < 300
+                                              ? Colors.orange[700]
+                                              : Colors.blue[700],
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -636,6 +677,10 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                                 ],
                               ),
                             ),
+                            if (emailDeliveryIssue) ...[
+                              const SizedBox(height: 8),
+                              _buildEmailDeliveryHelpCard(),
+                            ],
                           ],
                           if (_message.isNotEmpty) ...[
                             const SizedBox(height: 12),
@@ -690,15 +735,20 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                                   ),
                                 ),
                           const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 4,
+                            runSpacing: 4,
                             children: [
                               const Text(
-                                "Didn't receive the code? ",
+                                "Didn't receive the code?",
                                 style: TextStyle(fontSize: 14),
                               ),
                               TextButton(
-                                onPressed: _resendCountdown > 0 || _isResending || _resendCount >= _maxResends
+                                onPressed: _resendCountdown > 0 ||
+                                        _isResending ||
+                                        _resendCount >= _maxResends
                                     ? null
                                     : _resendCode,
                                 style: TextButton.styleFrom(
@@ -712,17 +762,20 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : Text(
-                                        _resendCountdown > 0
-                                            ? 'Resend in ${_resendCountdown}s'
-                                            : _resendCount >= _maxResends
-                                                ? 'Max resends reached'
-                                                : 'Resend Code',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: _resendCount >= _maxResends
-                                              ? Colors.grey
-                                              : const Color(0xFF4CAF50),
+                                    : FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          _resendCountdown > 0
+                                              ? 'Resend in ${_resendCountdown}s'
+                                              : _resendCount >= _maxResends
+                                                  ? 'Max resends reached'
+                                                  : 'Resend Code',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: _resendCount >= _maxResends
+                                                ? Colors.grey
+                                                : const Color(0xFF4CAF50),
+                                          ),
                                         ),
                                       ),
                               ),

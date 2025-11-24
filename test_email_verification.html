@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verification Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .result.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .api-url {
+            margin-bottom: 15px;
+        }
+        .api-url input {
+            font-size: 12px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Email Verification Test</h1>
+        
+        <div class="section">
+            <h2>1. API Configuration</h2>
+            <div class="form-group api-url">
+                <label for="apiUrl">Railway API URL:</label>
+                <input type="text" id="apiUrl" value="https://web-production-e167.up.railway.app" placeholder="https://your-railway-url.railway.app">
+            </div>
+            <button onclick="testConnection()">Test Connection</button>
+            <div id="connectionResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h2>2. Register New User</h2>
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" placeholder="testuser123" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" placeholder="your-email@gmail.com" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" placeholder="TestPassword123!" required>
+            </div>
+            <div class="form-group">
+                <label for="age">Age:</label>
+                <input type="number" id="age" value="25" min="18" required>
+            </div>
+            <button onclick="registerUser()">Register</button>
+            <div id="registerResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h2>3. Verify Email Code</h2>
+            <div class="form-group">
+                <label for="verifyEmail">Email:</label>
+                <input type="email" id="verifyEmail" placeholder="same-email-as-registration" required>
+            </div>
+            <div class="form-group">
+                <label for="verifyCode">Verification Code (6 digits):</label>
+                <input type="text" id="verifyCode" placeholder="123456" maxlength="6" required>
+            </div>
+            <button onclick="verifyCode()">Verify Code</button>
+            <div id="verifyResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        function getApiUrl() {
+            return document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
+        }
+
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = 'result ' + type;
+            element.style.display = 'block';
+        }
+
+        async function testConnection() {
+            const apiUrl = getApiUrl();
+            showResult('connectionResult', 'Testing connection...', 'info');
+            
+            try {
+                const response = await fetch(`${apiUrl}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('connectionResult', 
+                        `✅ Connected! Status: ${data.status || 'healthy'}, DB: ${data.db || data.ok}, Model: ${data.model || data.model_loaded}`, 
+                        'success');
+                } else {
+                    showResult('connectionResult', `❌ Connection failed: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                showResult('connectionResult', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function registerUser() {
+            const apiUrl = getApiUrl();
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const age = parseInt(document.getElementById('age').value);
+
+            if (!username || !email || !password || !age) {
+                showResult('registerResult', '❌ Please fill in all fields', 'error');
+                return;
+            }
+
+            showResult('registerResult', 'Registering...', 'info');
+
+            try {
+                const response = await fetch(`${apiUrl}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        email: email,
+                        password: password,
+                        age: age
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok || response.status === 201) {
+                    const expiresAt = data.expires_at ? new Date(data.expires_at).toLocaleString() : 'N/A';
+                    showResult('registerResult', 
+                        `✅ Registration successful!\n\n` +
+                        `Username: ${data.username}\n` +
+                        `Email: ${data.email}\n` +
+                        `Expires at: ${expiresAt}\n\n` +
+                        `📧 Check your email for the verification code!`, 
+                        'success');
+                    
+                    // Auto-fill verify email field
+                    document.getElementById('verifyEmail').value = email;
+                } else {
+                    showResult('registerResult', `❌ Registration failed: ${data.error || data.message || JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                showResult('registerResult', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function verifyCode() {
+            const apiUrl = getApiUrl();
+            const email = document.getElementById('verifyEmail').value.trim();
+            const code = document.getElementById('verifyCode').value.trim();
+
+            if (!email || !code) {
+                showResult('verifyResult', '❌ Please fill in email and code', 'error');
+                return;
+            }
+
+            if (code.length !== 6 || !/^\d+$/.test(code)) {
+                showResult('verifyResult', '❌ Code must be 6 digits', 'error');
+                return;
+            }
+
+            showResult('verifyResult', 'Verifying code...', 'info');
+
+            try {
+                const response = await fetch(`${apiUrl}/auth/verify-code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        code: code
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult('verifyResult', 
+                        `✅ Verification successful!\n\n` +
+                        `Account created: ${data.user?.username || 'N/A'}\n` +
+                        `Email: ${data.user?.email || email}\n\n` +
+                        `You can now log in!`, 
+                        'success');
+                } else {
+                    showResult('verifyResult', `❌ Verification failed: ${data.error || data.message || JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                showResult('verifyResult', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test connection on load
+        window.addEventListener('load', () => {
+            testConnection();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+

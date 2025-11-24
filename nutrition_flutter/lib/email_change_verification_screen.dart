@@ -582,12 +582,17 @@ class _EmailChangeVerificationScreenState
                             ),
                           ),
                     SizedBox(height: AppDesignSystem.spaceMD),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 4,
                       children: [
-                        Text(
-                          "Didn't receive the code? ",
-                          style: AppDesignSystem.bodyMedium,
+                        Flexible(
+                          child: Text(
+                            "Didn't receive the code?",
+                            style: AppDesignSystem.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                         TextButton(
                           onPressed: _resendCountdown > 0 || _isResending
@@ -595,6 +600,12 @@ class _EmailChangeVerificationScreenState
                               : _resendCode,
                           style: TextButton.styleFrom(
                             foregroundColor: primaryColor,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppDesignSystem.spaceXS,
+                              vertical: AppDesignSystem.spaceXS,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           child: _isResending
                               ? SizedBox(
@@ -606,13 +617,16 @@ class _EmailChangeVerificationScreenState
                                         AlwaysStoppedAnimation<Color>(primaryColor),
                                   ),
                                 )
-                              : Text(
-                                  _resendCountdown > 0
-                                      ? 'Resend in ${_resendCountdown}s'
-                                      : 'Resend Code',
-                                  style: AppDesignSystem.labelLarge.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: primaryColor,
+                              : FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    _resendCountdown > 0
+                                        ? 'Resend in ${_resendCountdown}s'
+                                        : 'Resend Code',
+                                    style: AppDesignSystem.labelLarge.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryColor,
+                                    ),
                                   ),
                                 ),
                         ),

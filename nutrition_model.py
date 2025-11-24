@@ -5,6 +5,8 @@ import os
 import sqlite3
 from typing import Dict, List, Optional, Tuple
 import json
+from datetime import datetime
+from collections import defaultdict
 
 class NutritionModel:
     def __init__(self, model_path: str = "model/best_regression_model.joblib"):
@@ -21,8 +23,29 @@ class NutritionModel:
         self.expanded_filipino_foods = self._load_expanded_filipino_foods()
         self.nutrition_guidelines = self._load_nutrition_guidelines()
         
+        # Monitoring and logging
+        self.ml_usage_stats = {
+            'total_predictions': 0,
+            'ml_predictions': 0,
+            'database_lookups': 0,
+            'rule_based_predictions': 0,
+            'ml_rejections': 0,
+            'average_confidence': 0.0,
+            'confidence_sum': 0.0,
+            'predictions_by_category': defaultdict(int),
+            'predictions_by_method': defaultdict(int)
+        }
+        self.ml_log_file = "instance/ml_predictions_log.jsonl"
+        self._ensure_log_directory()
+        
         # Load the model
         self._load_model()
+    
+    def _ensure_log_directory(self):
+        """Ensure the log directory exists"""
+        log_dir = os.path.dirname(self.ml_log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
     
     def _load_model(self):
         """Load the pre-trained regression model"""
@@ -37,6 +60,65 @@ class NutritionModel:
         except Exception as e:
             print(f"[ERROR] Error loading model: {str(e)}")
             self.model_loaded = False
+    
+    def _log_prediction(self, food_name: str, method: str, calories: float, 
+                       confidence: float = None, category: str = None, 
+                       ml_prediction: float = None, rule_based_pred: float = None):
+        """Log prediction for monitoring and analysis"""
+        try:
+            log_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'food_name': food_name,
+                'method': method,
+                'calories': calories,
+                'confidence': confidence,
+                'category': category,
+                'ml_prediction': ml_prediction,
+                'rule_based_prediction': rule_based_pred
+            }
+            
+            # Append to log file
+            with open(self.ml_log_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(log_entry) + '\n')
+        except Exception as e:
+            # Don't fail if logging fails
+            pass
+    
+    def get_usage_stats(self) -> Dict:
+        """Get ML model usage statistics"""
+        stats = self.ml_usage_stats.copy()
+        total = stats['total_predictions']
+        
+        if total > 0:
+            stats['ml_usage_percentage'] = round((stats['ml_predictions'] / total) * 100, 2)
+            stats['database_usage_percentage'] = round((stats['database_lookups'] / total) * 100, 2)
+            stats['rule_based_usage_percentage'] = round((stats['rule_based_predictions'] / total) * 100, 2)
+            
+            if stats['ml_predictions'] > 0:
+                stats['average_confidence'] = round(stats['confidence_sum'] / stats['ml_predictions'], 3)
+            else:
+                stats['average_confidence'] = 0.0
+        else:
+            stats['ml_usage_percentage'] = 0.0
+            stats['database_usage_percentage'] = 0.0
+            stats['rule_based_usage_percentage'] = 0.0
+            stats['average_confidence'] = 0.0
+        
+        return stats
+    
+    def reset_stats(self):
+        """Reset usage statistics (useful for testing or periodic resets)"""
+        self.ml_usage_stats = {
+            'total_predictions': 0,
+            'ml_predictions': 0,
+            'database_lookups': 0,
+            'rule_based_predictions': 0,
+            'ml_rejections': 0,
+            'average_confidence': 0.0,
+            'confidence_sum': 0.0,
+            'predictions_by_category': defaultdict(int),
+            'predictions_by_method': defaultdict(int)
+        }
     
     def is_model_loaded(self) -> bool:
         """Check if the model is loaded successfully"""
@@ -316,6 +398,9 @@ class NutritionModel:
         if not self.model_loaded:
             return {"error": "Model not loaded"}
         
+        # Update statistics
+        self.ml_usage_stats['total_predictions'] += 1
+        
         # Check if it's a known Filipino food
         food_name_lower = food_name.lower().replace(" ", "_")
         if food_name_lower in self.filipino_foods_db:
@@ -331,7 +416,12 @@ class NutritionModel:
                     predicted_calories, preparation_method
                 )
             
-            return {
+            # Update stats
+            self.ml_usage_stats['database_lookups'] += 1
+            self.ml_usage_stats['predictions_by_method']['database_lookup'] += 1
+            self.ml_usage_stats['predictions_by_category'][food_data["category"]] += 1
+            
+            result = {
                 "calories": round(predicted_calories, 1),
                 "confidence": 0.95,
                 "method": "database_lookup",
@@ -340,37 +430,124 @@ class NutritionModel:
                 "serving_size": serving_size
             }
         
-        # Use ML model for unknown foods, but validate predictions
+            # Log prediction
+            self._log_prediction(food_name, "database_lookup", predicted_calories, 
+                               confidence=0.95, category=food_data["category"])
+            
+            return result
+        
+        # Use ML model for unknown foods, but validate predictions intelligently
         if ingredients is None:
             ingredients = []
         
-        # Try ML model first, but validate the prediction
+        # Enhanced: Auto-detect preparation method from food name if not provided
+        if not preparation_method:
+            preparation_method = self._detect_preparation_from_name(food_name)
+        
+        # Enhanced: Extract ingredients from food name if not provided
+        if not ingredients:
+            ingredient_analysis = self._extract_ingredients_from_name(food_name)
+            # Create a simple ingredient list based on detected ingredients
+            detected_ingredients = []
+            if ingredient_analysis['has_meat']:
+                detected_ingredients.append('meat')
+            if ingredient_analysis['has_vegetable']:
+                detected_ingredients.append('vegetable')
+            if ingredient_analysis['has_grain']:
+                detected_ingredients.append('grain')
+            # Use detected ingredients count for better feature preparation
+            if detected_ingredients:
+                ingredients = detected_ingredients
+        
+        # Get rule-based prediction for comparison (needed for validation)
+        rule_based_pred = self._rule_based_calorie_prediction(
+            food_name, food_category, serving_size
+        )
+        
+        # Try ML model first, but validate the prediction with smarter logic
         ml_prediction = None
+        ml_confidence = 0.85  # Default confidence for ML predictions
         try:
             if self.model is not None and hasattr(self.model, 'predict'):
-                # Prepare features for ML model
-                features = self._prepare_features(
-                    food_name, food_category, serving_size, preparation_method, ingredients
-                )
+                # Automatically detect which features to use based on model
+                # Check if model expects 41 features (enhanced) or 13 features (basic)
+                expected_features = None
+                if hasattr(self.model, 'n_features_in_'):
+                    expected_features = self.model.n_features_in_
+                elif hasattr(self.model, 'feature_importances_'):
+                    expected_features = len(self.model.feature_importances_)
+                
+                # Use enhanced features if model expects 41, otherwise use basic (13)
+                if expected_features == 41:
+                    # Model was trained with enhanced features (41)
+                    try:
+                        features = self._prepare_enhanced_features(
+                            food_name, food_category, serving_size, preparation_method, ingredients
+                        )
+                    except Exception as e:
+                        # Fallback to basic features if enhanced fails
+                        print(f"[WARNING] Enhanced features failed, using basic: {e}")
+                        features = self._prepare_features(
+                            food_name, food_category, serving_size, preparation_method, ingredients
+                        )
+                else:
+                    # Model expects 13 features (basic) or unknown - use basic features
+                    features = self._prepare_features(
+                        food_name, food_category, serving_size, preparation_method, ingredients
+                    )
                 
                 # Make prediction
                 ml_prediction = self.model.predict([features])[0]
                 
-                # Validate ML prediction - check if it's reasonable
-                # If prediction is too high (>5000 kcal) or doesn't scale with serving size,
-                # it's likely the model isn't working correctly
-                rule_based_pred = self._rule_based_calorie_prediction(
-                    food_name, food_category, serving_size
-                )
+                # Smarter validation logic:
+                # 1. Only reject extreme outliers (>5000 kcal/100g is unrealistic for any food)
+                # 2. For high-calorie foods, use category-specific thresholds
+                # 3. Use weighted average for uncertain predictions instead of hard rejection
                 
-                # If ML prediction is way off (more than 5x rule-based or >2000 kcal), use rule-based instead
-                # Also check if prediction doesn't scale with serving size (constant predictions indicate broken model)
-                if (ml_prediction > 2000 or 
-                    (rule_based_pred > 0 and ml_prediction > rule_based_pred * 5)):
-                    ml_prediction = None  # Reject ML prediction
+                # Category-specific maximums (kcal per 100g)
+                category_max_calories = {
+                    "meats": 600,      # High-fat meats can be very calorie-dense
+                    "snacks": 550,     # Processed snacks can be high
+                    "dairy": 400,      # Full-fat dairy products
+                    "grains": 400,     # Some grain products
+                    "legumes": 350,    # Legumes with added fats
+                    "soups": 300,      # Creamy soups
+                    "fruits": 150,     # Dried fruits are highest
+                    "vegetables": 200  # Some prepared vegetables
+                }
+                
+                # Determine category for validation
+                validation_category = food_category.lower() if food_category else "meats"
+                max_allowed = category_max_calories.get(validation_category, 500)  # Default 500
+                
+                # Reject only extreme outliers
+                if ml_prediction > 5000:  # Absolute maximum (50 kcal/g is impossible)
+                    ml_prediction = None
+                    ml_confidence = 0.0
+                elif ml_prediction > max_allowed * 2:  # More than 2x category max is suspicious
+                    # Use weighted average instead of rejection
+                    if rule_based_pred > 0:
+                        # Weighted average: favor rule-based for extreme predictions
+                        ml_prediction = 0.3 * ml_prediction + 0.7 * rule_based_pred
+                        ml_confidence = 0.65  # Lower confidence for weighted predictions
+                elif rule_based_pred > 0:
+                    # Compare with rule-based prediction
+                    ratio = ml_prediction / rule_based_pred if rule_based_pred > 0 else 1.0
+                    
+                    # If prediction is way off (more than 10x or less than 0.1x), use weighted average
+                    if ratio > 10.0 or ratio < 0.1:
+                        ml_prediction = 0.6 * ml_prediction + 0.4 * rule_based_pred
+                        ml_confidence = 0.70  # Moderate confidence
+                    # If prediction is reasonable but different, adjust confidence slightly
+                    elif ratio > 3.0 or ratio < 0.33:
+                        ml_confidence = 0.75  # Slightly lower confidence
+                    # If predictions are close, high confidence
+                    elif 0.8 <= ratio <= 1.2:
+                        ml_confidence = 0.90  # High confidence when predictions agree
                     
         except Exception as e:
             ml_prediction = None  # ML model failed
+            ml_confidence = 0.0
         
         # Use rule-based prediction if ML prediction is invalid or unavailable
         if ml_prediction is None:
@@ -382,15 +559,27 @@ class NutritionModel:
             if preparation_method:
                 prediction = self._adjust_for_preparation(prediction, preparation_method)
             
-            return {
+            # Update stats
+            self.ml_usage_stats['rule_based_predictions'] += 1
+            self.ml_usage_stats['predictions_by_method']['rule_based'] += 1
+            if food_category:
+                self.ml_usage_stats['predictions_by_category'][food_category] += 1
+            
+            result = {
                 "calories": round(prediction, 1),
                 "confidence": 0.70,
                 "method": "rule_based",
                 "food_name": food_name,
                 "category": food_category,
                 "serving_size": serving_size,
-                "note": "Using rule-based prediction (ML model prediction was invalid)"
+                "note": "Using rule-based prediction (ML model unavailable or prediction rejected)"
             }
+            
+            # Log prediction
+            self._log_prediction(food_name, "rule_based", prediction, 
+                               confidence=0.70, category=food_category)
+            
+            return result
         else:
             # ML prediction is valid, use it
             # ml_prediction is in calories per 100g, so scale by serving_size
@@ -400,14 +589,29 @@ class NutritionModel:
             if preparation_method:
                 total_calories = self._adjust_for_preparation(total_calories, preparation_method)
             
-            return {
+            # Update stats
+            self.ml_usage_stats['ml_predictions'] += 1
+            self.ml_usage_stats['confidence_sum'] += ml_confidence
+            self.ml_usage_stats['predictions_by_method']['ml_model'] += 1
+            if food_category:
+                self.ml_usage_stats['predictions_by_category'][food_category] += 1
+            
+            result = {
                 "calories": round(total_calories, 1),
-                "confidence": 0.85,
+                "confidence": round(ml_confidence, 2),
                 "method": "ml_model",
                 "food_name": food_name,
                 "category": food_category,
-                "serving_size": serving_size
+                "serving_size": serving_size,
+                "calories_per_100g": round(ml_prediction, 1)  # Also return per 100g for reference
             }
+            
+            # Log prediction
+            self._log_prediction(food_name, "ml_model", total_calories, 
+                               confidence=ml_confidence, category=food_category,
+                               ml_prediction=ml_prediction, rule_based_pred=rule_based_pred)
+            
+            return result
     
     def predict_nutrition(self, food_name: str, food_category: str = "",
                          serving_size: float = 100, user_gender: str = "",
@@ -586,9 +790,129 @@ class NutritionModel:
         
         return results
     
+    def _extract_ingredients_from_name(self, food_name: str, provided_ingredients: Optional[List[str]] = None) -> Dict:
+        """Extract and categorize ingredients from food name and provided list
+        
+        Returns:
+            Dictionary with ingredient counts by category
+        """
+        if provided_ingredients is None:
+            provided_ingredients = []
+        
+        # Common ingredient keywords by category
+        meat_keywords = ['chicken', 'pork', 'beef', 'fish', 'meat', 'turkey', 'duck', 
+                        'shrimp', 'crab', 'lobster', 'squid', 'tuna', 'salmon', 'tilapia',
+                        'bangus', 'galunggong', 'adobo', 'sinigang', 'tinola']
+        vegetable_keywords = ['vegetable', 'veggie', 'cabbage', 'carrot', 'onion', 'garlic',
+                             'tomato', 'potato', 'eggplant', 'ampalaya', 'kangkong', 'malunggay',
+                             'pechay', 'sitaw', 'okra', 'squash', 'pepper', 'lettuce', 'spinach']
+        grain_keywords = ['rice', 'noodle', 'pasta', 'bread', 'wheat', 'corn', 'oats',
+                         'pancit', 'bihon', 'canton', 'spaghetti', 'kamote', 'sweet potato']
+        dairy_keywords = ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'gata', 'coconut milk']
+        legume_keywords = ['bean', 'monggo', 'munggo', 'tofu', 'lentil', 'chickpea', 'peanut']
+        
+        # Combine food name and ingredients for analysis
+        text_to_analyze = ' '.join([food_name.lower()] + [ing.lower() for ing in provided_ingredients])
+        
+        # Count ingredients by category
+        meat_count = sum(1 for keyword in meat_keywords if keyword in text_to_analyze)
+        vegetable_count = sum(1 for keyword in vegetable_keywords if keyword in text_to_analyze)
+        grain_count = sum(1 for keyword in grain_keywords if keyword in text_to_analyze)
+        dairy_count = sum(1 for keyword in dairy_keywords if keyword in text_to_analyze)
+        legume_count = sum(1 for keyword in legume_keywords if keyword in text_to_analyze)
+        
+        # Also count provided ingredients
+        total_ingredients = len(provided_ingredients) if provided_ingredients else 0
+        
+        return {
+            'meat_count': float(meat_count),
+            'vegetable_count': float(vegetable_count),
+            'grain_count': float(grain_count),
+            'dairy_count': float(dairy_count),
+            'legume_count': float(legume_count),
+            'total_ingredients': float(total_ingredients),
+            'has_meat': 1.0 if meat_count > 0 else 0.0,
+            'has_vegetable': 1.0 if vegetable_count > 0 else 0.0,
+            'has_grain': 1.0 if grain_count > 0 else 0.0,
+            'has_dairy': 1.0 if dairy_count > 0 else 0.0,
+            'has_legume': 1.0 if legume_count > 0 else 0.0
+        }
+    
+    def _detect_preparation_from_name(self, food_name: str, provided_method: str = "") -> str:
+        """Detect preparation method from food name if not provided"""
+        if provided_method:
+            return provided_method.lower()
+        
+        name_lower = food_name.lower()
+        
+        preparation_keywords = {
+            'fried': ['fried', 'fry', 'prito', 'ginisa'],
+            'deep_fried': ['deep fried', 'deep-fried', 'crispy'],
+            'grilled': ['grilled', 'grill', 'inasal', 'ihaw'],
+            'baked': ['baked', 'bake'],
+            'boiled': ['boiled', 'boil', 'nilaga', 'sinigang', 'tinola'],
+            'steamed': ['steamed', 'steam'],
+            'stir_fried': ['stir', 'ginisang', 'ginisa', 'sauteed'],
+            'raw': ['raw', 'fresh', 'sashimi'],
+            'braised': ['braised', 'adobo', 'stewed'],
+            'roasted': ['roasted', 'roast']
+        }
+        
+        for method, keywords in preparation_keywords.items():
+            if any(keyword in name_lower for keyword in keywords):
+                return method
+        
+        return ""
+    
+    def _analyze_food_name_semantics(self, food_name: str) -> Dict:
+        """Analyze food name for semantic features
+        
+        Returns:
+            Dictionary with semantic features
+        """
+        name_lower = food_name.lower()
+        
+        # Detect cuisine type
+        filipino_keywords = ['adobo', 'sinigang', 'tinola', 'kare-kare', 'pancit', 
+                            'lumpia', 'lechon', 'sisig', 'bistek', 'afritada']
+        asian_keywords = ['curry', 'stir-fry', 'teriyaki', 'sushi', 'ramen', 'pad thai']
+        
+        is_filipino = 1.0 if any(kw in name_lower for kw in filipino_keywords) else 0.0
+        is_asian = 1.0 if any(kw in name_lower for kw in asian_keywords) else 0.0
+        
+        # Detect descriptors
+        descriptors = {
+            'spicy': ['spicy', 'hot', 'chili', 'sili'],
+            'sweet': ['sweet', 'honey', 'sugar', 'caramel'],
+            'creamy': ['creamy', 'cream', 'gata', 'coconut milk'],
+            'sour': ['sour', 'tamarind', 'vinegar', 'calamansi'],
+            'salty': ['salted', 'salted', 'patis'],
+            'fried': ['fried', 'crispy', 'prito']
+        }
+        
+        descriptor_features = {}
+        for desc, keywords in descriptors.items():
+            descriptor_features[f'has_{desc}'] = 1.0 if any(kw in name_lower for kw in keywords) else 0.0
+        
+        # Word count and complexity
+        word_count = len(food_name.split())
+        has_multiple_words = 1.0 if word_count > 2 else 0.0
+        
+        return {
+            'is_filipino': is_filipino,
+            'is_asian': is_asian,
+            'word_count': float(word_count),
+            'has_multiple_words': has_multiple_words,
+            **descriptor_features
+        }
+    
     def _prepare_features(self, food_name: str, food_category: str, serving_size: float,
                          preparation_method: str, ingredients: Optional[List[str]]) -> List[float]:
-        """Prepare features for ML model prediction"""
+        """Prepare features for ML model prediction (13 features - backward compatible)
+        
+        For enhanced features (20+ features), use _prepare_enhanced_features() instead.
+        Note: Enhanced features require model retraining.
+        """
         if ingredients is None:
             ingredients = []
         
@@ -618,6 +942,83 @@ class NutritionModel:
         for cat in categories:
             features.append(1.0 if food_category.lower() == cat else 0.0)
         
+        return features
+    
+    def _prepare_enhanced_features(self, food_name: str, food_category: str, serving_size: float,
+                                   preparation_method: str, ingredients: Optional[List[str]]) -> List[float]:
+        """Prepare enhanced features for ML model (20+ features)
+        
+        This method creates enhanced features with:
+        - Ingredient analysis
+        - Better preparation method encoding
+        - Food name semantic features
+        
+        NOTE: This requires model retraining. Current model uses _prepare_features() with 13 features.
+        """
+        if ingredients is None:
+            ingredients = []
+        
+        # Start with basic features (5)
+        features = [
+            len(food_name),  # Name length
+            serving_size,    # Serving size
+            1.0 if food_category else 0.0,  # Has category
+            1.0 if preparation_method else 0.0,  # Has preparation method
+            len(ingredients) if ingredients else 0.0  # Number of ingredients
+        ]
+        
+        # Enhanced: Detect preparation method from name if not provided
+        detected_prep = self._detect_preparation_from_name(food_name, preparation_method)
+        
+        # Enhanced: Preparation method encoding (10 methods)
+        prep_methods = ['fried', 'deep_fried', 'grilled', 'baked', 'boiled', 
+                       'steamed', 'stir_fried', 'raw', 'braised', 'roasted']
+        for method in prep_methods:
+            features.append(1.0 if detected_prep == method else 0.0)
+        
+        # Enhanced: Ingredient analysis
+        ingredient_analysis = self._extract_ingredients_from_name(food_name, ingredients)
+        features.extend([
+            ingredient_analysis['meat_count'],
+            ingredient_analysis['vegetable_count'],
+            ingredient_analysis['grain_count'],
+            ingredient_analysis['dairy_count'],
+            ingredient_analysis['legume_count'],
+            ingredient_analysis['has_meat'],
+            ingredient_analysis['has_vegetable'],
+            ingredient_analysis['has_grain'],
+            ingredient_analysis['has_dairy'],
+            ingredient_analysis['has_legume']
+        ])
+        
+        # Enhanced: Food name semantic features
+        semantics = self._analyze_food_name_semantics(food_name)
+        features.extend([
+            semantics['is_filipino'],
+            semantics['is_asian'],
+            semantics['word_count'],
+            semantics['has_multiple_words'],
+            semantics.get('has_spicy', 0.0),
+            semantics.get('has_sweet', 0.0),
+            semantics.get('has_creamy', 0.0),
+            semantics.get('has_sour', 0.0)
+        ])
+        
+        # Category encoding (8 categories)
+        categories = [
+            "meats",
+            "vegetables",
+            "fruits",
+            "grains",
+            "legumes",
+            "soups",
+            "dairy",
+            "snacks",
+        ]
+        for cat in categories:
+            features.append(1.0 if food_category.lower() == cat else 0.0)
+        
+        # Total: 5 (basic) + 10 (prep) + 10 (ingredients) + 8 (semantics) + 8 (categories) = 41 features
         return features
     
     def _rule_based_calorie_prediction(self, food_name: str, food_category: str, serving_size: float) -> float:
@@ -797,8 +1198,19 @@ class NutritionModel:
             
             # Plant-based: Exclude meats, prioritize plant foods
             if "plant_based" in prefs_lower or "plant-based" in prefs_lower:
+                # Check category first
                 if category == "meats":
                     continue
+                # Also check food name for meat keywords (some foods might be mis-categorized)
+                meat_keywords = ['adobo', 'sinigang', 'lechon', 'sisig', 'tocino', 'longganisa', 
+                                'chicken', 'pork', 'beef', 'fish', 'meat', 'egg', 'seafood',
+                                'tinola', 'tinolang', 'manok', 'bangus', 'tilapia', 'galunggong']
+                if any(kw in food_name_lower for kw in meat_keywords):
+                    # But allow if it's a vegetable dish (e.g., "vegetable sinigang" - though rare)
+                    vegetable_keywords = ['vegetable', 'sitaw', 'monggo', 'ampalaya', 'kangkong']
+                    if not any(kw in food_name_lower for kw in vegetable_keywords):
+                        continue
+                
                 # Prioritize vegetables, fruits, grains, legumes
                 if category not in ["vegetables", "fruits", "grains", "legumes"]:
                     # Skip dairy unless specifically needed
@@ -806,10 +1218,24 @@ class NutritionModel:
                         continue
             
             # Legacy support for vegetarian/vegan if someone manually added it
-            if "vegetarian" in prefs_lower and category == "meats":
-                continue
-            if "vegan" in prefs_lower and category in ["meats", "dairy"]:
-                continue
+            if "vegetarian" in prefs_lower:
+                if category == "meats":
+                    continue
+                # Also check name for meat keywords
+                meat_keywords = ['adobo', 'sinigang', 'chicken', 'pork', 'beef', 'fish', 'meat',
+                                'tinola', 'tinolang', 'manok', 'bangus', 'tilapia']
+                if any(kw in food_name_lower for kw in meat_keywords):
+                    continue
+                    
+            if "vegan" in prefs_lower:
+                if category in ["meats", "dairy"]:
+                    continue
+                # Also check name for meat/dairy keywords
+                meat_keywords = ['adobo', 'sinigang', 'chicken', 'pork', 'beef', 'fish', 'meat', 'egg',
+                                'tinola', 'tinolang', 'manok', 'bangus', 'tilapia']
+                dairy_keywords = ['milk', 'cheese', 'butter', 'cream', 'gata']
+                if any(kw in food_name_lower for kw in meat_keywords + dairy_keywords):
+                    continue
             
             # All other preferences (healthy, comfort, spicy, sweet, protein) 
             # don't filter out foods, they just influence scoring/prioritization

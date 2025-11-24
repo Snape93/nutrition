@@ -1,15 +1,20 @@
-"""Email service for sending verification emails via Resend API (or SMTP fallback)"""
+"""Email service for sending verification emails via SMTP"""
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
+import json
 import os
-import requests
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
+
+def _truthy(value):
+    if value is None:
+        return False
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
 
 def _get_smtp_timeout():
     """Resolve SMTP timeout (seconds) with safe fallback."""
@@ -20,66 +25,11 @@ def _get_smtp_timeout():
 
 
 SMTP_TIMEOUT = _get_smtp_timeout()
-
-def _send_email_via_resend_api(from_email: str, to_email: str, subject: str, html_content: str, text_content: str) -> bool:
-    """
-    Send email via Resend API (works on Railway).
-    
-    Args:
-        from_email: Sender email address
-        to_email: Recipient email address
-        subject: Email subject
-        html_content: HTML email body
-        text_content: Plain text email body
-        
-    Returns:
-        True if email sent successfully, False otherwise
-    """
-    try:
-        api_key = os.environ.get('RESEND_API_KEY')
-        if not api_key:
-            print("[ERROR] RESEND_API_KEY not configured. Set RESEND_API_KEY in Railway Variables.")
-            return False
-        
-        api_url = "https://api.resend.com/emails"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        # Use Resend's test domain for unverified domains, or verified domain if available
-        # For testing: use onboarding@resend.dev (no verification needed)
-        # For production: verify your domain in Resend and use your verified email
-        resend_from_email = os.environ.get('RESEND_FROM_EMAIL', 'onboarding@resend.dev')
-        
-        payload = {
-            "from": f"Nutrition App <{resend_from_email}>",
-            "to": [to_email],
-            "subject": subject,
-            "html": html_content,
-            "text": text_content
-        }
-        
-        print(f"[INFO] Sending email via Resend API to {to_email}...")
-        response = requests.post(api_url, json=payload, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            result = response.json()
-            print(f"[SUCCESS] Email sent via Resend API. ID: {result.get('id', 'N/A')}")
-            return True
-        else:
-            error_msg = response.text
-            print(f"[ERROR] Resend API failed: Status {response.status_code}, Error: {error_msg}")
-            return False
-            
-    except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Resend API request failed: {e}")
-        return False
-    except Exception as e:
-        print(f"[ERROR] Unexpected error with Resend API: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+EMAIL_TEST_MODE = _truthy(os.environ.get('EMAIL_TEST_MODE'))
+EMAIL_TEST_LOG = os.environ.get(
+    'EMAIL_TEST_LOG',
+    os.path.join(os.path.dirname(__file__), 'instance', 'email_test_log.jsonl')
+)
 
 def _send_email_via_smtp(msg, mail_server: str, mail_username: str, mail_password: str) -> bool:
     """
@@ -137,7 +87,7 @@ def _send_email_via_smtp(msg, mail_server: str, mail_username: str, mail_passwor
 
 def send_verification_email(email: str, code: str, username: str = None) -> bool:
     """
-    Send verification code email to user via Resend API (or SMTP fallback).
+    Send verification code email via SMTP.
     
     Args:
         email: Recipient email address
@@ -205,7 +155,7 @@ Nutritionist App Team"""
 </body>
 </html>"""
         
-        # Send email using Resend API or SMTP fallback
+        # Send email via SMTP
         success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Verification email sent to {email}")
@@ -219,9 +169,28 @@ Nutritionist App Team"""
         traceback.print_exc()
         return False
 
+def _record_test_email(to_email: str, subject: str, text_body: str, html_body: str):
+    """Save email contents to a log file when EMAIL_TEST_MODE is enabled."""
+    if not EMAIL_TEST_MODE:
+        return
+    try:
+        os.makedirs(os.path.dirname(EMAIL_TEST_LOG), exist_ok=True)
+        payload = {
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'to': to_email,
+            'subject': subject,
+            'text': text_body,
+            'html': html_body,
+        }
+        with open(EMAIL_TEST_LOG, 'a', encoding='utf-8') as fp:
+            fp.write(json.dumps(payload) + '\n')
+    except Exception as err:
+        print(f"[WARN] Failed to log test email: {err}")
+
+
 def _send_email_with_fallback(from_email: str, to_email: str, subject: str, html_body: str, text_body: str) -> bool:
     """
-    Send email using Resend API (preferred) or SMTP fallback.
+    Send email via SMTP using TLS first, then SSL if needed.
     
     Args:
         from_email: Sender email address
@@ -233,23 +202,17 @@ def _send_email_with_fallback(from_email: str, to_email: str, subject: str, html
     Returns:
         True if email sent successfully, False otherwise
     """
-    # Try Resend API first (works on Railway)
-    if os.environ.get('RESEND_API_KEY'):
-        success = _send_email_via_resend_api(from_email, to_email, subject, html_body, text_body)
-        if success:
-            return True
-        else:
-            print(f"[WARN] Resend API failed, trying SMTP fallback...")
-    
-    # Fallback to SMTP (for local development)
     mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
     mail_password = os.environ.get('GMAIL_APP_PASSWORD')
     
     if not from_email or not mail_password:
-        print("[ERROR] Email not configured. Set RESEND_API_KEY (for Railway) or GMAIL_USERNAME/GMAIL_APP_PASSWORD (for local)")
+        print("[ERROR] Email not configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD environment variables.")
+        if EMAIL_TEST_MODE:
+            print("[INFO] EMAIL_TEST_MODE=1, simulating email delivery.")
+            _record_test_email(to_email, subject, text_body, html_body)
+            return True
         return False
     
-    # Create SMTP message
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
     msg['From'] = from_email
@@ -260,8 +223,17 @@ def _send_email_with_fallback(from_email: str, to_email: str, subject: str, html
     msg.attach(part1)
     msg.attach(part2)
     
-    # Send via SMTP
-    return _send_email_via_smtp(msg, mail_server, from_email, mail_password)
+    sent = _send_email_via_smtp(msg, mail_server, from_email, mail_password)
+    if sent:
+        _record_test_email(to_email, subject, text_body, html_body)
+        return True
+    
+    if EMAIL_TEST_MODE:
+        print("[WARN] SMTP failed but EMAIL_TEST_MODE is enabled. Recording email and continuing.")
+        _record_test_email(to_email, subject, text_body, html_body)
+        return True
+    
+    return False
 
 def generate_verification_code() -> str:
     """Generate a random 6-digit verification code"""
@@ -347,7 +319,7 @@ Nutritionist App Team"""
 </body>
 </html>"""
         
-        # Send email using Resend API or SMTP fallback
+        # Send email via SMTP
         success = _send_email_with_fallback(mail_username, new_email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Email change verification email sent to {new_email}")
@@ -460,7 +432,7 @@ Nutritionist App Team"""
 </body>
 </html>"""
         
-        # Send email using Resend API or SMTP fallback
+        # Send email via SMTP
         success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Account deletion verification email sent to {email}")
@@ -607,7 +579,7 @@ The verification code has been sent to your new email address: {new_email}
 </body>
 </html>"""
         
-        # Send email using Resend API or SMTP fallback
+        # Send email via SMTP
         success = _send_email_with_fallback(mail_username, old_email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Email change notification sent to {old_email}")
@@ -691,7 +663,7 @@ Nutritionist App Team"""
 </body>
 </html>"""
         
-        # Send email using Resend API or SMTP fallback
+        # Send email via SMTP
         success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Password change verification email sent to {email}")
@@ -781,7 +753,7 @@ Nutritionist App Team"""
 </body>
 </html>"""
         
-        # Send email using Resend API or SMTP fallback
+        # Send email via SMTP
         success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
             print(f"[SUCCESS] Password reset verification email sent to {email}")

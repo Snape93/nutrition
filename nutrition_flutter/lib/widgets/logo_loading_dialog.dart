@@ -21,19 +21,22 @@ class LogoLoadingFullScreen extends StatelessWidget {
       color: backgroundColor,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          AnimatedLogoWidget(
-            size: 140,
+        children: [
+          const AnimatedLogoWidget(
+            size: 120, // slightly smaller logo for a more balanced look
           ),
-          SizedBox(height: 24),
-          Text(
+          const SizedBox(height: 16),
+          const Text(
             'Nutritionist App',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF388E3C),
-            ),
             textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.15, // subtle system-like spacing
+              height: 1.3,
+              color: Color(0xFF388E3C),
+              decoration: TextDecoration.none,
+            ),
           ),
         ],
       ),

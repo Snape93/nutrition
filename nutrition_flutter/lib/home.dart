@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'dart:convert';
+
 import 'profile_view.dart';
 import 'settings.dart';
 import 'theme_service.dart';
@@ -20,6 +22,10 @@ import 'screens/custom_meals_screen.dart';
 import 'screens/ai_coach_chat_screen.dart';
 import 'services/progress_data_service.dart';
 import 'models/graph_models.dart';
+import 'onboarding/widgets/emoji_selector.dart';
+import 'utils/user_profile_helper.dart';
+import 'config.dart' as config;
+import 'package:http/http.dart' as http;
 // Removed graph-related imports to prevent paused exceptions
 
 class HomePage extends StatefulWidget {
@@ -63,6 +69,10 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
   DateTime? _lastBackPress;
 
+  // Mood & energy state (loaded from backend / onboarding)
+  String? _currentMoodValue; // e.g., 'calm', 'happy'
+  String? _currentEnergyValue; // e.g., 'good', 'high'
+
   @override
   void initState() {
     super.initState();
@@ -105,6 +115,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
         _loadCalorieGoal(),
         _loadTodayCalories(),
         _loadRemainingFromBackend(),
+        _loadMoodEnergy(),
       ]);
     } catch (e) {
       setState(() {
@@ -255,6 +266,42 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   // Removed all graph-related methods to prevent paused exceptions
+  // Mood & energy helpers
+  String get _currentMoodLabel {
+    final options = EmojiOptions.getMoodOptions();
+    final value = _currentMoodValue ?? 'calm';
+    return options
+        .firstWhere(
+          (o) => o.value == value,
+          orElse: () => options[1], // Calm as sensible default
+        )
+        .label;
+  }
+
+  String get _currentEnergyLabel {
+    final options = EmojiOptions.getEnergyOptions();
+    final value = _currentEnergyValue ?? 'good';
+    return options
+        .firstWhere(
+          (o) => o.value == value,
+          orElse: () => options[1], // Good Energy as default
+        )
+        .label;
+  }
+
+  Future<void> _loadMoodEnergy() async {
+    try {
+      final result =
+          await UserProfileHelper.fetchMoodEnergy(widget.usernameOrEmail);
+      if (!mounted) return;
+      setState(() {
+        _currentMoodValue = result['mood'] ?? _currentMoodValue;
+        _currentEnergyValue = result['energy'] ?? _currentEnergyValue;
+      });
+    } catch (e) {
+      debugPrint('DEBUG: Failed to load mood/energy: $e');
+    }
+  }
 
   Widget _buildMenuCard({
     required IconData icon,
@@ -308,6 +355,240 @@ class _HomePageState extends State<HomePage> with RouteAware {
         ),
       ),
     );
+  }
+
+  Widget _buildMoodEnergyCard({
+    required bool isVerySmallScreen,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isVerySmallScreen ? 12 : 16),
+        child: Row(
+          children: [
+            Icon(
+              Icons.emoji_emotions_outlined,
+              color: primaryColor,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Today\'s check-in',
+                    style: TextStyle(
+                      fontSize: isVerySmallScreen ? 14 : 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Mood: $_currentMoodLabel · Energy: $_currentEnergyLabel',
+                    style: TextStyle(
+                      fontSize: isVerySmallScreen ? 12 : 13,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () => _showMoodEnergyEditor(isVerySmallScreen),
+              child: const Text('Update'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMoodEnergyEditor(bool isVerySmallScreen) {
+    final initialMood = _currentMoodValue ?? 'calm';
+    final initialEnergy = _currentEnergyValue ?? 'good';
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) {
+        String selectedMood = initialMood;
+        String selectedEnergy = initialEnergy;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.all(isVerySmallScreen ? 12 : 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Update today\'s check-in',
+                              style: TextStyle(
+                                fontSize: isVerySmallScreen ? 16 : 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'This helps tailor your recommendations for how you feel today.',
+                          style: TextStyle(
+                            fontSize: isVerySmallScreen ? 12 : 13,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        EmojiSelector(
+                          options: EmojiOptions.getMoodOptions(),
+                          selectedValue: selectedMood,
+                          onChanged: (value) {
+                            setModalState(() {
+                              selectedMood = value;
+                            });
+                          },
+                          title: 'How are you feeling?',
+                          subtitle: null,
+                          allowMultipleSelection: false,
+                          primaryColor: primaryColor,
+                        ),
+                        const SizedBox(height: 12),
+                        EmojiSelector(
+                          options: EmojiOptions.getEnergyOptions(),
+                          selectedValue: selectedEnergy,
+                          onChanged: (value) {
+                            setModalState(() {
+                              selectedEnergy = value;
+                            });
+                          },
+                          title: 'Energy level',
+                          subtitle: null,
+                          allowMultipleSelection: false,
+                          primaryColor: primaryColor,
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              padding: EdgeInsets.symmetric(
+                                vertical: isVerySmallScreen ? 12 : 14,
+                              ),
+                            ),
+                            onPressed: () async {
+                              await _saveMoodEnergy(
+                                mood: selectedMood,
+                                energy: selectedEnergy,
+                              );
+                              if (mounted) {
+                                Navigator.pop(context);
+                              }
+                            },
+                            child: Text(
+                              'Save',
+                              style: TextStyle(
+                                fontSize: isVerySmallScreen ? 14 : 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _saveMoodEnergy({
+    required String mood,
+    required String energy,
+  }) async {
+    try {
+      final uri = Uri.parse('${config.apiBase}/user/${widget.usernameOrEmail}');
+      final body = jsonEncode({
+        'currentMood': mood,
+        'energyLevel': energy,
+      });
+      final response = await http
+          .put(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _currentMoodValue = mood;
+          _currentEnergyValue = energy;
+        });
+        UserProfileHelper.clearCache();
+        _scaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: const Text('Today\'s check-in updated.'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: primaryColor,
+          ),
+        );
+      } else {
+        debugPrint(
+          'DEBUG: Failed to save mood/energy: ${response.statusCode} ${response.body}',
+        );
+        _scaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Could not update check-in. Please try again.',
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('DEBUG: Error saving mood/energy: $e');
+      if (!mounted) return;
+      _scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Network error while updating check-in.',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Widget _buildMoreContent(bool isVerySmallScreen, bool isNarrowScreen) {
@@ -727,13 +1008,18 @@ class _HomePageState extends State<HomePage> with RouteAware {
                   ),
                 ),
               ),
+          // Today's mood & energy check-in card
+          SizedBox(height: isVerySmallScreen ? 12 : 18),
+          _buildMoodEnergyCard(
+            isVerySmallScreen: isVerySmallScreen,
+          ),
 
-              // AI Coach preview card
-              SizedBox(height: isVerySmallScreen ? 12 : 18),
-              _buildAiCoachCard(
-                isVerySmallScreen: isVerySmallScreen,
-                isNarrowScreen: isNarrowScreen,
-              ),
+          // AI Coach preview card
+          SizedBox(height: isVerySmallScreen ? 12 : 18),
+          _buildAiCoachCard(
+            isVerySmallScreen: isVerySmallScreen,
+            isNarrowScreen: isNarrowScreen,
+          ),
               if (_showManualHealthCard) ...[
                 SizedBox(height: isVerySmallScreen ? 12 : 18),
                 Card(

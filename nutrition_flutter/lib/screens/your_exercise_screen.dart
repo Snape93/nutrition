@@ -44,6 +44,7 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
   final TextEditingController _notesController = TextEditingController();
   String _category = 'Cardio';
   String _intensity = 'Medium';
+  String _durationUnit = 'min'; // 'min', 'sec', or 'hr'
   bool _submitting = false;
   String? _userGender;
   late TabController _tabController;
@@ -71,7 +72,6 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
     super.didChangeDependencies();
     routeObserver.subscribe(this, ModalRoute.of(context)! as PageRoute);
   }
-
 
   void _onTabChanged() {
     if (_tabController.index == 0 && !_tabController.indexIsChanging) {
@@ -107,14 +107,16 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
     });
 
     try {
-      debugPrint('🔄 Loading custom exercise history for: ${widget.usernameOrEmail}');
-      
+      debugPrint(
+        '🔄 Loading custom exercise history for: ${widget.usernameOrEmail}',
+      );
+
       // First, get custom exercise names
       final customNames = await CustomExerciseService.getCustomExerciseNames(
         user: widget.usernameOrEmail,
       );
       debugPrint('📋 Found ${customNames.length} custom exercise names');
-      
+
       if (mounted) {
         setState(() {
           _customExerciseNames = customNames.toSet();
@@ -131,43 +133,45 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
         debugPrint('📊 Found ${sessions.length} total exercise sessions');
 
         // Filter exercises by custom exercise names
-        final filteredSessions = sessions.where((session) {
-          final exerciseName = session['exercise_name'] as String? ?? '';
-          final isCustomExercise = _customExerciseNames.contains(exerciseName);
-          
-          debugPrint(
-            '   Exercise: $exerciseName -> Custom: $isCustomExercise',
-          );
+        final filteredSessions =
+            sessions.where((session) {
+              final exerciseName = session['exercise_name'] as String? ?? '';
+              final isCustomExercise = _customExerciseNames.contains(
+                exerciseName,
+              );
 
-          return isCustomExercise;
-        }).toList();
+              debugPrint(
+                '   Exercise: $exerciseName -> Custom: $isCustomExercise',
+              );
 
-        debugPrint(
-          '✅ Filtered to ${filteredSessions.length} custom exercises',
-        );
+              return isCustomExercise;
+            }).toList();
+
+        debugPrint('✅ Filtered to ${filteredSessions.length} custom exercises');
 
         // Convert to display format
         final today = DateTime.now();
         final todayStr =
             '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-        final workouts = filteredSessions.map((session) {
-          final dateStr = session['date'] as String? ?? '';
-          final durationSecs = session['duration_seconds'] as int? ?? 0;
-          final durationMins = (durationSecs / 60).round();
-          final calories =
-              (session['calories_burned'] as num?)?.toDouble() ?? 0.0;
+        final workouts =
+            filteredSessions.map((session) {
+              final dateStr = session['date'] as String? ?? '';
+              final durationSecs = session['duration_seconds'] as int? ?? 0;
+              final durationMins = (durationSecs / 60).round();
+              final calories =
+                  (session['calories_burned'] as num?)?.toDouble() ?? 0.0;
 
-          return {
-            'id': session['id'],
-            'exercise_name': session['exercise_name'] ?? 'Exercise',
-            'duration': durationMins,
-            'calories': calories,
-            'date': dateStr,
-            'created_at': session['created_at'] ?? dateStr,
-            'isToday': dateStr == todayStr,
-          };
-        }).toList();
+              return {
+                'id': session['id'],
+                'exercise_name': session['exercise_name'] ?? 'Exercise',
+                'duration': durationMins,
+                'calories': calories,
+                'date': dateStr,
+                'created_at': session['created_at'] ?? dateStr,
+                'isToday': dateStr == todayStr,
+              };
+            }).toList();
 
         // Sort by date (newest first)
         workouts.sort((a, b) {
@@ -219,12 +223,17 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
     setState(() => _submitting = true);
 
     final name = _nameController.text.trim();
-    final duration = int.tryParse(_durationController.text.trim());
+    final rawDuration = int.tryParse(_durationController.text.trim());
+    final duration = _convertDurationToMinutes(rawDuration);
     final reps = int.tryParse(_repsController.text.trim());
     final sets = int.tryParse(_setsController.text.trim());
 
     // Calculate personalized calories based on user's weight
-    final effectiveCalories = await _estimateCaloriesPersonalized(duration, _intensity, _category);
+    final effectiveCalories = await _estimateCaloriesPersonalized(
+      duration,
+      _intensity,
+      _category,
+    );
 
     // Save locally; allow test injection override
     final saver =
@@ -284,17 +293,17 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
 
     // Show professional success overlay
     _showSuccessOverlay(name, effectiveCalories, _category);
-    
+
     // Refresh history after submission
     _loadLoggedExercises();
-    
+
     // Clear form
     _nameController.clear();
     _durationController.clear();
     _repsController.clear();
     _setsController.clear();
     _notesController.clear();
-    
+
     if (widget.closeOnSubmit) {
       // Close after overlay disappears
       Future.delayed(const Duration(milliseconds: 2000), () {
@@ -462,43 +471,51 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
   double _getMetFromIntensity(String intensity, String category) {
     // Base MET values by intensity (standard MET ranges)
     final baseMet = switch (intensity) {
-      'Low' => 3.0,      // Light intensity (e.g., walking, stretching)
-      'Medium' => 6.0,   // Moderate intensity (e.g., jogging, cycling)
-      'High' => 9.0,     // Vigorous intensity (e.g., running, HIIT)
-      _ => 5.0,          // Default moderate
+      'Low' => 3.0, // Light intensity (e.g., walking, stretching)
+      'Medium' => 6.0, // Moderate intensity (e.g., jogging, cycling)
+      'High' => 9.0, // Vigorous intensity (e.g., running, HIIT)
+      _ => 5.0, // Default moderate
     };
-    
+
     // Adjust based on category
     final categoryLower = category.toLowerCase();
-    if (categoryLower.contains('cardio') || categoryLower.contains('dance') || categoryLower.contains('sports')) {
+    if (categoryLower.contains('cardio') ||
+        categoryLower.contains('dance') ||
+        categoryLower.contains('sports')) {
       // Cardio exercises typically have higher MET
       return baseMet * 1.1; // Slightly higher for cardio
     } else if (categoryLower.contains('strength')) {
       // Strength exercises typically have moderate MET
       return baseMet * 0.9; // Slightly lower for strength
     }
-    
+
     return baseMet;
   }
 
   // Calculate personalized calories using MET formula
-  Future<int> _estimateCaloriesPersonalized(int? durationMin, String intensity, String category) async {
+  Future<int> _estimateCaloriesPersonalized(
+    int? durationMin,
+    String intensity,
+    String category,
+  ) async {
     if (durationMin == null || durationMin <= 0) return 0;
-    
+
     try {
       // Get user's weight
       final userData = await UserDatabase().getUserData(widget.usernameOrEmail);
-      final weightKg = (userData?['weight_kg'] as num?)?.toDouble() ?? 70.0; // Default to 70kg
-      
+      final weightKg =
+          (userData?['weight_kg'] as num?)?.toDouble() ??
+          70.0; // Default to 70kg
+
       // Get MET value from intensity
       final metValue = _getMetFromIntensity(intensity, category);
-      
+
       // Calculate: (MET × Weight) / 60 = calories per minute
       final caloriesPerMin = (metValue * weightKg) / 60.0;
-      
+
       // Total calories = calories per minute × duration
       final totalCalories = (caloriesPerMin * durationMin).round();
-      
+
       return totalCalories;
     } catch (e) {
       // Fallback to simple calculation if user data fetch fails
@@ -513,216 +530,243 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
     }
   }
 
+  /// Convert typed duration in the selected unit into minutes for calculations.
+  int? _convertDurationToMinutes(int? value) {
+    if (value == null || value <= 0) return null;
+
+    switch (_durationUnit) {
+      case 'sec':
+        // Round to nearest whole minute
+        return (value / 60).round();
+      case 'hr':
+        return value * 60;
+      case 'min':
+      default:
+        return value;
+    }
+  }
 
   Widget _buildHistoryTab() {
-    final content = loggedExercises.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.history, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  isLoadingHistory
-                      ? 'Loading exercise history...'
-                      : 'No custom exercise history yet',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Add exercises to see them here',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                ),
-              ],
-            ),
-          )
-        : RefreshIndicator(
-            onRefresh: _loadLoggedExercises,
-            color: _primaryColor,
-            child: ListView.builder(
-              padding: EdgeInsets.all(16),
-              itemCount: loggedExercises.length,
-              itemBuilder: (context, index) {
-                final workout = loggedExercises[index];
-                final sessionId = workout['id'] as int?;
-                final exerciseName =
-                    workout['exercise_name'] as String? ?? 'Exercise';
-                final duration = workout['duration'] as int? ?? 0;
-                final calories = workout['calories'] as double? ?? 0.0;
-                final dateTime = workout['created_at'] as String? ?? '';
-                final isToday = workout['isToday'] as bool? ?? false;
-
-                // Format date/time
-                String displayDate = '';
-                try {
-                  if (dateTime.isNotEmpty) {
-                    final dt = DateTime.parse(dateTime);
-                    if (isToday) {
-                      displayDate =
-                          'Today at ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-                    } else {
-                      displayDate = '${dt.day}/${dt.month}/${dt.year}';
-                    }
-                  }
-                } catch (e) {
-                  displayDate = dateTime;
-                }
-
-                return Dismissible(
-                  key: Key('custom_exercise_${sessionId}_$index'),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    margin: EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    alignment: Alignment.centerRight,
-                    padding: EdgeInsets.only(right: 20),
-                    child: Icon(Icons.delete, color: Colors.white, size: 28),
+    final content =
+        loggedExercises.isEmpty
+            ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.history, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    isLoadingHistory
+                        ? 'Loading exercise history...'
+                        : 'No custom exercise history yet',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
-                  confirmDismiss: (direction) async {
-                    // Show confirmation dialog
-                    return await showDialog<bool>(
-                          context: context,
-                          builder:
-                              (context) => AlertDialog(
-                                title: Text('Delete Exercise?'),
-                                content: Text(
-                                  'Are you sure you want to delete "$exerciseName"? This action cannot be undone.',
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(false),
-                                    child: Text(
-                                      'Cancel',
-                                      style: TextStyle(color: Colors.grey[600]),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(true),
-                                    child: Text(
-                                      'Delete',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                        ) ??
-                        false;
-                  },
-                  onDismissed: (direction) async {
-                    if (sessionId != null) {
-                      final success = await ExerciseService.deleteExerciseSession(
-                        sessionId,
-                      );
-                      if (success) {
-                        // Remove from local list
-                        setState(() {
-                          loggedExercises.removeAt(index);
-                        });
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add exercises to see them here',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+            )
+            : RefreshIndicator(
+              onRefresh: _loadLoggedExercises,
+              color: _primaryColor,
+              child: ListView.builder(
+                padding: EdgeInsets.all(16),
+                itemCount: loggedExercises.length,
+                itemBuilder: (context, index) {
+                  final workout = loggedExercises[index];
+                  final sessionId = workout['id'] as int?;
+                  final exerciseName =
+                      workout['exercise_name'] as String? ?? 'Exercise';
+                  final duration = workout['duration'] as int? ?? 0;
+                  final calories = workout['calories'] as double? ?? 0.0;
+                  final dateTime = workout['created_at'] as String? ?? '';
+                  final isToday = workout['isToday'] as bool? ?? false;
 
-                        // Clear progress cache to refresh dashboard/progress
-                        ProgressDataService.clearCache();
-
-                        // Show success message
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Exercise deleted'),
-                            backgroundColor: _primaryColor,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
+                  // Format date/time
+                  String displayDate = '';
+                  try {
+                    if (dateTime.isNotEmpty) {
+                      final dt = DateTime.parse(dateTime);
+                      if (isToday) {
+                        displayDate =
+                            'Today at ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
                       } else {
-                        // Reload list if delete failed
-                        _loadLoggedExercises();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Failed to delete exercise'),
-                            backgroundColor: Colors.red,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
+                        displayDate = '${dt.day}/${dt.month}/${dt.year}';
                       }
                     }
-                  },
-                  child: Card(
-                    elevation: 2,
-                    margin: EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  } catch (e) {
+                    displayDate = dateTime;
+                  }
+
+                  return Dismissible(
+                    key: Key('custom_exercise_${sessionId}_$index'),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      margin: EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.centerRight,
+                      padding: EdgeInsets.only(right: 20),
+                      child: Icon(Icons.delete, color: Colors.white, size: 28),
                     ),
-                    child: ListTile(
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: _primaryColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Icon(
-                          Icons.add_circle_outline,
-                          color: _primaryColor,
-                          size: 20,
-                        ),
+                    confirmDismiss: (direction) async {
+                      // Show confirmation dialog
+                      return await showDialog<bool>(
+                            context: context,
+                            builder:
+                                (context) => AlertDialog(
+                                  title: Text('Delete Exercise?'),
+                                  content: Text(
+                                    'Are you sure you want to delete "$exerciseName"? This action cannot be undone.',
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed:
+                                          () =>
+                                              Navigator.of(context).pop(false),
+                                      child: Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed:
+                                          () => Navigator.of(context).pop(true),
+                                      child: Text(
+                                        'Delete',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                          ) ??
+                          false;
+                    },
+                    onDismissed: (direction) async {
+                      if (sessionId != null) {
+                        final success =
+                            await ExerciseService.deleteExerciseSession(
+                              sessionId,
+                            );
+                        if (success) {
+                          // Remove from local list
+                          setState(() {
+                            loggedExercises.removeAt(index);
+                          });
+
+                          // Clear progress cache to refresh dashboard/progress
+                          ProgressDataService.clearCache();
+
+                          // Show success message
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Exercise deleted'),
+                              backgroundColor: _primaryColor,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        } else {
+                          // Reload list if delete failed
+                          _loadLoggedExercises();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to delete exercise'),
+                              backgroundColor: Colors.red,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: Card(
+                      elevation: 2,
+                      margin: EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      title: Text(
-                        exerciseName,
-                        style:
-                            TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(Icons.timer,
-                                  size: 14, color: Colors.grey[600]),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$duration min',
-                                style: TextStyle(
-                                  fontSize: 12,
+                      child: ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: _primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Icon(
+                            Icons.add_circle_outline,
+                            color: _primaryColor,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          exerciseName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.timer,
+                                  size: 14,
                                   color: Colors.grey[600],
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              Icon(
-                                Icons.local_fire_department,
-                                size: 14,
-                                color: _primaryColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${calories.toStringAsFixed(1)} kcal',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: _primaryColor,
-                                  fontWeight: FontWeight.w600,
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$duration min',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
                                 ),
+                                const SizedBox(width: 16),
+                                Icon(
+                                  Icons.local_fire_department,
+                                  size: 14,
+                                  color: _primaryColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${calories.toStringAsFixed(1)} kcal',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: _primaryColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              displayDate,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[500],
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            displayDate,
-                            style:
-                                TextStyle(fontSize: 11, color: Colors.grey[500]),
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
-          );
+                  );
+                },
+              ),
+            );
 
     return Stack(
       children: [
@@ -746,9 +790,7 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
       padding: const EdgeInsets.all(16),
       child: Card(
         elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Form(
@@ -756,6 +798,11 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  'Create a custom exercise so we can include it in your calorie tracking.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
@@ -776,7 +823,7 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _category,
+                        initialValue: _category,
                         decoration: InputDecoration(
                           labelText: 'Category',
                           labelStyle: TextStyle(color: _primaryColor),
@@ -808,7 +855,7 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _intensity,
+                        initialValue: _intensity,
                         decoration: InputDecoration(
                           labelText: 'Intensity',
                           labelStyle: TextStyle(color: _primaryColor),
@@ -825,10 +872,7 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                             value: 'Medium',
                             child: Text('Medium'),
                           ),
-                          DropdownMenuItem(
-                            value: 'High',
-                            child: Text('High'),
-                          ),
+                          DropdownMenuItem(value: 'High', child: Text('High')),
                         ],
                         onChanged:
                             (v) => setState(() => _intensity = v ?? 'Medium'),
@@ -844,7 +888,8 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                         controller: _durationController,
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
-                          labelText: 'Duration (min)',
+                          labelText: 'Duration',
+                          hintText: 'e.g. 20',
                           labelStyle: TextStyle(color: _primaryColor),
                           focusedBorder: OutlineInputBorder(
                             borderSide: BorderSide(
@@ -852,18 +897,48 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                               width: 2,
                             ),
                           ),
+                          suffixIcon: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _durationUnit,
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'sec',
+                                  child: Text('sec'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'min',
+                                  child: Text('min'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'hr',
+                                  child: Text('hr'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _durationUnit = value;
+                                });
+                              },
+                            ),
+                          ),
+                          suffixIconConstraints: const BoxConstraints(
+                            minWidth: 64,
+                          ),
                         ),
                         validator: (v) {
-                          if ((v == null || v.isEmpty) &&
-                              (_repsController.text.isEmpty ||
-                                  _setsController.text.isEmpty)) {
-                            return 'Provide duration or reps & sets';
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Please enter duration';
                           }
-                          final n = int.tryParse(v ?? '');
-                          if (v != null &&
-                              v.isNotEmpty &&
-                              (n == null || n <= 0 || n > 480)) {
-                            return 'Enter 1-480';
+                          final raw = int.tryParse(v.trim());
+                          if (raw == null) {
+                            return 'Enter a valid number';
+                          }
+                          final minutes = _convertDurationToMinutes(raw);
+                          if (minutes == null ||
+                              minutes <= 0 ||
+                              minutes > 480) {
+                            return 'Duration must be between 1 and 480 minutes';
                           }
                           return null;
                         },
@@ -876,6 +951,7 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           labelText: 'Reps',
+                          hintText: 'e.g. 12',
                           labelStyle: TextStyle(color: _primaryColor),
                           focusedBorder: OutlineInputBorder(
                             borderSide: BorderSide(
@@ -884,6 +960,16 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                             ),
                           ),
                         ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Please enter reps';
+                          }
+                          final n = int.tryParse(v.trim());
+                          if (n == null || n <= 0 || n > 1000) {
+                            return 'Reps must be between 1 and 1000';
+                          }
+                          return null;
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -893,6 +979,7 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           labelText: 'Sets',
+                          hintText: 'e.g. 3',
                           labelStyle: TextStyle(color: _primaryColor),
                           focusedBorder: OutlineInputBorder(
                             borderSide: BorderSide(
@@ -901,6 +988,16 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                             ),
                           ),
                         ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Please enter sets';
+                          }
+                          final n = int.tryParse(v.trim());
+                          if (n == null || n <= 0 || n > 100) {
+                            return 'Sets must be between 1 and 100';
+                          }
+                          return null;
+                        },
                       ),
                     ),
                   ],
@@ -997,10 +1094,7 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
               labelColor: Colors.white,
               unselectedLabelColor: Colors.grey[600],
               labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              tabs: const [
-                Tab(text: 'HISTORY'),
-                Tab(text: 'ADD EXERCISE'),
-              ],
+              tabs: const [Tab(text: 'HISTORY'), Tab(text: 'ADD EXERCISE')],
             ),
           ),
 

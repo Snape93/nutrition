@@ -1341,8 +1341,8 @@ class _BeautifulProgressScreenState extends State<BeautifulProgressScreen>
   }
 
   Widget _buildStreakCard() {
-    // Show calories streak by default, or exercise if calories not available
-    final streakToShow = _caloriesStreak ?? _exerciseStreak;
+    // Only show the calories streak; exercise streak is used for insights only.
+    final streakToShow = _caloriesStreak;
 
     // Always show the streak card, even if no data (will show empty state)
     return StreakCard(

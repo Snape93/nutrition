@@ -525,12 +525,17 @@ class _AccountDeletionVerificationScreenState
                         borderRadius: BorderRadius.circular(AppDesignSystem.radiusSM),
                         border: Border.all(color: AppDesignSystem.outline),
                       ),
-                      child: Text(
-                        widget.email,
-                        style: AppDesignSystem.bodyLarge.copyWith(
-                          fontWeight: FontWeight.bold,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          widget.email,
+                          style: AppDesignSystem.bodyLarge.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: TextAlign.center,
                       ),
                     ),
                     // Expiration countdown
@@ -566,13 +571,19 @@ class _AccountDeletionVerificationScreenState
                                   : infoColor,
                             ),
                             SizedBox(width: AppDesignSystem.spaceXS),
-                            Text(
-                              'Code expires in: ${_formatCountdown(_expirationCountdown)}',
-                              style: AppDesignSystem.labelSmall.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: _expirationCountdown < 300
-                                    ? warningColor
-                                    : infoColor,
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Code expires in: ${_formatCountdown(_expirationCountdown)}',
+                                  style: AppDesignSystem.labelSmall.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: _expirationCountdown < 300
+                                        ? warningColor
+                                        : infoColor,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
                             ),
                           ],
@@ -698,12 +709,17 @@ class _AccountDeletionVerificationScreenState
                             ),
                           ),
                     SizedBox(height: AppDesignSystem.spaceMD),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 4,
                       children: [
-                        Text(
-                          "Didn't receive the code? ",
-                          style: AppDesignSystem.bodyMedium,
+                        Flexible(
+                          child: Text(
+                            "Didn't receive the code?",
+                            style: AppDesignSystem.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                         TextButton(
                           onPressed: _resendCountdown > 0 || _isResending
@@ -711,6 +727,12 @@ class _AccountDeletionVerificationScreenState
                               : _resendCode,
                           style: TextButton.styleFrom(
                             foregroundColor: errorColor,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppDesignSystem.spaceXS,
+                              vertical: AppDesignSystem.spaceXS,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           child: _isResending
                               ? SizedBox(
@@ -722,13 +744,16 @@ class _AccountDeletionVerificationScreenState
                                         AlwaysStoppedAnimation<Color>(errorColor),
                                   ),
                                 )
-                              : Text(
-                                  _resendCountdown > 0
-                                      ? 'Resend in ${_resendCountdown}s'
-                                      : 'Resend Code',
-                                  style: AppDesignSystem.labelLarge.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: errorColor,
+                              : FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    _resendCountdown > 0
+                                        ? 'Resend in ${_resendCountdown}s'
+                                        : 'Resend Code',
+                                    style: AppDesignSystem.labelLarge.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: errorColor,
+                                    ),
                                   ),
                                 ),
                         ),

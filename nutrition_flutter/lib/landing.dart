@@ -4,7 +4,7 @@ import 'login.dart';
 import 'register.dart';
 import 'services/connectivity_service.dart';
 import 'utils/connectivity_notification_helper.dart';
-import 'widgets/animated_logo_widget.dart';
+import 'widgets/logo_loading_dialog.dart';
 
 class LandingScreen extends StatefulWidget {
   final Function(String?)? onUserSexChanged;
@@ -15,17 +15,25 @@ class LandingScreen extends StatefulWidget {
 }
 
 class _LandingScreenState extends State<LandingScreen> {
-  bool _isCheckingConnectivity = true;
   bool _hasConnection = false;
   bool _isInitialCheck = true; // Track if this is the initial check
   bool _isNavigatingToLogin = false;
   bool _isNavigatingToRegister = false;
   StreamSubscription<bool>? _connectivitySubscription;
+  LogoLoadingOverlayController? _loadingOverlay;
 
   @override
   void initState() {
     super.initState();
-    _checkConnectivityOnStart();
+    // Show a full-screen loading overlay while we perform the very first
+    // connectivity check right after the native launcher screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadingOverlay =
+          LogoLoadingOverlayController.show(context, dimBackground: false);
+      _checkConnectivityOnStart();
+    });
+
     // Listen to connectivity changes (only after initial check)
     _connectivitySubscription = ConnectivityService.instance.connectivityStream.listen(
       (isConnected) {
@@ -58,25 +66,33 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
+    _loadingOverlay?.hide();
     super.dispose();
   }
 
   Future<void> _checkConnectivityOnStart() async {
-    // Check connectivity IMMEDIATELY when app starts (no delay)
-    final isConnected = await ConnectivityService.instance.hasInternetConnection();
-    
-    if (mounted) {
-      setState(() {
-        _hasConnection = isConnected;
-        _isCheckingConnectivity = false;
-        _isInitialCheck = false; // Mark initial check as complete
-      });
+    try {
+      // Check connectivity IMMEDIATELY when app starts (no delay)
+      final isConnected =
+          await ConnectivityService.instance.hasInternetConnection();
 
-      // If no connection, show dialog immediately
-      if (!isConnected) {
-        _showInitialConnectionDialog();
+      if (mounted) {
+        setState(() {
+          _hasConnection = isConnected;
+          _isInitialCheck = false; // Mark initial check as complete
+        });
+
+        // If no connection, show dialog immediately
+        if (!isConnected) {
+          await _showInitialConnectionDialog();
+        }
+        // If connected, proceed silently (no notification)
       }
-      // If connected, proceed silently (no notification)
+    } finally {
+      // Always hide the loading overlay once the initial check is done,
+      // respecting its minimum display duration.
+      await _loadingOverlay?.hide();
+      _loadingOverlay = null;
     }
   }
 
@@ -86,18 +102,12 @@ class _LandingScreenState extends State<LandingScreen> {
     final shouldRetry = await ConnectivityNotificationHelper.showNoConnectionDialog(context);
     
     if (shouldRetry && mounted) {
-      // Retry connectivity check with force refresh
-      setState(() {
-        _isCheckingConnectivity = true;
-      });
-      
       // Force a fresh check when user clicks retry
       final isConnected = await ConnectivityService.instance.hasInternetConnection(forceRefresh: true);
       
       if (mounted) {
         setState(() {
           _hasConnection = isConnected;
-          _isCheckingConnectivity = false;
         });
 
         if (!isConnected) {
@@ -191,31 +201,7 @@ class _LandingScreenState extends State<LandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Show animated logo while checking connectivity
-    if (_isCheckingConnectivity) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF6FFF7),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const AnimatedLogoWidget(
-                size: 120,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Nutritionist App',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF388E3C), // Dark green
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    // Always show the main landing UI; avoid extra full-screen loading animation.
     return Scaffold(
       backgroundColor: const Color(0xFFF6FFF7), // Light greenish background
       body: Center(
@@ -231,13 +217,13 @@ class _LandingScreenState extends State<LandingScreen> {
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 32),
-                Text(
-                  'Welcome to Nutritionist App',
+                const Text(
+                  'Welcome to Nutritionist\nApp',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF388E3C), // Dark green
+                    color: Color(0xFF388E3C), // Dark green
                   ),
                 ),
                 const SizedBox(height: 40),

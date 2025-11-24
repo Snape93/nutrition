@@ -24,18 +24,31 @@ class ConnectivityService {
 
   /// Initialize connectivity monitoring
   void initialize() {
-    // Initialize InternetConnectionChecker
-    _connectionChecker = InternetConnectionChecker.createInstance(
-      checkInterval: const Duration(seconds: 10),
-      checkTimeout: const Duration(seconds: 3),
-    );
-    
-    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
-      _debounceConnectivityCheck();
-    });
-    
-    // Initial check
-    _checkConnectivity();
+    try {
+      // Initialize InternetConnectionChecker
+      _connectionChecker = InternetConnectionChecker.createInstance(
+        checkInterval: const Duration(seconds: 10),
+        checkTimeout: const Duration(seconds: 3),
+      );
+      
+      // Schedule connectivity listener after a short delay to ensure bindings are ready
+      Future.delayed(const Duration(milliseconds: 100), () {
+        try {
+          _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+            _debounceConnectivityCheck();
+          });
+          
+          // Initial check
+          _checkConnectivity();
+        } catch (e) {
+          debugPrint('ConnectivityService: Error setting up connectivity listener: $e');
+          // Still try to do an initial check
+          _checkConnectivity();
+        }
+      });
+    } catch (e) {
+      debugPrint('ConnectivityService: Error initializing: $e');
+    }
   }
 
   /// Debounce connectivity checks to avoid rapid notifications

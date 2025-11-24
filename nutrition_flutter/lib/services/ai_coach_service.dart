@@ -38,7 +38,7 @@ class AiCoachService {
               'date': ds,
             }),
           )
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode != 200) {
         debugPrint(
@@ -51,6 +51,10 @@ class AiCoachService {
       return data;
     } catch (e) {
       debugPrint('AI Coach summary error: $e');
+      // Provide more helpful error message for timeout
+      if (e.toString().contains('TimeoutException')) {
+        throw Exception('AI summary request timed out. The server may be processing your request. Please try again.');
+      }
       rethrow;
     }
   }
@@ -78,7 +82,7 @@ class AiCoachService {
                 'next_meal_type': nextMealType,
             }),
           )
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode != 200) {
         debugPrint(

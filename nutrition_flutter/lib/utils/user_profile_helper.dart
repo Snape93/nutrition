@@ -62,6 +62,36 @@ class UserProfileHelper {
     return null;
   }
 
+  /// Fetch current mood and energy level from backend (parsed from current_state)
+  static Future<Map<String, String?>> fetchMoodEnergy(
+    String usernameOrEmail,
+  ) async {
+    final profile = await fetchUserProfileData(usernameOrEmail);
+    String? mood;
+    String? energy;
+
+    if (profile != null) {
+      final state = profile['current_state'];
+      if (state is String && state.isNotEmpty) {
+        final parts = state.split('|');
+        for (final part in parts) {
+          final kv = part.split(':');
+          if (kv.length == 2) {
+            final key = kv[0].trim().toLowerCase();
+            final value = kv[1].trim();
+            if (key == 'mood') {
+              mood = value;
+            } else if (key == 'energy') {
+              energy = value;
+            }
+          }
+        }
+      }
+    }
+
+    return {'mood': mood, 'energy': energy};
+  }
+
   /// Clear cached profile data
   static void clearCache() {
     _cachedProfile = null;

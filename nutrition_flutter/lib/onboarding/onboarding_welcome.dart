@@ -35,31 +35,7 @@ class OnboardingWelcome extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 24),
-                // Apple image in glowing circle
-                Center(
-                  child: Container(
-                    width: 110,
-                    height: 110,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: primaryColor.withValues(alpha: 0.15),
-                          blurRadius: 32,
-                          spreadRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Image.asset(
-                        'design/logo.png', // Replace with your apple image asset if available
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ),
+                Center(child: _AppleBadge(primaryColor: primaryColor)),
                 const SizedBox(height: 24),
                 // Welcome text
                 Text(
@@ -247,6 +223,49 @@ class OnboardingWelcome extends StatelessWidget {
                 const SizedBox(height: 18),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AppleBadge extends StatelessWidget {
+  final Color primaryColor;
+  const _AppleBadge({required this.primaryColor});
+
+  @override
+  Widget build(BuildContext context) {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double baseSize = (screenWidth * 0.26).clamp(96.0, 168.0).toDouble();
+    final double appleSize = baseSize * 0.56;
+    final double borderWidth = baseSize * 0.035;
+
+    return Container(
+      width: baseSize,
+      height: baseSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.08),
+          width: borderWidth,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: baseSize * 0.16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Center(
+        child: SizedBox(
+          width: appleSize,
+          height: appleSize,
+          child: Image.asset(
+            'design/logo.png',
+            fit: BoxFit.contain,
           ),
         ),
       ),

@@ -1,13 +1,17 @@
-// Centralized API base URL for the Flutter app
-// Uses --dart-define=API_BASE_URL to override per environment
-// Defaults to production Railway URL
+// Centralized API base URL for the Flutter app.
+// Uses --dart-define=API_BASE_URL to override per environment.
+// Default behavior:
+//   • Release/profile builds  → Production Railway URL
+//   • Debug builds            → Local dev server (Android emulator 10.0.2.2)
+const bool _isReleaseMode = bool.fromEnvironment('dart.vm.product');
+const String _prodApiBase = 'https://web-production-e167.up.railway.app';
+const String _devApiBase = 'http://10.0.2.2:5000';
+
 const String apiBase = String.fromEnvironment(
   'API_BASE_URL',
-  // Production: Railway deployment
-  // For local development, override via: flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000
-  // For Android emulator, use 10.0.2.2 (maps to host localhost)
-  // For physical device, use your computer's LAN IP (e.g., 192.168.1.5)
-  defaultValue: 'https://web-production-e167.up.railway.app', // Production Railway URL
+  // For physical device testing, override with LAN IP:
+  // flutter run --dart-define=API_BASE_URL=http://192.168.1.7:5000
+  defaultValue: _isReleaseMode ? _prodApiBase : _devApiBase,
 );
 
 // ExerciseDB (RapidAPI) configuration

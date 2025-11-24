@@ -42,21 +42,41 @@ except ImportError:
 
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, mean_absolute_percentage_error, explained_variance_score
 from sklearn.preprocessing import StandardScaler
-import matplotlib.pyplot as plt
-import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
 
-# Set style for better-looking plots
-plt.style.use('seaborn-v0_8-darkgrid')
-sns.set_palette("husl")
+# Optional visualization imports
+try:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    VISUALIZATION_AVAILABLE = True
+    # Set style for better-looking plots
+    plt.style.use('seaborn-v0_8-darkgrid')
+    sns.set_palette("husl")
+except ImportError:
+    VISUALIZATION_AVAILABLE = False
+    print("[WARNING] matplotlib/seaborn not available. Visualizations will be skipped.")
+    print("[INFO] Training will proceed without visualizations.")
+
+# Import NutritionModel for enhanced feature preparation
+try:
+    from nutrition_model import NutritionModel
+    NUTRITION_MODEL_AVAILABLE = True
+except ImportError:
+    NUTRITION_MODEL_AVAILABLE = False
+    print("Warning: NutritionModel not available. Will use basic features (13 features).")
+
+# Set style for better-looking plots (if available)
+if VISUALIZATION_AVAILABLE:
+    plt.style.use('seaborn-v0_8-darkgrid')
+    sns.set_palette("husl")
 
 # %% [markdown]
 # ## 2. Define CalorieModelTrainer Class
 
 # %%
 class CalorieModelTrainer:
-    def __init__(self, csv_path: str = "data/Filipino_Food_Nutrition_Dataset.csv"):
+    def __init__(self, csv_path: str = "data/Filipino_Food_Nutrition_Dataset.csv", use_enhanced_features: bool = True):
         self.csv_path = csv_path
         self.df = None
         self.X = None
@@ -70,6 +90,24 @@ class CalorieModelTrainer:
         self.results = {}
         self.training_times = {}
         self.output_dir = "training_results"
+        self.use_enhanced_features = use_enhanced_features and NUTRITION_MODEL_AVAILABLE
+        
+        # Initialize NutritionModel for enhanced feature extraction
+        if self.use_enhanced_features:
+            try:
+                # Don't require model file to exist for feature extraction
+                self.nutrition_model = NutritionModel()
+                print(f"[INFO] Enhanced features enabled (41 features)")
+            except Exception as e:
+                print(f"[WARNING] Could not initialize NutritionModel: {e}")
+                print(f"[INFO] Falling back to basic features (13 features)")
+                self.use_enhanced_features = False
+        else:
+            self.nutrition_model = None
+            if not NUTRITION_MODEL_AVAILABLE:
+                print(f"[INFO] Using basic features (13 features) - NutritionModel not available")
+            else:
+                print(f"[INFO] Using basic features (13 features) - enhanced features disabled")
         
         # Category mapping from dataset categories to model categories
         self.category_mapping = {
@@ -232,18 +270,34 @@ class CalorieModelTrainer:
                 # Detect preparation method
                 preparation = self.detect_preparation_method(food_name)
                 
-                # Build feature vector (13 features)
-                features = [
-                    len(food_name),  # Name length
-                    serving_size_g,  # Serving size in grams
-                    1.0 if category else 0.0,  # Has category
-                    1.0 if preparation else 0.0,  # Has preparation method
-                    0.0,  # Number of ingredients (not available in dataset)
-                ]
-                
-                # Add category flags (8 categories)
-                for cat in self.model_categories:
-                    features.append(1.0 if mapped_category == cat else 0.0)
+                # Build feature vector using enhanced features if available
+                if self.use_enhanced_features and self.nutrition_model:
+                    # Use enhanced feature preparation (41 features)
+                    # Extract ingredients from food name if possible
+                    ingredients = []  # Can be extracted from food_name if needed
+                    
+                    # Use enhanced feature preparation method
+                    features = self.nutrition_model._prepare_enhanced_features(
+                        food_name=food_name,
+                        food_category=mapped_category,
+                        serving_size=serving_size_g,
+                        preparation_method=preparation,
+                        ingredients=ingredients
+                    )
+                    # Returns 41 features: basic (5) + prep (10) + ingredients (10) + semantics (8) + categories (8)
+                else:
+                    # Build basic feature vector (13 features) - backward compatible
+                    features = [
+                        len(food_name),  # Name length
+                        serving_size_g,  # Serving size in grams
+                        1.0 if category else 0.0,  # Has category
+                        1.0 if preparation else 0.0,  # Has preparation method
+                        0.0,  # Number of ingredients (not available in dataset)
+                    ]
+                    
+                    # Add category flags (8 categories)
+                    for cat in self.model_categories:
+                        features.append(1.0 if mapped_category == cat else 0.0)
                 
                 features_list.append(features)
                 calories_list.append(calories_per_100g)  # Use per 100g for training
@@ -258,6 +312,12 @@ class CalorieModelTrainer:
         print(f"Prepared {len(self.X)} samples")
         print(f"Feature shape: {self.X.shape}")
         print(f"Target shape: {self.y.shape}")
+        if self.X.shape[1] == 41:
+            print(f"[INFO] Using enhanced features (41 features)")
+        elif self.X.shape[1] == 13:
+            print(f"[INFO] Using basic features (13 features)")
+        else:
+            print(f"[INFO] Using {self.X.shape[1]} features")
         print(f"Calories range: {self.y.min():.1f} - {self.y.max():.1f} kcal/100g")
         print(f"Mean calories: {self.y.mean():.1f} kcal/100g")
         
@@ -564,18 +624,29 @@ class CalorieModelTrainer:
         
         print("\nSample Predictions (calories per 100g):")
         for case in test_cases:
-            # Prepare features
-            features = [
-                len(case["name"]),
-                case["serving"],
-                1.0,  # has category
-                0.0,  # has preparation
-                0.0,  # num ingredients
-            ]
-            
-            # Add category flags
-            for cat in self.model_categories:
-                features.append(1.0 if case["category"] == cat else 0.0)
+            # Prepare features using the same method as training
+            if self.use_enhanced_features and self.nutrition_model:
+                # Use enhanced features (41 features)
+                features = self.nutrition_model._prepare_enhanced_features(
+                    food_name=case["name"],
+                    food_category=case["category"],
+                    serving_size=case["serving"],
+                    preparation_method="",
+                    ingredients=[]
+                )
+            else:
+                # Use basic features (13 features)
+                features = [
+                    len(case["name"]),
+                    case["serving"],
+                    1.0,  # has category
+                    0.0,  # has preparation
+                    0.0,  # num ingredients
+                ]
+                
+                # Add category flags
+                for cat in self.model_categories:
+                    features.append(1.0 if case["category"] == cat else 0.0)
             
             # Predict (this gives calories per 100g)
             prediction = model.predict([features])[0]
@@ -612,6 +683,10 @@ class CalorieModelTrainer:
     
     def create_visualizations(self):
         """Create visualizations of training results"""
+        if not VISUALIZATION_AVAILABLE:
+            print("\n[INFO] Skipping visualizations (matplotlib/seaborn not available)")
+            return self
+            
         print("\n" + "=" * 70)
         print("CREATING VISUALIZATIONS")
         print("=" * 70)
@@ -919,20 +994,35 @@ class CalorieModelTrainer:
         print("GENERATING TRAINING REPORT")
         print("=" * 70)
         
-        report = f"""# ML Model Training Report
+        # Determine feature count and description
+        feature_count = self.X.shape[1] if self.X is not None and len(self.X.shape) > 1 else 13
+        if feature_count == 41:
+            feature_description = """## Feature Engineering (41 Enhanced Features)
 
-## Training Date
-{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}
+1. **Basic Features (5)**:
+   - Name length (integer)
+   - Serving size in grams (float)
+   - Has category (binary)
+   - Has preparation method (binary)
+   - Number of ingredients (integer)
 
-## Dataset Information
-- **Source**: {self.csv_path}
-- **Total Samples**: {len(self.df)}
-- **Training Samples**: {len(self.X_train)}
-- **Testing Samples**: {len(self.X_test)}
-- **Features**: 13 features
-- **Target**: Calories per 100g
+2. **Preparation Method Encoding (10)**:
+   - fried, deep_fried, grilled, baked, boiled, steamed, stir_fried, raw, braised, roasted
 
-## Feature Engineering
+3. **Ingredient Analysis (10)**:
+   - Meat count, vegetable count, grain count, dairy count, legume count
+   - Has meat, has vegetable, has grain, has dairy, has legume (binary flags)
+
+4. **Semantic Features (8)**:
+   - Is Filipino cuisine, is Asian cuisine
+   - Word count, has multiple words
+   - Has spicy, has sweet, has creamy, has sour (descriptors)
+
+5. **Category Flags (8)**:
+   - meats, vegetables, fruits, grains, legumes, soups, dairy, snacks"""
+        else:
+            feature_description = """## Feature Engineering (13 Basic Features)
+
 1. Name length (integer)
 2. Serving size in grams (float)
 3. Has category (binary)
@@ -946,7 +1036,22 @@ class CalorieModelTrainer:
    - legumes
    - soups
    - dairy
-   - snacks
+   - snacks"""
+        
+        report = f"""# ML Model Training Report
+
+## Training Date
+{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## Dataset Information
+- **Source**: {self.csv_path}
+- **Total Samples**: {len(self.df)}
+- **Training Samples**: {len(self.X_train)}
+- **Testing Samples**: {len(self.X_test)}
+- **Features**: {feature_count} features
+- **Target**: Calories per 100g
+
+{feature_description}
 
 ## Model Experimentation Results
 
@@ -989,7 +1094,7 @@ class CalorieModelTrainer:
 
 ### Preprocessing
 - **Pipeline**: {'Yes - StandardScaler applied to Linear Regression and KNN' if hasattr(self, 'use_pipeline') and self.use_pipeline else 'No - Raw features used'}
-- **Feature Engineering**: 13 features (name length, serving size, category flags, etc.)
+- **Feature Engineering**: {feature_count} features ({'Enhanced features with ingredient analysis, preparation methods, and semantic understanding' if feature_count == 41 else 'Basic features: name length, serving size, category flags, etc.'})
 - **Data Normalization**: Calories normalized to per 100g basis
 
 ### Model Training
@@ -1043,15 +1148,24 @@ Training visualizations have been generated and saved to `{self.output_dir}/`:
 # 5. Saves the best model
 
 # %%
-def main():
-    """Main training pipeline"""
+def main(use_enhanced_features: bool = True):
+    """Main training pipeline
+    
+    Args:
+        use_enhanced_features: If True, use 41 enhanced features. If False, use 13 basic features (backward compatible).
+    """
     print("=" * 70)
     print("ML MODEL TRAINING WITH EXPERIMENTATION")
+    if use_enhanced_features:
+        print("Using ENHANCED FEATURES (41 features)")
+    else:
+        print("Using BASIC FEATURES (13 features)")
     print("=" * 70)
     
     try:
-        # Initialize trainer
-        trainer = CalorieModelTrainer()
+        # Initialize trainer with enhanced features enabled
+        # Set use_enhanced_features=True to use 41 features, False for 13 features (backward compatible)
+        trainer = CalorieModelTrainer(use_enhanced_features=use_enhanced_features)
         
         # Load and prepare data
         trainer.load_data()

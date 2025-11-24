@@ -484,48 +484,72 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
           ),
           // Centered loading overlay
           if (_isLoggingFood)
-            Container(
-              color: Colors.black.withValues(alpha: 0.3),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _primaryColor.withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        spreadRadius: 5,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                final screenHeight = MediaQuery.of(context).size.height;
+                final isVerySmallScreen = screenHeight < 600;
+                final isNarrowScreen = screenWidth < 360;
+                
+                return Container(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  child: Center(
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: screenWidth * 0.85,
+                        maxHeight: screenHeight * 0.3,
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 60,
-                        height: 60,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 4,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            _primaryColor,
+                      margin: EdgeInsets.symmetric(
+                        horizontal: isNarrowScreen ? 16 : 24,
+                      ),
+                      padding: EdgeInsets.all(isVerySmallScreen ? 20 : 28),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _primaryColor.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            spreadRadius: 5,
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Logging food...',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: _primaryColor,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: isVerySmallScreen ? 50 : 60,
+                            height: isVerySmallScreen ? 50 : 60,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 4,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                _primaryColor,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: isVerySmallScreen ? 16 : 20),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Logging food...',
+                                style: TextStyle(
+                                  fontSize: isVerySmallScreen ? 16 : 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: _primaryColor,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
         ],
       ),
@@ -1377,6 +1401,11 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
   }
 
   void _showFoodLogSuccessDialog(double totalCalories, int foodCount) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isVerySmallScreen = screenHeight < 600;
+    final isNarrowScreen = screenWidth < 360;
+    
     showDialog(
       context: context,
       barrierColor: Colors.black54,
@@ -1386,7 +1415,14 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
             backgroundColor: Colors.transparent,
             elevation: 0,
             child: Container(
-              padding: const EdgeInsets.all(32),
+              constraints: BoxConstraints(
+                maxWidth: screenWidth * 0.9,
+                maxHeight: screenHeight * 0.8,
+              ),
+              margin: EdgeInsets.symmetric(
+                horizontal: isNarrowScreen ? 16 : 24,
+              ),
+              padding: EdgeInsets.all(isVerySmallScreen ? 20 : 28),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
@@ -1398,118 +1434,146 @@ class _ProfessionalFoodLogScreenState extends State<ProfessionalFoodLogScreen> {
                   ),
                 ],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Success icon with animation
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: _primaryColor.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.check_circle,
-                      color: _primaryColor,
-                      size: 50,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Title
-                  Text(
-                    'Meal Logged Successfully!',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: _primaryColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  // Calories info
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _backgroundColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _primaryColor.withValues(alpha: 0.3),
-                        width: 2,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Success icon with animation
+                    Container(
+                      width: isVerySmallScreen ? 60 : 80,
+                      height: isVerySmallScreen ? 60 : 80,
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check_circle,
+                        color: _primaryColor,
+                        size: isVerySmallScreen ? 40 : 50,
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.local_fire_department,
-                          color: _primaryColor,
-                          size: 28,
+                    SizedBox(height: isVerySmallScreen ? 16 : 24),
+                    // Title
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Meal Logged Successfully!',
+                          style: TextStyle(
+                            fontSize: isVerySmallScreen ? 20 : 24,
+                            fontWeight: FontWeight.bold,
+                            color: _primaryColor,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              totalCalories.toStringAsFixed(0),
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: _primaryColor,
-                              ),
+                      ),
+                    ),
+                    SizedBox(height: isVerySmallScreen ? 12 : 16),
+                    // Calories info
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isNarrowScreen ? 16 : 24,
+                        vertical: isVerySmallScreen ? 12 : 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _backgroundColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _primaryColor.withValues(alpha: 0.3),
+                          width: 2,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.local_fire_department,
+                            color: _primaryColor,
+                            size: isVerySmallScreen ? 24 : 28,
+                          ),
+                          SizedBox(width: isNarrowScreen ? 8 : 12),
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    totalCalories.toStringAsFixed(0),
+                                    style: TextStyle(
+                                      fontSize: isVerySmallScreen ? 24 : 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: _primaryColor,
+                                    ),
+                                  ),
+                                ),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    'calories logged',
+                                    style: TextStyle(
+                                      fontSize: isVerySmallScreen ? 12 : 14,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              'calories logged',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Food count info
-                  Text(
-                    foodCount == 1
-                        ? '1 food item added to your log'
-                        : '$foodCount food items added to your log',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  // Close button - just closes dialog, stays on screen
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop(); // Close dialog only
-                        // Stay on screen - form is already reset
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                          ),
+                        ],
                       ),
-                      child: const Text(
-                        'Done',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                    ),
+                    SizedBox(height: isVerySmallScreen ? 16 : 24),
+                    // Food count info
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          foodCount == 1
+                              ? '1 food item added to your log'
+                              : '$foodCount food items added to your log',
+                          style: TextStyle(
+                            fontSize: isVerySmallScreen ? 14 : 16,
+                            color: Colors.grey[700],
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: isVerySmallScreen ? 24 : 32),
+                    // Close button - just closes dialog, stays on screen
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog only
+                          // Stay on screen - form is already reset
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            vertical: isVerySmallScreen ? 12 : 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Done',
+                          style: TextStyle(
+                            fontSize: isVerySmallScreen ? 14 : 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

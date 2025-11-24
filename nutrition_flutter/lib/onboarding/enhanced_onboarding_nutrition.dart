@@ -450,6 +450,26 @@ class _EnhancedOnboardingNutritionState
                               md: 8,
                             ),
                           ),
+                          Text(
+                            'Best results: choose up to 3 preferences.',
+                            style: TextStyle(
+                              fontSize: AppDesignSystem.getResponsiveFontSize(
+                                context,
+                                xs: 10,
+                                sm: 11,
+                                md: 12,
+                              ),
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          SizedBox(
+                            height: AppDesignSystem.getResponsiveSpacingExact(
+                              context,
+                              xs: 4,
+                              sm: 6,
+                              md: 8,
+                            ),
+                          ),
                           EmojiSelector(
                             options: EmojiOptions.getFoodPreferenceOptions(),
                             selectedValues: _selectedPreferences,
@@ -474,6 +494,30 @@ class _EnhancedOnboardingNutritionState
                               ),
                             ),
                           _buildPreferenceInsight(context, theme),
+                          ],
+                          if (_selectedPreferences.length > 3) ...[
+                            SizedBox(
+                              height:
+                                  AppDesignSystem.getResponsiveSpacingExact(
+                                context,
+                                xs: 4,
+                                sm: 6,
+                                md: 8,
+                              ),
+                            ),
+                            Text(
+                              'You selected many preferences — this may limit recommendations.',
+                              style: TextStyle(
+                                fontSize:
+                                    AppDesignSystem.getResponsiveFontSize(
+                                  context,
+                                  xs: 10,
+                                  sm: 11,
+                                  md: 12,
+                                ),
+                                color: Colors.redAccent,
+                              ),
+                            ),
                           ],
                           SizedBox(
                             height: AppDesignSystem.getResponsiveSpacingExact(

@@ -1603,15 +1603,19 @@ def log_exercise_session():
         db.session.add(session)
         db.session.commit()
         
-        # Update exercise streak after logging exercise session
-        try:
-            user = data['user']
-            streak = get_or_create_streak(user, 'exercise')
-            met_goal = check_exercise_goal_met(user, session_date, streak.minimum_exercise_minutes)
-            update_streak(user, 'exercise', met_goal, session_date)
-        except Exception as e:
-            # Don't fail the request if streak update fails
-            print(f'Warning: Failed to update exercise streak: {e}')
+        # NOTE: Exercise streak updates disabled - streaks now track calories only.
+        # The logic below is intentionally commented out to avoid counting
+        # exercise-only days as streaks.
+        # try:
+        #     user = data['user']
+        #     streak = get_or_create_streak(user, 'exercise')
+        #     met_goal = check_exercise_goal_met(
+        #         user, session_date, streak.minimum_exercise_minutes
+        #     )
+        #     update_streak(user, 'exercise', met_goal, session_date)
+        # except Exception as e:
+        #     # Don't fail the request if streak update fails
+        #     print(f'Warning: Failed to update exercise streak: {e}')
         
         return jsonify({
             'success': True,
@@ -1700,6 +1704,50 @@ def health_check():
         'message': 'Nutrition API is running',
         'model_loaded': model_status
     })
+
+@app.route('/ml/stats', methods=['GET'])
+def ml_model_stats():
+    """Get ML model usage statistics
+    
+    Returns statistics about ML model usage including:
+    - Total predictions
+    - ML vs database vs rule-based usage
+    - Average confidence scores
+    - Predictions by category and method
+    
+    Response: {
+        "success": true,
+        "stats": {
+            "total_predictions": 1000,
+            "ml_predictions": 150,
+            "database_lookups": 800,
+            "rule_based_predictions": 50,
+            "ml_usage_percentage": 15.0,
+            "average_confidence": 0.85,
+            ...
+        }
+    }
+    """
+    try:
+        if not nutrition_model:
+            return jsonify({
+                'success': False,
+                'error': 'Nutrition model not available'
+            }), 503
+        
+        stats = nutrition_model.get_usage_stats()
+        
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'model_loaded': nutrition_model.is_model_loaded()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/debug/db', methods=['GET'])
 def debug_db_info():
@@ -3993,6 +4041,26 @@ def update_user(username):
             user.data_importance = data['data_importance']
         if 'is_metric' in data:
             user.is_metric = data['is_metric']
+        # Mood/Energy: allow both explicit current_state and structured fields
+        if (
+            'current_state' in data
+            or 'currentMood' in data
+            or 'energyLevel' in data
+        ):
+            # Highest priority: explicit current_state string
+            current_state_raw = data.get('current_state')
+            if isinstance(current_state_raw, str) and current_state_raw.strip():
+                user.current_state = current_state_raw.strip()[:50]
+            else:
+                mood = data.get('currentMood')
+                energy = data.get('energyLevel')
+                parts = []
+                if isinstance(mood, str) and mood.strip():
+                    parts.append(f"mood:{mood.strip()}")
+                if isinstance(energy, str) and energy.strip():
+                    parts.append(f"energy:{energy.strip()}")
+                if parts:
+                    user.current_state = "|".join(parts)[:50]
         
         # Recalculate daily calorie goal if relevant fields changed
         recalculate_calories = any(field in data for field in ['age', 'sex', 'weight_kg', 'height_cm', 'activity_level', 'goal'])
@@ -6937,20 +7005,31 @@ def remaining_calories():
 @app.route('/log/custom-meal', methods=['POST'])
 def log_custom_meal():
     """Log a custom meal (single food item) to the food log.
+    Now with ML-powered nutrition prediction if calories/nutrition not provided!
     
     Request body:
     {
         "user": "username",
         "meal_name": "Custom Food Name",
-        "calories": 250.0,
-        "carbs": 30.0,
-        "fat": 15.0,
+        "calories": 250.0,  # Optional - will use ML prediction if not provided
+        "carbs": 30.0,      # Optional - will use ML prediction if not provided
+        "fat": 15.0,        # Optional - will use ML prediction if not provided
+        "protein": 20.0,    # Optional - will use ML prediction if not provided
+        "food_category": "meats",  # Optional - helps ML prediction accuracy
+        "serving_size": 150.0,     # Optional - in grams, defaults to 100
+        "preparation_method": "fried",  # Optional - helps ML prediction
+        "ingredients": ["chicken", "rice"],  # Optional - helps ML prediction
         "description": "Optional description",
         "meal_type": "Lunch",
         "date": "2024-01-15"  # Optional, defaults to today
     }
     
-    Response: { "success": true, "id": 123 }
+    Response: { 
+        "success": true, 
+        "id": 123,
+        "prediction_used": true,  # Whether ML prediction was used
+        "prediction": {...}  # ML prediction details if used
+    }
     """
     try:
         data = request.get_json()
@@ -6960,17 +7039,26 @@ def log_custom_meal():
         # Required fields
         user = data.get('user')
         meal_name = data.get('meal_name')
-        calories = data.get('calories')
+        calories = data.get('calories')  # Optional - will use ML if not provided
         
-        if not user or not meal_name or calories is None:
-            return jsonify({'error': 'user, meal_name, and calories are required'}), 400
+        if not user or not meal_name:
+            return jsonify({'error': 'user and meal_name are required'}), 400
         
         # Optional fields with defaults
-        carbs = data.get('carbs', 0.0)
-        fat = data.get('fat', 0.0)
+        carbs = data.get('carbs')
+        fat = data.get('fat')
+        protein = data.get('protein', 0.0)
+        fiber = data.get('fiber', 0.0)
+        sodium = data.get('sodium', 0.0)
         description = data.get('description', '')
         meal_type = data.get('meal_type', 'Other')
         date_str = data.get('date')
+        
+        # ML prediction parameters (optional, but help accuracy)
+        food_category = data.get('food_category', '')
+        serving_size = data.get('serving_size', 100.0)  # grams
+        preparation_method = data.get('preparation_method', '')
+        ingredients = data.get('ingredients', [])
         
         # Parse date
         if date_str:
@@ -6981,19 +7069,83 @@ def log_custom_meal():
         else:
             target_date = date.today()
         
+        # Use ML prediction if calories not provided
+        prediction_used = False
+        prediction_details = None
+        
+        if calories is None and nutrition_model and nutrition_model.is_model_loaded():
+            try:
+                # Use ML model to predict calories and nutrition
+                prediction = nutrition_model.predict_calories(
+                    food_name=meal_name,
+                    food_category=food_category,
+                    serving_size=serving_size,
+                    preparation_method=preparation_method,
+                    ingredients=ingredients
+                )
+                
+                if 'error' not in prediction:
+                    calories = prediction.get('calories', 0.0)
+                    prediction_used = True
+                    prediction_details = {
+                        'method': prediction.get('method', 'ml_model'),
+                        'confidence': prediction.get('confidence', 0.85),
+                        'calories_per_100g': prediction.get('calories_per_100g'),
+                        'category': prediction.get('category', food_category)
+                    }
+                    
+                    # If carbs/fat not provided, try to get from nutrition prediction
+                    if carbs is None or fat is None:
+                        try:
+                            nutrition_info = nutrition_model.predict_nutrition(
+                                food_name=meal_name,
+                                food_category=food_category,
+                                serving_size=serving_size,
+                                user_gender='',
+                                user_age=25,
+                                user_weight=60,
+                                user_height=160,
+                                user_activity_level='moderate',
+                                user_goal='maintain'
+                            )
+                            
+                            nutrition_data = nutrition_info.get('nutrition_info', {})
+                            if carbs is None:
+                                carbs = nutrition_data.get('carbs', 0.0)
+                            if fat is None:
+                                fat = nutrition_data.get('fat', 0.0)
+                            if protein == 0.0:
+                                protein = nutrition_data.get('protein', 0.0)
+                            if fiber == 0.0:
+                                fiber = nutrition_data.get('fiber', 0.0)
+                        except Exception:
+                            pass  # Use defaults if nutrition prediction fails
+            except Exception as e:
+                print(f"[WARNING] ML prediction failed for custom meal: {e}")
+                # Continue with defaults if prediction fails
+        
+        # If still no calories, return error
+        if calories is None:
+            return jsonify({
+                'error': 'calories is required. Provide calories or ensure ML model is available for prediction.'
+            }), 400
+        
         # Validate numeric values
         try:
             calories = float(calories)
-            carbs = float(carbs)
-            fat = float(fat)
+            carbs = float(carbs) if carbs is not None else 0.0
+            fat = float(fat) if fat is not None else 0.0
+            protein = float(protein) if protein is not None else 0.0
+            fiber = float(fiber) if fiber is not None else 0.0
+            sodium = float(sodium) if sodium is not None else 0.0
         except (ValueError, TypeError):
-            return jsonify({'error': 'calories, carbs, and fat must be valid numbers'}), 400
+            return jsonify({'error': 'calories, carbs, fat, protein, fiber, and sodium must be valid numbers'}), 400
         
-        if calories < 0 or carbs < 0 or fat < 0:
-            return jsonify({'error': 'calories, carbs, and fat must be non-negative'}), 400
+        if calories < 0 or carbs < 0 or fat < 0 or protein < 0 or fiber < 0 or sodium < 0:
+            return jsonify({'error': 'All nutrition values must be non-negative'}), 400
         
-        if calories > 2500:
-            return jsonify({'error': 'calories cannot exceed 2500 per meal'}), 400
+        if calories > 5000:  # Reasonable maximum for a single meal
+            return jsonify({'error': 'Calories value seems too high (>5000). Please verify.'}), 400
         
         # Create food log entry
         food_log = FoodLog(
@@ -7002,11 +7154,11 @@ def log_custom_meal():
             calories=calories,
             carbs=carbs,
             fat=fat,
-            protein=0.0,  # Not provided in custom meals
-            fiber=0.0,    # Not provided in custom meals
-            sodium=0.0,    # Not provided in custom meals
+            protein=protein,
+            fiber=fiber,
+            sodium=sodium,
             meal_type=meal_type,
-            serving_size='custom',
+            serving_size=f'custom ({serving_size}g)' if serving_size != 100 else 'custom',
             quantity=1.0,
             date=target_date
         )
@@ -7014,11 +7166,20 @@ def log_custom_meal():
         db.session.add(food_log)
         db.session.commit()
         
-        return jsonify({
+        response = {
             'success': True,
             'id': food_log.id,
             'message': 'Custom meal logged successfully'
-        }), 200
+        }
+        
+        if prediction_used:
+            response['prediction_used'] = True
+            response['prediction'] = prediction_details
+            response['message'] = 'Custom meal logged successfully with ML prediction'
+        else:
+            response['prediction_used'] = False
+        
+        return jsonify(response), 200
         
     except Exception as e:
         db.session.rollback()
@@ -7242,6 +7403,9 @@ def _apply_preference_filtering(foods_list, active_filters, food_df=None):
     # Hard exclusions for plant_based
     plant_based = 'plant_based' in filters_lower or 'plant-based' in filters_lower
     
+    # Hard exclusions for healthy preference
+    healthy_preference = 'healthy' in filters_lower
+    
     filtered = []
     
     def _infer_category_from_name(food_name):
@@ -7267,6 +7431,11 @@ def _apply_preference_filtering(foods_list, active_filters, food_df=None):
         
         # Try to get food data from food_df if available
         food_category = ''
+        food_calories = None
+        food_fat = None
+        food_fiber = None
+        food_protein = None
+        
         if food_df is not None and hasattr(food_df, 'copy'):
             try:
                 food_df_normalized = food_df.copy()
@@ -7282,7 +7451,15 @@ def _apply_preference_filtering(foods_list, active_filters, food_df=None):
                     food_df_normalized['_normalized_name'] == food_name_normalized
                 ]
                 if not food_match.empty:
-                    food_category = str(food_match.iloc[0].get('Category', '')).lower()
+                    row = food_match.iloc[0]
+                    food_category = str(row.get('Category', '')).lower()
+                    try:
+                        food_calories = float(row.get('Calories', 0))
+                        food_fat = float(row.get('Fat (g)', 0))
+                        food_fiber = float(row.get('Fiber (g)', 0))
+                        food_protein = float(row.get('Protein (g)', 0))
+                    except (ValueError, TypeError):
+                        pass
             except Exception:
                 pass
         
@@ -7292,8 +7469,36 @@ def _apply_preference_filtering(foods_list, active_filters, food_df=None):
         
         # Hard exclusion: Plant-based
         if plant_based:
-            meat_keywords = ['chicken', 'pork', 'beef', 'fish', 'meat', 'egg', 'seafood', 'adobo', 'sinigang']
+            meat_keywords = ['chicken', 'pork', 'beef', 'fish', 'meat', 'egg', 'seafood', 'adobo', 'sinigang', 
+                           'lechon', 'sisig', 'tocino', 'longganisa', 'bangus', 'tilapia', 'tuyo', 'tinapa',
+                           'shrimp', 'crab', 'squid', 'tuna', 'sardines', 'galunggong', 'manok', 'baboy']
             if any(kw in food_name_normalized for kw in meat_keywords) or food_category == 'meats':
+                continue
+        
+        # Hard exclusion: Healthy preference - exclude very unhealthy foods
+        if healthy_preference:
+            # 1. Exclude very high-calorie foods (>400 kcal per serving)
+            if food_calories and food_calories > 400:
+                continue
+            
+            # 2. Exclude fried foods (very unhealthy)
+            fried_keywords = ['fried', 'deep fried', 'lechon', 'chicharon']
+            if any(kw in food_name_normalized for kw in fried_keywords):
+                continue
+            
+            # 3. Exclude very high-fat foods (>25g fat per serving)
+            if food_fat and food_fat > 25:
+                continue
+            
+            # 4. Exclude high-calorie, low-nutrition foods (calories > 350 and low fiber/protein)
+            if food_calories and food_calories > 350:
+                if food_fiber is not None and food_protein is not None:
+                    if food_fiber < 2 and food_protein < 15:
+                        continue
+            
+            # 5. Exclude processed meats and high-sodium dishes
+            processed_keywords = ['tocino', 'longganisa', 'hotdog', 'corned beef']
+            if any(kw in food_name_normalized for kw in processed_keywords):
                 continue
         
         # Calculate match score for other filters
@@ -7338,12 +7543,25 @@ def _apply_preference_filtering(foods_list, active_filters, food_df=None):
         
         # Only include foods that match at least one filter (or all if user wants strict AND)
         # Strategy: If multiple filters selected, require at least 50% match
+        # BUT: If healthy preference is selected, foods must pass healthy criteria OR match other filters
         non_plant_filters = [f for f in filters_lower if f not in ['plant_based', 'plant-based']]
         
         if non_plant_filters:
-            min_matches_required = max(1, len(non_plant_filters) // 2)  # At least 50% match
-            if match_score < min_matches_required:
-                continue
+            # If healthy is the only filter, require it to match
+            if healthy_preference and len(non_plant_filters) == 1:
+                # For healthy-only, require healthy match (vegetables, fruits, grains, or low-calorie nutritious)
+                if 'healthy' not in matched_filters:
+                    # Check if it's a healthy food by nutrition (low calorie, good nutrition)
+                    if food_calories and food_calories <= 200 and food_fiber and food_fiber >= 2:
+                        matched_filters.append('healthy')
+                        match_score += 2
+                    else:
+                        continue  # Exclude if doesn't match healthy criteria
+            else:
+                # Multiple filters: require at least 50% match
+                min_matches_required = max(1, len(non_plant_filters) // 2)
+                if match_score < min_matches_required:
+                    continue
         
         filtered.append(food_name)
     
@@ -7399,15 +7617,16 @@ def foods_recommend():
                                        getattr(user_obj, 'diet_type', None) or [])
         medical_history = parse_list(getattr(user_obj, 'medical_history', None) or [])
         
-        # Always combine active_filters + saved_preferences for comprehensive scoring
-        # Active filters take precedence (70% weight), but saved preferences still considered (30% weight)
+        # Always combine active_filters + saved_preferences so onboarding choices
+        # still influence recommendations even when the user doesn't tap any chips
         all_preferences = []
         if active_filters:
             all_preferences.extend(active_filters)
         if saved_preferences:
             # Add saved preferences that aren't already in active filters
+            active_lower = [f.lower() for f in active_filters]
             for pref in saved_preferences:
-                if pref.lower() not in [f.lower() for f in active_filters]:
+                if str(pref).lower() not in active_lower:
                     all_preferences.append(pref)
         
         print(f'DEBUG: [Food Recommendations] Active filters: {active_filters}')
@@ -7491,15 +7710,17 @@ def foods_recommend():
             foods_to_score = []
             print(f'DEBUG: [Food Recommendations] Error accessing database: {e}, using empty list')
         
-        # Apply hard filtering for active filters (if any)
-        if active_filters:
+        # Apply hard filtering for preferences (onboarding + active filters)
+        # so that "plant-based" / "healthy" users don't see obviously conflicting foods.
+        preferences_for_filtering = [p for p in all_preferences if p]
+        if preferences_for_filtering:
             try:
                 filter_food_df = globals().get('food_df', None)
             except:
                 filter_food_df = None
             foods_to_score = _apply_preference_filtering(
                 foods_to_score, 
-                active_filters, 
+                preferences_for_filtering, 
                 filter_food_df
             )
         

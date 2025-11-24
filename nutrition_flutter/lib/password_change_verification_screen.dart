@@ -427,10 +427,16 @@ class _PasswordChangeVerificationScreenState
                             color: infoColor,
                           ),
                           SizedBox(width: AppDesignSystem.spaceXS),
-                          Text(
-                            'Code expires in: ${_formatCountdown(_expirationCountdown)}',
-                            style: AppDesignSystem.labelSmall.copyWith(
-                              color: infoColor,
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Code expires in: ${_formatCountdown(_expirationCountdown)}',
+                                style: AppDesignSystem.labelSmall.copyWith(
+                                  color: infoColor,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
                         ],
@@ -599,6 +605,14 @@ class _PasswordChangeVerificationScreenState
                     onPressed: _resendCountdown > 0 || _isResending
                         ? null
                         : _resendCode,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppDesignSystem.spaceXS,
+                        vertical: AppDesignSystem.spaceXS,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     child: _isResending
                         ? SizedBox(
                             height: 20,
@@ -609,12 +623,15 @@ class _PasswordChangeVerificationScreenState
                                   AlwaysStoppedAnimation<Color>(primaryColor),
                             ),
                           )
-                        : Text(
-                            _resendCountdown > 0
-                                ? 'Resend code (${_resendCountdown}s)'
-                                : 'Resend Code',
-                            style: AppDesignSystem.labelLarge.copyWith(
-                              color: primaryColor,
+                        : FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _resendCountdown > 0
+                                  ? 'Resend code (${_resendCountdown}s)'
+                                  : 'Resend Code',
+                              style: AppDesignSystem.labelLarge.copyWith(
+                                color: primaryColor,
+                              ),
                             ),
                           ),
                   ),
