@@ -802,6 +802,34 @@ class AppDesignSystem {
     }
   }
 
+  /// Get responsive button width with max constraint
+  /// Buttons should not stretch too wide on large screens
+  static double? getResponsiveButtonWidth(BuildContext context) {
+    try {
+      final screenWidth = MediaQuery.of(context).size.width;
+      // On very small screens, use full width
+      if (screenWidth < 360) return double.infinity;
+      // On small-medium screens, use full width
+      if (screenWidth < 600) return double.infinity;
+      // On tablets and larger, constrain to max 500px and center
+      if (screenWidth < 900) return 500.0;
+      // On desktop, max 400px
+      return 400.0;
+    } catch (e) {
+      return double.infinity;
+    }
+  }
+
+  /// Check if button should be centered (for larger screens)
+  static bool shouldCenterButton(BuildContext context) {
+    try {
+      final screenWidth = MediaQuery.of(context).size.width;
+      return screenWidth >= 600; // Center on tablets and larger
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Get responsive container height (as percentage of screen)
   static double getResponsiveContainerHeight(
     BuildContext context, {

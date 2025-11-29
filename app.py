@@ -95,8 +95,8 @@ else:
     })
 
 # Configure app based on environment
-# Auto-detect deployment environment (Railway/Render sets PORT environment variable)
-# Render sets RENDER environment variable, Railway sets RAILWAY_ENVIRONMENT
+# Auto-detect deployment environment (Azure/Railway/Render sets PORT environment variable)
+# Azure sets WEBSITE_SITE_NAME, Render sets RENDER, Railway sets RAILWAY_ENVIRONMENT
 is_production_deploy = os.environ.get('PORT') is not None or os.environ.get('RAILWAY_ENVIRONMENT') is not None or os.environ.get('RENDER') is not None
 default_env = 'production' if is_production_deploy else 'development'
 
@@ -105,7 +105,7 @@ if config_name not in config:
     print(f"[WARN] Unknown FLASK_ENV '{config_name}', falling back to 'default'")
     config_name = 'default'
     
-deploy_platform = 'Render' if os.environ.get('RENDER') else ('Railway' if os.environ.get('RAILWAY_ENVIRONMENT') else 'Local')
+deploy_platform = 'Render' if os.environ.get('RENDER') else ('Railway' if os.environ.get('RAILWAY_ENVIRONMENT') else ('Azure' if os.environ.get('WEBSITE_SITE_NAME') else 'Local'))
 print(f"[INFO] Using config: {config_name} (FLASK_ENV={os.environ.get('FLASK_ENV', 'not set')}, Platform={deploy_platform})")
 app.config.from_object(config[config_name])
 
@@ -132,7 +132,9 @@ if config_name == 'production' or is_production_deploy:
         error_msg += "\n".join(missing_vars)
         error_msg += "\n\n"
         error_msg += "To fix this:\n"
-        if deploy_platform == 'Render':
+        if deploy_platform == 'Azure':
+            error_msg += "1. Go to Azure Portal → Your App Service → Settings → Environment variables\n"
+        elif deploy_platform == 'Render':
             error_msg += "1. Go to Render Dashboard → Your Service → Environment tab\n"
         else:
             error_msg += "1. Go to Railway Dashboard → Your Project → Variables tab\n"
@@ -7385,7 +7387,7 @@ def recommendations_food_search():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-def _apply_preference_filtering(foods_list, active_filters, food_df=None):
+def _apply_preference_filtering(foods_list, active_filters, food_df=None, user_goal=None):
     """
     Apply intelligent filtering when multiple preferences are selected.
     
@@ -7400,6 +7402,9 @@ def _apply_preference_filtering(foods_list, active_filters, food_df=None):
     # Normalize filters
     filters_lower = [f.lower().strip() for f in active_filters]
     
+    goal_lower = (user_goal or '').lower()
+    muscle_goal = any(keyword in goal_lower for keyword in ['gain', 'muscle'])
+
     # Hard exclusions for plant_based
     plant_based = 'plant_based' in filters_lower or 'plant-based' in filters_lower
     
@@ -7475,28 +7480,43 @@ def _apply_preference_filtering(foods_list, active_filters, food_df=None):
             if any(kw in food_name_normalized for kw in meat_keywords) or food_category == 'meats':
                 continue
         
+        # Helper: determine if this food earns an override for muscle gain goals
+        def passes_muscle_override():
+            if not muscle_goal:
+                return False
+            try:
+                return (food_protein or 0) >= 12
+            except TypeError:
+                return False
+        
         # Hard exclusion: Healthy preference - exclude very unhealthy foods
         if healthy_preference:
-            # 1. Exclude very high-calorie foods (>400 kcal per serving)
-            if food_calories and food_calories > 400:
-                continue
+            # 1. Exclude very high-calorie foods unless they support muscle goals
+            if food_calories and food_calories > (550 if muscle_goal else 400):
+                if not passes_muscle_override():
+                    continue
             
-            # 2. Exclude fried foods (very unhealthy)
+            # 2. Exclude fried foods (still off-limits even for muscle goals)
             fried_keywords = ['fried', 'deep fried', 'lechon', 'chicharon']
             if any(kw in food_name_normalized for kw in fried_keywords):
                 continue
             
-            # 3. Exclude very high-fat foods (>25g fat per serving)
-            if food_fat and food_fat > 25:
-                continue
+            # 3. Exclude high-fat foods, but allow slightly higher fat when goal is muscle gain and protein is high
+            fat_limit = 35 if muscle_goal else 25
+            if food_fat and food_fat > fat_limit:
+                if not passes_muscle_override():
+                    continue
             
-            # 4. Exclude high-calorie, low-nutrition foods (calories > 350 and low fiber/protein)
+            # 4. Exclude high-calorie, low-nutrition foods, with overrides for high-protein options when bulking
             if food_calories and food_calories > 350:
                 if food_fiber is not None and food_protein is not None:
                     if food_fiber < 2 and food_protein < 15:
-                        continue
+                        if not passes_muscle_override():
+                            continue
+                elif not passes_muscle_override():
+                    continue
             
-            # 5. Exclude processed meats and high-sodium dishes
+            # 5. Exclude processed meats/high sodium regardless of goal
             processed_keywords = ['tocino', 'longganisa', 'hotdog', 'corned beef']
             if any(kw in food_name_normalized for kw in processed_keywords):
                 continue
@@ -7718,11 +7738,12 @@ def foods_recommend():
                 filter_food_df = globals().get('food_df', None)
             except:
                 filter_food_df = None
-            foods_to_score = _apply_preference_filtering(
-                foods_to_score, 
-                preferences_for_filtering, 
-                filter_food_df
-            )
+        foods_to_score = _apply_preference_filtering(
+            foods_to_score,
+            preferences_for_filtering,
+            filter_food_df,
+            user_goal=user_obj.goal,
+        )
         
         foods = foods_to_score
 
@@ -8116,8 +8137,8 @@ def foods_recommend():
                         else:
                             saved_preference_score += boost * 0.3
                 
-                # Combine active and saved preference scores (70% active, 30% saved)
-                preference_score = (active_preference_score * 0.7) + (saved_preference_score * 0.3)
+                # Combine active and saved preference scores (80% active, 20% saved)
+                preference_score = (active_preference_score * 0.8) + (saved_preference_score * 0.2)
                 
                 # Normalize preference_score to 0-100 range
                 preference_score = max(0.0, min(100.0, preference_score))
@@ -8138,13 +8159,13 @@ def foods_recommend():
                         meal_type_score = 20.0
                 
                 # ===== COMBINED SCORING FORMULA =====
-                # final_score = (base_score * 0.3) + (goal_alignment_score * 0.3) + 
-                #              (preference_match_score * 0.2) + (meal_type_match_score * 0.1) + 
+                # final_score = (base_score * 0.25) + (goal_alignment_score * 0.4) + 
+                #              (preference_match_score * 0.15) + (meal_type_match_score * 0.1) + 
                 #              (activity_level_score * 0.1)
                 final_score = (
-                    base_score * 0.3 +
-                    goal_score * 0.3 +
-                    preference_score * 0.2 +
+                    base_score * 0.25 +
+                    goal_score * 0.4 +
+                    preference_score * 0.15 +
                     meal_type_score * 0.1 +
                     activity_score * 0.1
                 )

@@ -68,7 +68,17 @@ class UnitConverter {
 
   /// Round to specified decimal places
   static double roundToDecimals(double value, int decimals) {
-    final factor = 10.0 * decimals;
+    if (decimals < 0) {
+      throw ArgumentError('Decimals must be non-negative');
+    }
+    if (decimals == 0) {
+      return value.roundToDouble();
+    }
+    // Calculate 10^decimals (e.g., 10^2 = 100 for 2 decimal places)
+    double factor = 1.0;
+    for (int i = 0; i < decimals; i++) {
+      factor *= 10.0;
+    }
     return (value * factor).round() / factor;
   }
 }

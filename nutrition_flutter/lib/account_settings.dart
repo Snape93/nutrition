@@ -42,6 +42,7 @@ class _AccountSettingsState extends State<AccountSettings> {
   bool _isSaving = false;
   bool _isChangingEmail = false;
   bool _isChangingPassword = false;
+  bool _isDeletionRequestInProgress = false;
   bool _showNewPassword = false;
   bool _showConfirmPassword = false;
   String? _currentEmail;
@@ -306,7 +307,26 @@ class _AccountSettingsState extends State<AccountSettings> {
   }
 
   Future<void> _changePassword() async {
-    if (!_passwordFormKey.currentState!.validate()) return;
+    if (_isChangingPassword) return;
+
+    void resetFlag() {
+      if (mounted) {
+        setState(() {
+          _isChangingPassword = false;
+        });
+      } else {
+        _isChangingPassword = false;
+      }
+    }
+
+    setState(() {
+      _isChangingPassword = true;
+    });
+
+    if (!_passwordFormKey.currentState!.validate()) {
+      resetFlag();
+      return;
+    }
 
     // Check password strength
     final strengthResult = calculatePasswordStrength(
@@ -314,65 +334,15 @@ class _AccountSettingsState extends State<AccountSettings> {
     );
     if (!strengthResult.isValid) {
       _showErrorDialog('Password is too weak. Please ensure all requirements are met.');
+      resetFlag();
       return;
     }
 
     // Check connectivity before attempting password change
     final isConnected = await ConnectivityNotificationHelper.checkAndNotifyIfDisconnected(context);
     if (!isConnected) {
+      resetFlag();
       return;
-    }
-
-    setState(() {
-      _isChangingPassword = true;
-    });
-
-    // Show loading dialog
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(AppDesignSystem.radiusLG),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  spreadRadius: 5,
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 4,
-                    valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Requesting password change...',
-                  style: AppDesignSystem.titleMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: primaryColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
     }
 
     try {
@@ -388,11 +358,6 @@ class _AccountSettingsState extends State<AccountSettings> {
       );
 
       final responseData = json.decode(response.body);
-
-      // Close loading dialog
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
 
       if (response.statusCode == 200 && responseData['success'] == true) {
         if (mounted) {
@@ -428,11 +393,6 @@ class _AccountSettingsState extends State<AccountSettings> {
         }
       }
     } catch (e) {
-      // Close loading dialog if still open
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-
       if (mounted) {
         // Clean up error message - remove "Error: Exception:" prefix
         String errorMessage = e.toString();
@@ -446,11 +406,7 @@ class _AccountSettingsState extends State<AccountSettings> {
         _showErrorDialog(errorMessage);
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isChangingPassword = false;
-        });
-      }
+      resetFlag();
     }
   }
 
@@ -488,10 +444,27 @@ class _AccountSettingsState extends State<AccountSettings> {
   }
 
   Future<void> _changeEmail() async {
+    if (_isChangingEmail) return;
+
+    void resetFlag() {
+      if (mounted) {
+        setState(() {
+          _isChangingEmail = false;
+        });
+      } else {
+        _isChangingEmail = false;
+      }
+    }
+
+    setState(() {
+      _isChangingEmail = true;
+    });
+
     final newEmail = _newEmailController.text.trim();
 
     if (newEmail.isEmpty) {
       _showErrorDialog('Please enter a new email');
+      resetFlag();
       return;
     }
 
@@ -499,6 +472,7 @@ class _AccountSettingsState extends State<AccountSettings> {
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(newEmail)) {
       _showErrorDialog('Please enter a valid email address');
+      resetFlag();
       return;
     }
 
@@ -506,18 +480,16 @@ class _AccountSettingsState extends State<AccountSettings> {
     if (_currentEmail != null &&
         _currentEmail!.toLowerCase() == newEmail.toLowerCase()) {
       _showErrorDialog('New email must be different from your current email');
+      resetFlag();
       return;
     }
 
     // Check connectivity before attempting email change
     final isConnected = await ConnectivityNotificationHelper.checkAndNotifyIfDisconnected(context);
     if (!isConnected) {
+      resetFlag();
       return;
     }
-
-    setState(() {
-      _isChangingEmail = true;
-    });
 
     try {
       // First, check if email is already registered (optional pre-check)
@@ -534,65 +506,14 @@ class _AccountSettingsState extends State<AccountSettings> {
           final checkData = json.decode(checkResponse.body);
           if (checkData['exists'] == true) {
             if (mounted) {
-              setState(() {
-                _isChangingEmail = false;
-              });
               _showErrorDialog('This email is already registered to another account');
-              return;
             }
+            return;
           }
         }
       } catch (e) {
         // If check fails, continue with the request (backend will validate)
         debugPrint('Email check failed, continuing with request: $e');
-      }
-
-      // Show loading dialog
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            child: Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppDesignSystem.radiusLG),
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 60,
-                    height: 60,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 4,
-                      valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Requesting email change...',
-                    style: AppDesignSystem.titleMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: primaryColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
       }
 
       // Request email change
@@ -605,11 +526,6 @@ class _AccountSettingsState extends State<AccountSettings> {
             body: json.encode({'new_email': newEmail}),
           )
           .timeout(const Duration(seconds: 10));
-
-      // Close loading dialog
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
 
       final responseData = json.decode(response.body);
 
@@ -663,11 +579,6 @@ class _AccountSettingsState extends State<AccountSettings> {
         }
       }
     } catch (e) {
-      // Close loading dialog if still open
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-
       if (mounted) {
         // Clean up error message - remove "Error: Exception:" prefix
         String errorMessage = e.toString();
@@ -691,15 +602,27 @@ class _AccountSettingsState extends State<AccountSettings> {
         _showErrorDialog(errorMessage);
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isChangingEmail = false;
-        });
-      }
+      resetFlag();
     }
   }
 
   Future<void> _deleteAccount() async {
+    if (_isDeletionRequestInProgress) return;
+
+    void resetDeletionFlag() {
+      if (mounted) {
+        setState(() {
+          _isDeletionRequestInProgress = false;
+        });
+      } else {
+        _isDeletionRequestInProgress = false;
+      }
+    }
+
+    setState(() {
+      _isDeletionRequestInProgress = true;
+    });
+
     // Enhanced confirmation dialog with design system styling
     final confirmed = await showDialog<bool>(
       context: context,
@@ -864,60 +787,13 @@ class _AccountSettingsState extends State<AccountSettings> {
       // Check connectivity before attempting account deletion
       final isConnected = await ConnectivityNotificationHelper.checkAndNotifyIfDisconnected(context);
       if (!isConnected) {
+        resetDeletionFlag();
         return;
       }
 
       setState(() {
         _isSaving = true; // Keep _isSaving for account deletion
       });
-
-      // Show loading dialog
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            child: Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppDesignSystem.radiusLG),
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 60,
-                    height: 60,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 4,
-                      valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Requesting account deletion...',
-                    style: AppDesignSystem.titleMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: primaryColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      }
 
       try {
         final response = await http.post(
@@ -926,11 +802,6 @@ class _AccountSettingsState extends State<AccountSettings> {
           ),
           headers: {'Content-Type': 'application/json'},
         );
-
-        // Close loading dialog
-        if (mounted) {
-          Navigator.of(context).pop();
-        }
 
         final responseData = json.decode(response.body);
 
@@ -956,11 +827,6 @@ class _AccountSettingsState extends State<AccountSettings> {
           throw Exception(errorMsg);
         }
       } catch (e) {
-        // Close loading dialog if still open
-        if (mounted) {
-          Navigator.of(context).pop();
-        }
-
         debugPrint('Error deleting account: $e');
         if (mounted) {
           // Clean up error message - remove "Error: Exception:" prefix
@@ -994,7 +860,10 @@ class _AccountSettingsState extends State<AccountSettings> {
             _isSaving = false;
           });
         }
+        resetDeletionFlag();
       }
+    } else {
+      resetDeletionFlag();
     }
   }
 
@@ -1593,12 +1462,10 @@ class _AccountSettingsState extends State<AccountSettings> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _isSaving
+                            onPressed: (_isSaving || _isDeletionRequestInProgress)
                                 ? null
                                 : () {
-                                    // Unfocus any text fields to prevent form validation
                                     FocusScope.of(context).unfocus();
-                                    // Call delete account after unfocus
                                     _deleteAccount();
                                   },
                             style: ElevatedButton.styleFrom(
@@ -1611,7 +1478,9 @@ class _AccountSettingsState extends State<AccountSettings> {
                               ),
                             ),
                             child: Text(
-                              _isSaving ? 'Processing...' : 'Delete Account',
+                              (_isSaving || _isDeletionRequestInProgress)
+                                  ? 'Processing...'
+                                  : 'Delete Account',
                             ),
                           ),
                         ),

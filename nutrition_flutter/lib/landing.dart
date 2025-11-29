@@ -202,31 +202,63 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   Widget build(BuildContext context) {
     // Always show the main landing UI; avoid extra full-screen loading animation.
+    final mediaQuery = MediaQuery.of(context);
+    final size = mediaQuery.size;
+    final shortestSide = size.shortestSide;
+
+    // Simple helper to keep responsive values within a safe range.
+    double clampValue(double value, double min, double max) {
+      if (value < min) return min;
+      if (value > max) return max;
+      return value;
+    }
+
+    // Logo scales primarily with width but is clamped to keep a consistent feel.
+    final logoHeight = clampValue(shortestSide * 0.22, 90, 150);
+
+    // Title font size scales with screen size but stays within a readable range.
+    final baseTitleSize = shortestSide * 0.055;
+    final titleFontSize = clampValue(baseTitleSize, 22, 30);
+
+    // Spacing and safe-area paddings adapt to screen height.
+    final verticalUnit = clampValue(size.height * 0.02, 12, 24);
+    final topPadding = mediaQuery.padding.top + verticalUnit * 2;
+    final bottomPadding = mediaQuery.padding.bottom + verticalUnit * 2;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6FFF7), // Light greenish background
       body: Center(
         child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+          padding: EdgeInsets.fromLTRB(
+            32,
+            topPadding,
+            32,
+            bottomPadding,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 420,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Image.asset(
                   'design/logo.png',
-                  height: 120,
+                  height: logoHeight,
                   fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 32),
-                const Text(
-                  'Welcome to Nutritionist\nApp',
+                SizedBox(height: verticalUnit * 1.6),
+                Text(
+                  'Welcome to Nutritionist App',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF388E3C), // Dark green
+                    height: 1.25,
+                    color: const Color(0xFF388E3C), // Dark green
                   ),
                 ),
-                const SizedBox(height: 40),
+                SizedBox(height: verticalUnit * 2),
                 // Connection status indicator
                 if (!_hasConnection)
                   Container(

@@ -203,6 +203,8 @@ class _PasswordChangeVerificationScreenState
         _isLoading = false;
         _errorMessage = 'Network error: $e';
       });
+    } finally {
+      // Keep inline loading indicator only
     }
   }
 
@@ -258,6 +260,8 @@ class _PasswordChangeVerificationScreenState
         _isResending = false;
         _errorMessage = 'Network error: $e';
       });
+    } finally {
+      // Keep inline loading indicator only
     }
   }
 
@@ -359,26 +363,22 @@ class _PasswordChangeVerificationScreenState
       child: Scaffold(
         backgroundColor: backgroundColor,
         body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                padding: AppDesignSystem.getResponsivePadding(context),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(AppDesignSystem.spaceLG),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Card(
+                  elevation: AppDesignSystem.elevationMedium,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppDesignSystem.radiusLG),
                   ),
-                  child: Center(
-                    child: Card(
-                      elevation: AppDesignSystem.elevationMedium,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppDesignSystem.radiusLG),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.all(AppDesignSystem.spaceLG),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
+                  child: Padding(
+                    padding: EdgeInsets.all(AppDesignSystem.spaceLG),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                             // Icon
                             Icon(
                               Icons.lock_outline,
@@ -577,7 +577,10 @@ class _PasswordChangeVerificationScreenState
                       ),
                     )
                   else
-                    ElevatedButton(
+                    Center(
+                      child: SizedBox(
+                        width: AppDesignSystem.getResponsiveButtonWidth(context),
+                        child: ElevatedButton(
                       onPressed: _verifyCode,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
@@ -594,6 +597,8 @@ class _PasswordChangeVerificationScreenState
                         'Verify Code',
                         style: AppDesignSystem.titleMedium.copyWith(
                           color: Colors.white,
+                        ),
+                      ),
                         ),
                       ),
                     ),
@@ -658,16 +663,14 @@ class _PasswordChangeVerificationScreenState
                             style: AppDesignSystem.labelLarge,
                           ),
                   ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+              ],
+            ),
+          ),
         ),
-      ),
       ),
     );
   }

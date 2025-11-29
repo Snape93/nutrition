@@ -1,0 +1,36 @@
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info
+pip-wheel-metadata/
+dist/
+build/
+
+# Virtual environments and local secrets
+.env
+.venv/
+venv/
+env/
+ENV/
+
+# Logs and instance data
+*.log
+instance/email_test_log.jsonl
+
+# Frontend/mobile assets (not needed in backend container)
+nutrition_flutter/
+*.apk
+*.aab
+
+# VCS / editor junk
+.git
+.gitignore
+.vscode/
+.idea/
+*.swp
+
+
+

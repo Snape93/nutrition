@@ -881,51 +881,117 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _durationController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'Duration',
-                          hintText: 'e.g. 20',
-                          labelStyle: TextStyle(color: _primaryColor),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(
-                              color: _primaryColor,
-                              width: 2,
+                Builder(
+                  builder: (context) {
+                    final screenWidth = MediaQuery.of(context).size.width;
+                    final isSmallScreen = screenWidth < 360;
+                    final fontSize = isSmallScreen ? 12.0 : 14.0;
+                    final suffixHeight = isSmallScreen ? 28.0 : 32.0;
+                    
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _durationController,
+                            keyboardType: TextInputType.number,
+                            scrollPadding: const EdgeInsets.all(8.0),
+                            style: TextStyle(fontSize: fontSize),
+                            decoration: InputDecoration(
+                              labelText: 'Duration',
+                              hintText: 'e.g. 20',
+                              labelStyle: TextStyle(
+                                color: _primaryColor,
+                                fontSize: fontSize,
+                              ),
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: isSmallScreen ? 8 : 12,
+                                vertical: isSmallScreen ? 12 : 16,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: _primaryColor,
+                                  width: 2,
+                                ),
+                              ),
+                              suffixIcon: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _durationUnit,
+                                  isDense: true,
+                                  style: TextStyle(
+                                    fontSize: fontSize,
+                                    color: Colors.black87,
+                                  ),
+                                  iconSize: isSmallScreen ? 16 : 20,
+                                  itemHeight: isSmallScreen ? 36 : 48,
+                                  menuMaxHeight: isSmallScreen ? 120 : 200,
+                                  underline: const SizedBox.shrink(),
+                                  selectedItemBuilder: (BuildContext context) {
+                                    return ['sec', 'min', 'hr'].map<Widget>((String item) {
+                                      return Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Padding(
+                                          padding: EdgeInsets.only(
+                                            right: isSmallScreen ? 4 : 8,
+                                          ),
+                                          child: Text(
+                                            item,
+                                            style: TextStyle(
+                                              fontSize: fontSize,
+                                              color: Colors.black87,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            textAlign: TextAlign.right,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList();
+                                  },
+                                  items: [
+                                    DropdownMenuItem(
+                                      value: 'sec',
+                                      child: Text(
+                                        'sec',
+                                        style: TextStyle(
+                                          fontSize: fontSize,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'min',
+                                      child: Text(
+                                        'min',
+                                        style: TextStyle(
+                                          fontSize: fontSize,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'hr',
+                                      child: Text(
+                                        'hr',
+                                        style: TextStyle(
+                                          fontSize: fontSize,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value == null) return;
+                                    setState(() {
+                                      _durationUnit = value;
+                                    });
+                                  },
+                                ),
+                              ),
+                              suffixIconConstraints: BoxConstraints(
+                                minWidth: isSmallScreen ? 48 : 56,
+                                minHeight: suffixHeight,
+                              ),
                             ),
-                          ),
-                          suffixIcon: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _durationUnit,
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'sec',
-                                  child: Text('sec'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'min',
-                                  child: Text('min'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'hr',
-                                  child: Text('hr'),
-                                ),
-                              ],
-                              onChanged: (value) {
-                                if (value == null) return;
-                                setState(() {
-                                  _durationUnit = value;
-                                });
-                              },
-                            ),
-                          ),
-                          suffixIconConstraints: const BoxConstraints(
-                            minWidth: 64,
-                          ),
-                        ),
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) {
                             return 'Please enter duration';
@@ -1001,6 +1067,8 @@ class _YourExerciseScreenState extends State<YourExerciseScreen>
                       ),
                     ),
                   ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

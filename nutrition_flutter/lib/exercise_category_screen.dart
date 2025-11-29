@@ -460,18 +460,20 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
     try {
       // Use ExerciseService with user parameter to get personalized calories
       // This ensures calories are calculated based on current user's weight
-      List<Exercise> categoryExercises = await ExerciseService.getExercisesByCategory(
-        widget.category,
-        user: widget.usernameOrEmail,
-      );
-      
+      List<Exercise> categoryExercises =
+          await ExerciseService.getExercisesByCategory(
+            widget.category,
+            user: widget.usernameOrEmail,
+          );
+
       // If ExerciseService fails, fallback to ProcessedExerciseService (local JSON)
       // Note: ProcessedExerciseService won't have personalized calories
       if (categoryExercises.isEmpty) {
         try {
-          categoryExercises = await ProcessedExerciseService.getExercisesByCategory(
-            widget.category,
-          );
+          categoryExercises =
+              await ProcessedExerciseService.getExercisesByCategory(
+                widget.category,
+              );
         } catch (e) {
           // If both fail, categoryExercises will remain empty
         }
@@ -596,7 +598,10 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                   ),
                   labelColor: Colors.white,
                   unselectedLabelColor: Colors.grey[600],
-                  labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                   tabs: const [Tab(text: 'HISTORY'), Tab(text: 'BROWSE ALL')],
                 ),
               ),
@@ -661,54 +666,47 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                       searchQuery = '';
                     });
                   },
-                  child: Text(
-                    'Clear',
-                    style: TextStyle(color: primaryColor),
-                  ),
+                  child: Text('Clear', style: TextStyle(color: primaryColor)),
                 ),
             ],
           ),
         ),
         Expanded(
-          child: exercisesList.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.fitness_center,
-                        size: 64,
-                        color: Colors.grey[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        showLoadingPlaceholder
-                            ? 'Fetching ${widget.category.toLowerCase()} workouts...'
-                            : searchQuery.isEmpty
-                                ? 'No exercises found for ${widget.category}'
-                                : 'No exercises match your search',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[600],
+          child:
+              exercisesList.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.fitness_center,
+                          size: 64,
+                          color: Colors.grey[400],
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        Text(
+                          showLoadingPlaceholder
+                              ? 'Fetching ${widget.category.toLowerCase()} workouts...'
+                              : searchQuery.isEmpty
+                              ? 'No exercises found for ${widget.category}'
+                              : 'No exercises match your search',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  )
+                  : ListView.builder(
+                    padding: EdgeInsets.all(isVerySmallScreen ? 8 : 12),
+                    itemCount: exercisesList.length,
+                    itemBuilder: (context, index) {
+                      final exercise = exercisesList[index];
+                      return _buildExerciseCard(exercise, isVerySmallScreen);
+                    },
                   ),
-                )
-              : ListView.builder(
-                  padding: EdgeInsets.all(
-                    isVerySmallScreen ? 8 : 12,
-                  ),
-                  itemCount: exercisesList.length,
-                  itemBuilder: (context, index) {
-                    final exercise = exercisesList[index];
-                    return _buildExerciseCard(
-                      exercise,
-                      isVerySmallScreen,
-                    );
-                  },
-                ),
         ),
       ],
     );
@@ -856,7 +854,7 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
     );
     // Use fresh exercise if available, otherwise fall back to cached exercise
     final displayExercise = freshExercise ?? exercise;
-    
+
     final exerciseAdded = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -943,7 +941,9 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                           ),
                         ),
                         SizedBox(height: 12),
-                        ...displayExercise.instructions.asMap().entries.map((entry) {
+                        ...displayExercise.instructions.asMap().entries.map((
+                          entry,
+                        ) {
                           final index = entry.key;
                           final instruction = entry.value;
                           return Padding(
@@ -1000,7 +1000,8 @@ class _ExerciseCategoryScreenState extends State<ExerciseCategoryScreen>
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  displayExercise.estimatedCaloriesPerMinute != null
+                                  displayExercise.estimatedCaloriesPerMinute !=
+                                          null
                                       ? 'Estimated ${displayExercise.estimatedCaloriesPerMinute!.toStringAsFixed(1)} calories burned per minute'
                                       : 'Enter duration to calculate calories',
                                   style: TextStyle(
@@ -1401,16 +1402,19 @@ class _DurationAndCaloriesFooterState
                       final dailyGoal = snapshot.data ?? 2000;
                       final isLargeWorkout = calories >= dailyGoal * 0.5;
                       final isMediumWorkout = calories >= 200;
-                      
+
                       String message;
                       if (isLargeWorkout) {
-                        message = 'Amazing workout! You burned ${calories.toStringAsFixed(0)} calories. This means you can eat ${calories.toStringAsFixed(0)} more calories today and still stay on track. Your body needs fuel to recover! 💪';
+                        message =
+                            'Amazing workout! You burned ${calories.toStringAsFixed(0)} calories. This means you can eat ${calories.toStringAsFixed(0)} more calories today and still stay on track. Your body needs fuel to recover! 💪';
                       } else if (isMediumWorkout) {
-                        message = 'Great workout! You burned ${calories.toStringAsFixed(0)} calories. This means you can eat ${calories.toStringAsFixed(0)} more calories today and still meet your goal. Would you like suggestions for a post-workout snack?';
+                        message =
+                            'Great workout! You burned ${calories.toStringAsFixed(0)} calories. This means you can eat ${calories.toStringAsFixed(0)} more calories today and still meet your goal. Would you like suggestions for a post-workout snack?';
                       } else {
-                        message = 'Nice workout! You burned ${calories.toStringAsFixed(0)} calories. You can enjoy a small snack to refuel. I can suggest healthy options!';
+                        message =
+                            'Nice workout! You burned ${calories.toStringAsFixed(0)} calories. You can enjoy a small snack to refuel. I can suggest healthy options!';
                       }
-                      
+
                       return Container(
                         margin: const EdgeInsets.only(top: 20),
                         padding: const EdgeInsets.all(16),
@@ -1479,44 +1483,121 @@ class _DurationAndCaloriesFooterState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _durationCtrl,
-                  keyboardType: TextInputType.number,
-                  onChanged: (_) => _recalculate(),
-                  decoration: InputDecoration(
-                    labelText: 'Duration Time',
-                    hintText: 'e.g., 5',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+          Builder(
+            builder: (context) {
+              final screenWidth = MediaQuery.of(context).size.width;
+              final isSmallScreen = screenWidth < 360;
+              final fontSize = isSmallScreen ? 12.0 : 14.0;
+              final textFieldPadding = isSmallScreen ? 8.0 : 12.0;
+              final dropdownPadding = isSmallScreen ? 4.0 : 8.0;
+
+              return Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _durationCtrl,
+                      keyboardType: TextInputType.number,
+                      scrollPadding: const EdgeInsets.all(8.0),
+                      style: TextStyle(fontSize: fontSize),
+                      onChanged: (_) => _recalculate(),
+                      decoration: InputDecoration(
+                        labelText: 'Duration Time',
+                        hintText: 'e.g., 5',
+                        labelStyle: TextStyle(fontSize: fontSize),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: textFieldPadding,
+                          vertical: isSmallScreen ? 12 : 16,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 140,
-                child: DropdownButtonFormField<String>(
-                  value: _unit,
-                  items: const [
-                    DropdownMenuItem(value: 'seconds', child: Text('seconds')),
-                    DropdownMenuItem(value: 'minutes', child: Text('minutes')),
-                    DropdownMenuItem(value: 'hours', child: Text('hours')),
-                  ],
-                  onChanged: (v) {
-                    setState(() => _unit = v ?? 'minutes');
-                    _recalculate();
-                  },
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  SizedBox(width: isSmallScreen ? 6 : 8),
+                  Flexible(
+                    flex: 1,
+                    child: DropdownButtonFormField<String>(
+                      value: _unit,
+                      isDense: true,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        color: Colors.black87,
+                      ),
+                      iconSize: isSmallScreen ? 16 : 20,
+                      itemHeight: isSmallScreen ? 36 : 48,
+                      menuMaxHeight: isSmallScreen ? 120 : 200,
+                      selectedItemBuilder: (BuildContext context) {
+                        return ['seconds', 'minutes', 'hours'].map<Widget>((
+                          String item,
+                        ) {
+                          return Text(
+                            item,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        }).toList();
+                      },
+                      items: [
+                        DropdownMenuItem(
+                          value: 'seconds',
+                          child: Text(
+                            'seconds',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'minutes',
+                          child: Text(
+                            'minutes',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'hours',
+                          child: Text(
+                            'hours',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        setState(() => _unit = v ?? 'minutes');
+                        _recalculate();
+                      },
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: dropdownPadding,
+                          vertical: isSmallScreen ? 12 : 16,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           Container(

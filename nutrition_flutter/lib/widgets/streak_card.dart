@@ -319,7 +319,8 @@ class StreakCard extends StatelessWidget {
   Widget _buildEmptyState() {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const SizedBox(height: 20),
         Container(
@@ -343,6 +344,7 @@ class StreakCard extends StatelessWidget {
           style: AppDesignSystem.headlineSmall.copyWith(
             color: AppDesignSystem.onSurface,
           ),
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(

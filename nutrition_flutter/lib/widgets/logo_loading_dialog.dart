@@ -4,10 +4,12 @@ import 'animated_logo_widget.dart';
 
 class LogoLoadingFullScreen extends StatelessWidget {
   final bool dimBackground;
+  final String? statusMessage;
 
   const LogoLoadingFullScreen({
     super.key,
     this.dimBackground = false,
+    this.statusMessage,
   });
 
   @override
@@ -38,6 +40,18 @@ class LogoLoadingFullScreen extends StatelessWidget {
               decoration: TextDecoration.none,
             ),
           ),
+          if (statusMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              statusMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF4E4E4E),
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -49,11 +63,13 @@ class LogoLoadingOverlayController {
     this._context,
     this._minDisplayDuration,
     this._dimBackground,
+    this._statusMessage,
   );
 
   final BuildContext _context;
   final Duration _minDisplayDuration;
   final bool _dimBackground;
+  final String? _statusMessage;
   OverlayEntry? _overlayEntry;
   DateTime? _shownAt;
 
@@ -63,11 +79,13 @@ class LogoLoadingOverlayController {
     BuildContext context, {
     Duration minDisplayDuration = defaultDuration,
     bool dimBackground = false,
+    String? statusMessage,
   }) {
     final controller = LogoLoadingOverlayController._(
       context,
       minDisplayDuration,
       dimBackground,
+      statusMessage,
     );
     controller._showOverlay();
     return controller;
@@ -79,7 +97,10 @@ class LogoLoadingOverlayController {
 
     _shownAt = DateTime.now();
     _overlayEntry = OverlayEntry(
-      builder: (_) => LogoLoadingFullScreen(dimBackground: _dimBackground),
+      builder: (_) => LogoLoadingFullScreen(
+        dimBackground: _dimBackground,
+        statusMessage: _statusMessage,
+      ),
     );
     overlay.insert(_overlayEntry!);
   }

@@ -239,6 +239,8 @@ class _AccountDeletionVerificationScreenState
         _isLoading = false;
         _errorMessage = 'Network error: $e';
       });
+    } finally {
+      // Keep inline loading indicator only
     }
   }
 
@@ -378,6 +380,8 @@ class _AccountDeletionVerificationScreenState
         _isResending = false;
         _errorMessage = 'Network error: $e';
       });
+    } finally {
+      // Keep inline loading indicator only
     }
   }
 
@@ -425,6 +429,8 @@ class _AccountDeletionVerificationScreenState
         if (mounted) {
           Navigator.of(context).pop();
         }
+      } finally {
+        // No full-screen overlay; navigation feedback is enough
       }
     }
   }
@@ -438,6 +444,7 @@ class _AccountDeletionVerificationScreenState
         padding: EdgeInsets.all(AppDesignSystem.spaceLG),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Card(
               elevation: AppDesignSystem.elevationMedium,
@@ -447,6 +454,7 @@ class _AccountDeletionVerificationScreenState
               child: Padding(
                 padding: EdgeInsets.all(AppDesignSystem.spaceLG),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       decoration: BoxDecoration(
@@ -684,12 +692,15 @@ class _AccountDeletionVerificationScreenState
                     ],
                     SizedBox(height: AppDesignSystem.spaceLG),
                     _isLoading
-                        ? CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(errorColor),
+                        ? Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(errorColor),
+                            ),
                           )
-                        : SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
+                        : Center(
+                            child: SizedBox(
+                              width: AppDesignSystem.getResponsiveButtonWidth(context),
+                              child: ElevatedButton(
                               onPressed: _verifyCode,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: errorColor,
@@ -708,18 +719,17 @@ class _AccountDeletionVerificationScreenState
                               child: const Text('Verify & Delete Account'),
                             ),
                           ),
+                        ),
                     SizedBox(height: AppDesignSystem.spaceMD),
                     Wrap(
                       alignment: WrapAlignment.center,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       spacing: 4,
                       children: [
-                        Flexible(
-                          child: Text(
-                            "Didn't receive the code?",
-                            style: AppDesignSystem.bodyMedium,
-                            textAlign: TextAlign.center,
-                          ),
+                        Text(
+                          "Didn't receive the code?",
+                          style: AppDesignSystem.bodyMedium,
+                          textAlign: TextAlign.center,
                         ),
                         TextButton(
                           onPressed: _resendCountdown > 0 || _isResending

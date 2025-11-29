@@ -688,7 +688,7 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                         Icon(Icons.warning, size: 16, color: Colors.amber[700]),
                         SizedBox(width: 4),
                         Text(
-                          'Disappears in 1 hour',
+                          'You can delete this only today',
                           style: TextStyle(
                             color: Colors.amber[700],
                             fontSize: 12,

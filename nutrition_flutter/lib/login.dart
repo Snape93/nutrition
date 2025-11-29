@@ -233,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
             _failedAttempts > 0 &&
             _failedAttempts < _maxFailedAttempts) {
           final remaining = _maxFailedAttempts - _failedAttempts;
-          msg += '\n${remaining} attempt${remaining > 1 ? 's' : ''} remaining.';
+          msg += '\n$remaining attempt${remaining > 1 ? 's' : ''} remaining.';
         }
 
         setState(() {
@@ -326,7 +326,7 @@ class _LoginScreenState extends State<LoginScreen> {
             _failedAttempts < _maxFailedAttempts) {
           final remaining = _maxFailedAttempts - _failedAttempts;
           errorMsg +=
-              '\n${remaining} attempt${remaining > 1 ? 's' : ''} remaining.';
+              '\n$remaining attempt${remaining > 1 ? 's' : ''} remaining.';
         }
 
         setState(() {
@@ -417,9 +417,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _message = isReachable
-            ? 'Server is taking too long to respond. Please try again.'
-            : 'Cannot connect to server. Please check your internet connection and try again.';
+        _message =
+            isReachable
+                ? 'Server is taking too long to respond. Please try again.'
+                : 'Cannot connect to server. Please check your internet connection and try again.';
       });
     } catch (e, stackTrace) {
       // Log the error for debugging
@@ -436,7 +437,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isNarrowScreen = AppDesignSystem.isNarrowScreen(context);
-    
+
     return Scaffold(
       body: Stack(
         children: [
@@ -487,43 +488,51 @@ class _LoginScreenState extends State<LoginScreen> {
                             children: [
                               Image.asset(
                                 'design/logo.png',
-                                height: AppDesignSystem.getResponsiveImageHeight(
-                                  context,
-                                  xs: 80,
-                                  sm: 90,
-                                  md: 100,
-                                  lg: 110,
-                                ),
+                                height:
+                                    AppDesignSystem.getResponsiveImageHeight(
+                                      context,
+                                      xs: 80,
+                                      sm: 90,
+                                      md: 100,
+                                      lg: 110,
+                                    ),
                                 fit: BoxFit.contain,
                               ),
-                              SizedBox(height: AppDesignSystem.getResponsiveSpacingExact(
-                                context,
-                                xs: 12,
-                                sm: 14,
-                                md: 16,
-                                lg: 20,
-                              )),
+                              SizedBox(
+                                height:
+                                    AppDesignSystem.getResponsiveSpacingExact(
+                                      context,
+                                      xs: 12,
+                                      sm: 14,
+                                      md: 16,
+                                      lg: 20,
+                                    ),
+                              ),
                               Text(
                                 'Welcome Back',
-                                style: AppDesignSystem.getResponsiveDisplaySmall(context).copyWith(
-                                  color: const Color(0xFF388E3C),
-                                ),
+                                style:
+                                    AppDesignSystem.getResponsiveDisplaySmall(
+                                      context,
+                                    ).copyWith(color: const Color(0xFF388E3C)),
                               ),
                               SizedBox(height: AppDesignSystem.spaceSM),
                               Text(
                                 'Sign in to continue your nutrition journey',
-                                style: AppDesignSystem.getResponsiveBodyMedium(context).copyWith(
-                                  color: Colors.grey[600],
-                                ),
+                                style: AppDesignSystem.getResponsiveBodyMedium(
+                                  context,
+                                ).copyWith(color: Colors.grey[600]),
                                 textAlign: TextAlign.center,
                               ),
-                              SizedBox(height: AppDesignSystem.getResponsiveSpacingExact(
-                                context,
-                                xs: 20,
-                                sm: 22,
-                                md: 24,
-                                lg: 28,
-                              )),
+                              SizedBox(
+                                height:
+                                    AppDesignSystem.getResponsiveSpacingExact(
+                                      context,
+                                      xs: 20,
+                                      sm: 22,
+                                      md: 24,
+                                      lg: 28,
+                                    ),
+                              ),
                               TextField(
                                 key: const Key('usernameField'),
                                 controller: _usernameController,
@@ -532,7 +541,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   prefixIcon: Icon(
                                     Icons.person_outline,
                                     color: const Color(0xFF4CAF50),
-                                    size: AppDesignSystem.getResponsiveIconSize(context),
+                                    size: AppDesignSystem.getResponsiveIconSize(
+                                      context,
+                                    ),
                                   ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(
@@ -547,13 +558,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                   fillColor: Colors.grey[50],
                                 ),
                               ),
-                              SizedBox(height: AppDesignSystem.getResponsiveSpacingExact(
-                                context,
-                                xs: 12,
-                                sm: 14,
-                                md: 16,
-                                lg: 18,
-                              )),
+                              SizedBox(
+                                height:
+                                    AppDesignSystem.getResponsiveSpacingExact(
+                                      context,
+                                      xs: 12,
+                                      sm: 14,
+                                      md: 16,
+                                      lg: 18,
+                                    ),
+                              ),
                               TextField(
                                 key: const Key('passwordField'),
                                 controller: _passwordController,
@@ -563,7 +577,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   prefixIcon: Icon(
                                     Icons.lock_outline,
                                     color: const Color(0xFF4CAF50),
-                                    size: AppDesignSystem.getResponsiveIconSize(context),
+                                    size: AppDesignSystem.getResponsiveIconSize(
+                                      context,
+                                    ),
                                   ),
                                   suffixIcon: IconButton(
                                     icon: Icon(
@@ -571,7 +587,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ? Icons.visibility_off
                                           : Icons.visibility,
                                       color: const Color(0xFF4CAF50),
-                                      size: AppDesignSystem.getResponsiveIconSize(context),
+                                      size:
+                                          AppDesignSystem.getResponsiveIconSize(
+                                            context,
+                                          ),
                                     ),
                                     onPressed: () {
                                       setState(() {
@@ -612,7 +631,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                     child: Text(
                                       'Forgot Password?',
-                                      style: AppDesignSystem.getResponsiveBodySmall(context),
+                                      style:
+                                          AppDesignSystem.getResponsiveBodySmall(
+                                            context,
+                                          ),
                                     ),
                                   ),
                                 ],
@@ -621,7 +643,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 SizedBox(height: AppDesignSystem.spaceSM),
                                 Text(
                                   'Locked. Retry in ${_formatCountdown(_remainingSeconds)}.',
-                                  style: AppDesignSystem.getResponsiveBodySmall(context).copyWith(
+                                  style: AppDesignSystem.getResponsiveBodySmall(
+                                    context,
+                                  ).copyWith(
                                     color: Colors.red[700],
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -629,119 +653,152 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ],
                               SizedBox(height: AppDesignSystem.spaceSM),
-                              SizedBox(
-                                width: double.infinity,
-                                height: AppDesignSystem.getResponsiveButtonHeight(context),
-                                child: ElevatedButton(
-                                  onPressed:
-                                      (!_isLoading && !_isLockedOut)
+                              Builder(
+                                builder: (context) {
+                                  final widthValue =
+                                      AppDesignSystem.getResponsiveButtonWidth(
+                                    context,
+                                  );
+                                  final buttonWidth =
+                                      widthValue ?? double.infinity;
+                                  final buttonHeight =
+                                      AppDesignSystem.getResponsiveButtonHeight(
+                                    context,
+                                  );
+                                  final borderRadius =
+                                      AppDesignSystem.getResponsiveBorderRadius(
+                                    context,
+                                    xs: AppDesignSystem.radiusSM,
+                                    sm: AppDesignSystem.radiusMD,
+                                  );
+
+                                  final button = SizedBox(
+                                    width: buttonWidth,
+                                    child: ElevatedButton(
+                                      onPressed: (!_isLoading && !_isLockedOut)
                                           ? _login
                                           : null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF4CAF50),
-                                    foregroundColor: Colors.white,
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: AppDesignSystem.getResponsiveSpacingExact(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFF4CAF50),
+                                        foregroundColor: Colors.white,
+                                        disabledBackgroundColor:
+                                            const Color(0xFF4CAF50)
+                                                .withOpacity(0.45),
+                                        disabledForegroundColor:
+                                            Colors.white.withOpacity(0.8),
+                                        minimumSize:
+                                            Size.fromHeight(buttonHeight),
+                                        padding: EdgeInsets.zero,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(
+                                            borderRadius,
+                                          ),
+                                        ),
+                                        textStyle: AppDesignSystem
+                                            .getResponsiveHeadlineSmall(
+                                          context,
+                                        ).copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: _isLoading
+                                          ? SizedBox(
+                                              width: buttonHeight / 2,
+                                              height: buttonHeight / 2,
+                                              child:
+                                                  const CircularProgressIndicator(
+                                                strokeWidth: 2.5,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                        Color>(Colors.white),
+                                              ),
+                                            )
+                                          : const Text('Sign In'),
+                                    ),
+                                  );
+
+                                  final shouldCenter =
+                                      AppDesignSystem.shouldCenterButton(
+                                            context,
+                                          ) &&
+                                          buttonWidth != double.infinity;
+
+                                  return shouldCenter
+                                      ? Align(
+                                          alignment: Alignment.center,
+                                          child: button,
+                                        )
+                                      : button;
+                                },
+                              ),
+                              if (_message.isNotEmpty && !_isLockedOut) ...[
+                                SizedBox(
+                                  height:
+                                      AppDesignSystem.getResponsiveSpacingExact(
                                         context,
                                         xs: 12,
                                         sm: 14,
                                         md: 16,
                                         lg: 18,
                                       ),
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppDesignSystem.getResponsiveBorderRadius(
-                                          context,
-                                          xs: AppDesignSystem.radiusSM,
-                                          sm: AppDesignSystem.radiusMD,
-                                        ),
-                                      ),
-                                    ),
-                                    textStyle: AppDesignSystem.getResponsiveHeadlineSmall(context).copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                  child: _isLoading
-                                      ? SizedBox(
-                                          width: AppDesignSystem.getResponsiveIconSize(
-                                            context,
-                                            xs: 20,
-                                            sm: 24,
-                                            md: 28,
-                                          ),
-                                          height: AppDesignSystem.getResponsiveIconSize(
-                                            context,
-                                            xs: 20,
-                                            sm: 24,
-                                            md: 28,
-                                          ),
-                                          child: const CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                              Colors.white,
-                                            ),
-                                          ),
-                                        )
-                                      : Text('Sign In'),
                                 ),
-                              ),
-                              if (_message.isNotEmpty && !_isLockedOut) ...[
-                                SizedBox(height: AppDesignSystem.getResponsiveSpacingExact(
-                                  context,
-                                  xs: 12,
-                                  sm: 14,
-                                  md: 16,
-                                  lg: 18,
-                                )),
                                 Text(
                                   _message,
-                                  style: AppDesignSystem.getResponsiveBodyMedium(context).copyWith(
-                                    color: Colors.red,
-                                  ),
+                                  style:
+                                      AppDesignSystem.getResponsiveBodyMedium(
+                                        context,
+                                      ).copyWith(color: Colors.red),
                                   textAlign: TextAlign.center,
                                 ),
                               ],
-                              SizedBox(height: AppDesignSystem.getResponsiveSpacingExact(
-                                context,
-                                xs: 12,
-                                sm: 14,
-                                md: 16,
-                                lg: 18,
-                              )),
+                              SizedBox(
+                                height:
+                                    AppDesignSystem.getResponsiveSpacingExact(
+                                      context,
+                                      xs: 12,
+                                      sm: 14,
+                                      md: 16,
+                                      lg: 18,
+                                    ),
+                              ),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
                                     "Don't have an account? ",
-                                    style: AppDesignSystem.getResponsiveBodyMedium(context),
+                                    style:
+                                        AppDesignSystem.getResponsiveBodyMedium(
+                                          context,
+                                        ),
                                   ),
                                   TextButton(
                                     onPressed:
                                         (_isLoading || _isNavigatingToRegister)
                                             ? null
                                             : () async {
+                                              setState(() {
+                                                _isNavigatingToRegister = true;
+                                              });
+
+                                              await Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder:
+                                                      (context) =>
+                                                          const RegisterScreen(),
+                                                ),
+                                              );
+
+                                              if (mounted) {
                                                 setState(() {
-                                                  _isNavigatingToRegister = true;
+                                                  _isNavigatingToRegister =
+                                                      false;
                                                 });
-
-                                                await Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        const RegisterScreen(),
-                                                  ),
-                                                );
-
-                                                if (mounted) {
-                                                  setState(() {
-                                                    _isNavigatingToRegister =
-                                                        false;
-                                                  });
-                                                }
-                                              },
+                                              }
+                                            },
                                     style: TextButton.styleFrom(
                                       foregroundColor: const Color(0xFF4CAF50),
                                     ),
@@ -763,7 +820,10 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-  Future<bool> _isServerReachable({Duration timeout = const Duration(seconds: 5)}) async {
+
+  Future<bool> _isServerReachable({
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
     try {
       final response = await http
           .get(Uri.parse('$apiBase/health'))

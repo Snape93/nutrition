@@ -1,12 +1,8 @@
 """Email service for sending verification emails via SMTP"""
 import smtplib
-import secrets
-import logging
-import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
-from typing import Optional
 import json
 import os
 from dotenv import load_dotenv
@@ -14,54 +10,18 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Configure logging
-logger = logging.getLogger(__name__)
 
-# Constants
-VERIFICATION_CODE_LENGTH = 6
-VERIFICATION_CODE_MIN = 100000
-VERIFICATION_CODE_MAX = 999999
-VERIFICATION_CODE_EXPIRATION_MINUTES = 15
-DEFAULT_SMTP_TIMEOUT = 15.0
-DEFAULT_MAIL_SERVER = 'smtp.gmail.com'
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-
-
-def _truthy(value: Optional[str]) -> bool:
-    """Check if a value is truthy (1, true, yes, on)."""
+def _truthy(value):
     if value is None:
         return False
     return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
 
-
-def _get_smtp_timeout() -> float:
+def _get_smtp_timeout():
     """Resolve SMTP timeout (seconds) with safe fallback."""
     try:
-        timeout = os.environ.get('SMTP_TIMEOUT_SECONDS', str(DEFAULT_SMTP_TIMEOUT))
-        return float(timeout)
+        return float(os.environ.get('SMTP_TIMEOUT_SECONDS', '15'))
     except (TypeError, ValueError):
-        logger.warning(f"Invalid SMTP_TIMEOUT_SECONDS, using default: {DEFAULT_SMTP_TIMEOUT}")
-        return DEFAULT_SMTP_TIMEOUT
-
-
-def _validate_email(email: str) -> bool:
-    """Validate email address format."""
-    if not email or not isinstance(email, str):
-        return False
-    return bool(EMAIL_REGEX.match(email.strip()))
-
-
-def _get_mail_username() -> str:
-    """Get mail username from environment, fail if not configured."""
-    mail_username = os.environ.get('GMAIL_USERNAME')
-    if not mail_username:
-        error_msg = "GMAIL_USERNAME environment variable is required for email service"
-        logger.error(error_msg)
-        if not EMAIL_TEST_MODE:
-            raise ValueError(error_msg)
-        logger.warning("EMAIL_TEST_MODE enabled, continuing without GMAIL_USERNAME")
-        return ''
-    return mail_username
+        return 15.0
 
 
 SMTP_TIMEOUT = _get_smtp_timeout()
@@ -71,7 +31,7 @@ EMAIL_TEST_LOG = os.environ.get(
     os.path.join(os.path.dirname(__file__), 'instance', 'email_test_log.jsonl')
 )
 
-def _send_email_via_smtp(msg: MIMEMultipart, mail_server: str, mail_username: str, mail_password: str) -> bool:
+def _send_email_via_smtp(msg, mail_server: str, mail_username: str, mail_password: str) -> bool:
     """
     Send email via SMTP with fallback to port 465 (SSL) if port 587 (TLS) fails.
     
@@ -86,12 +46,12 @@ def _send_email_via_smtp(msg: MIMEMultipart, mail_server: str, mail_username: st
     """
     # Try port 587 (TLS) first
     try:
-        logger.info(f"Attempting SMTP connection to {mail_server}:587 (TLS)...")
+        print(f"[INFO] Attempting SMTP connection to {mail_server}:587 (TLS)...")
         with smtplib.SMTP(mail_server, 587, timeout=SMTP_TIMEOUT) as server:
             server.starttls()
             server.login(mail_username, mail_password)
             server.send_message(msg)
-        logger.info(f"Email sent successfully via port 587 (TLS)")
+        print(f"[SUCCESS] Email sent via port 587 (TLS)")
         return True
     except (OSError, ConnectionError, smtplib.SMTPException) as e:
         error_msg = str(e)
@@ -99,31 +59,33 @@ def _send_email_via_smtp(msg: MIMEMultipart, mail_server: str, mail_username: st
         
         # Check if it's a network error (port 587 blocked)
         if error_code == 101 or 'Network is unreachable' in error_msg or 'Connection refused' in error_msg:
-            logger.warning(f"Port 587 (TLS) failed: {error_msg}. Trying port 465 (SSL) as fallback...")
+            print(f"[WARN] Port 587 (TLS) failed: {error_msg}. Trying port 465 (SSL) as fallback...")
             
             # Try port 465 (SSL) as fallback
             try:
-                logger.info(f"Attempting SMTP connection to {mail_server}:465 (SSL)...")
+                print(f"[INFO] Attempting SMTP connection to {mail_server}:465 (SSL)...")
                 import ssl
                 context = ssl.create_default_context()
                 with smtplib.SMTP_SSL(mail_server, 465, timeout=SMTP_TIMEOUT, context=context) as server:
                     server.login(mail_username, mail_password)
                     server.send_message(msg)
-                logger.info(f"Email sent successfully via port 465 (SSL)")
+                print(f"[SUCCESS] Email sent via port 465 (SSL)")
                 return True
             except Exception as ssl_error:
-                logger.error(f"Port 465 (SSL) also failed: {ssl_error}")
-                logger.error("Both SMTP ports (587 and 465) failed. Network may be blocking SMTP connections.")
+                print(f"[ERROR] Port 465 (SSL) also failed: {ssl_error}")
+                print(f"[ERROR] Both SMTP ports (587 and 465) failed. Network may be blocking SMTP connections.")
                 return False
         else:
             # Other errors (authentication, etc.)
-            logger.error(f"SMTP connection failed: {error_msg}")
+            print(f"[ERROR] SMTP connection failed: {error_msg}")
             return False
     except Exception as e:
-        logger.exception(f"Unexpected error sending email: {e}")
+        print(f"[ERROR] Unexpected error sending email: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
-def send_verification_email(email: str, code: str, username: Optional[str] = None) -> bool:
+def send_verification_email(email: str, code: str, username: str = None) -> bool:
     """
     Send verification code email via SMTP.
     
@@ -136,19 +98,12 @@ def send_verification_email(email: str, code: str, username: Optional[str] = Non
         True if email sent successfully, False otherwise
     """
     try:
-        # Validate email address
-        if not _validate_email(email):
-            logger.error(f"Invalid email address format: {email}")
-            return False
-        
         # Get email configuration
-        mail_username = _get_mail_username()
-        if not mail_username and not EMAIL_TEST_MODE:
-            return False
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
         # Email body
         name = username or 'there'
-        expiration_minutes = VERIFICATION_CODE_EXPIRATION_MINUTES
+        expiration_minutes = 15
         
         subject = 'Nutritionist App - Email Verification Code'
         
@@ -203,23 +158,23 @@ Nutritionist App Team"""
         # Send email via SMTP
         success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
-            logger.info(f"Verification email sent successfully to {email}")
+            print(f"[SUCCESS] Verification email sent to {email}")
         else:
-            logger.error(f"Failed to send verification email to {email}")
+            print(f"[ERROR] Failed to send verification email to {email}")
         return success
         
     except Exception as e:
-        logger.exception(f"Failed to send verification email to {email}: {e}")
+        print(f"[ERROR] Failed to send verification email to {email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
-def _record_test_email(to_email: str, subject: str, text_body: str, html_body: str) -> None:
+def _record_test_email(to_email: str, subject: str, text_body: str, html_body: str):
     """Save email contents to a log file when EMAIL_TEST_MODE is enabled."""
     if not EMAIL_TEST_MODE:
         return
     try:
-        log_dir = os.path.dirname(EMAIL_TEST_LOG)
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(os.path.dirname(EMAIL_TEST_LOG), exist_ok=True)
         payload = {
             'timestamp': datetime.utcnow().isoformat() + 'Z',
             'to': to_email,
@@ -229,9 +184,8 @@ def _record_test_email(to_email: str, subject: str, text_body: str, html_body: s
         }
         with open(EMAIL_TEST_LOG, 'a', encoding='utf-8') as fp:
             fp.write(json.dumps(payload) + '\n')
-        logger.debug(f"Test email logged to {EMAIL_TEST_LOG}")
     except Exception as err:
-        logger.warning(f"Failed to log test email: {err}")
+        print(f"[WARN] Failed to log test email: {err}")
 
 
 def _send_email_with_fallback(from_email: str, to_email: str, subject: str, html_body: str, text_body: str) -> bool:
@@ -248,19 +202,13 @@ def _send_email_with_fallback(from_email: str, to_email: str, subject: str, html
     Returns:
         True if email sent successfully, False otherwise
     """
-    # Validate recipient email
-    if not _validate_email(to_email):
-        logger.error(f"Invalid recipient email address format: {to_email}")
-        return False
-    
-    mail_server = os.environ.get('MAIL_SERVER', DEFAULT_MAIL_SERVER)
+    mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
     mail_password = os.environ.get('GMAIL_APP_PASSWORD')
     
     if not from_email or not mail_password:
-        error_msg = "Email not configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD environment variables."
-        logger.error(error_msg)
+        print("[ERROR] Email not configured. Set GMAIL_USERNAME and GMAIL_APP_PASSWORD environment variables.")
         if EMAIL_TEST_MODE:
-            logger.info("EMAIL_TEST_MODE=1, simulating email delivery.")
+            print("[INFO] EMAIL_TEST_MODE=1, simulating email delivery.")
             _record_test_email(to_email, subject, text_body, html_body)
             return True
         return False
@@ -281,24 +229,18 @@ def _send_email_with_fallback(from_email: str, to_email: str, subject: str, html
         return True
     
     if EMAIL_TEST_MODE:
-        logger.warning("SMTP failed but EMAIL_TEST_MODE is enabled. Recording email and continuing.")
+        print("[WARN] SMTP failed but EMAIL_TEST_MODE is enabled. Recording email and continuing.")
         _record_test_email(to_email, subject, text_body, html_body)
         return True
     
     return False
 
-
 def generate_verification_code() -> str:
-    """
-    Generate a cryptographically secure 6-digit verification code.
-    
-    Returns:
-        A 6-digit string code (100000-999999)
-    """
-    code = secrets.randbelow(VERIFICATION_CODE_MAX - VERIFICATION_CODE_MIN + 1) + VERIFICATION_CODE_MIN
-    return str(code)
+    """Generate a random 6-digit verification code"""
+    import random
+    return str(random.randint(100000, 999999))
 
-def send_email_change_verification(new_email: str, code: str, old_email: Optional[str] = None, username: Optional[str] = None) -> bool:
+def send_email_change_verification(new_email: str, code: str, old_email: str = None, username: str = None) -> bool:
     """
     Send email change verification code to the new email address.
     
@@ -312,21 +254,14 @@ def send_email_change_verification(new_email: str, code: str, old_email: Optiona
         True if email sent successfully, False otherwise
     """
     try:
-        # Validate email address
-        if not _validate_email(new_email):
-            logger.error(f"Invalid new email address format: {new_email}")
-            return False
-        
         # Get email configuration
-        mail_username = _get_mail_username()
-        if not mail_username and not EMAIL_TEST_MODE:
-            return False
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
         subject = 'Nutritionist App - Verify Your New Email Address'
         
         # Email body
         name = username or 'there'
-        expiration_minutes = VERIFICATION_CODE_EXPIRATION_MINUTES
+        expiration_minutes = 15
         old_email_text = f"\nCurrent email: {old_email}\n" if old_email else ""
         
         text_body = f"""Hi {name},
@@ -387,16 +322,18 @@ Nutritionist App Team"""
         # Send email via SMTP
         success = _send_email_with_fallback(mail_username, new_email, subject, html_body, text_body)
         if success:
-            logger.info(f"Email change verification email sent successfully to {new_email}")
+            print(f"[SUCCESS] Email change verification email sent to {new_email}")
         else:
-            logger.error(f"Failed to send email change verification email to {new_email}")
+            print(f"[ERROR] Failed to send email change verification email to {new_email}")
         return success
         
     except Exception as e:
-        logger.exception(f"Failed to send email change verification email to {new_email}: {e}")
+        print(f"[ERROR] Failed to send email change verification email to {new_email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
-def send_account_deletion_verification(email: str, code: str, username: Optional[str] = None) -> bool:
+def send_account_deletion_verification(email: str, code: str, username: str = None) -> bool:
     """
     Send account deletion verification code to the current email address.
     
@@ -409,21 +346,14 @@ def send_account_deletion_verification(email: str, code: str, username: Optional
         True if email sent successfully, False otherwise
     """
     try:
-        # Validate email address
-        if not _validate_email(email):
-            logger.error(f"Invalid email address format: {email}")
-            return False
-        
         # Get email configuration
-        mail_username = _get_mail_username()
-        if not mail_username and not EMAIL_TEST_MODE:
-            return False
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
         subject = 'Nutritionist App - Confirm Account Deletion'
         
         # Email body
         name = username or 'there'
-        expiration_minutes = VERIFICATION_CODE_EXPIRATION_MINUTES
+        expiration_minutes = 15
         
         text_body = f"""Hi {name},
 
@@ -505,16 +435,18 @@ Nutritionist App Team"""
         # Send email via SMTP
         success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
-            logger.info(f"Account deletion verification email sent successfully to {email}")
+            print(f"[SUCCESS] Account deletion verification email sent to {email}")
         else:
-            logger.error(f"Failed to send account deletion verification email to {email}")
+            print(f"[ERROR] Failed to send account deletion verification email to {email}")
         return success
         
     except Exception as e:
-        logger.exception(f"Failed to send account deletion verification email to {email}: {e}")
+        print(f"[ERROR] Failed to send account deletion verification email to {email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
-def send_email_change_notification(old_email: str, new_email: str, username: Optional[str] = None, timestamp: Optional[str] = None) -> bool:
+def send_email_change_notification(old_email: str, new_email: str, username: str = None, timestamp: str = None) -> bool:
     """
     Send security notification to old email address when email change is requested.
     This is informational only - no verification code is included.
@@ -529,18 +461,8 @@ def send_email_change_notification(old_email: str, new_email: str, username: Opt
         True if email sent successfully, False otherwise
     """
     try:
-        # Validate email addresses
-        if not _validate_email(old_email):
-            logger.error(f"Invalid old email address format: {old_email}")
-            return False
-        if not _validate_email(new_email):
-            logger.error(f"Invalid new email address format: {new_email}")
-            return False
-        
         # Get email configuration
-        mail_username = _get_mail_username()
-        if not mail_username and not EMAIL_TEST_MODE:
-            return False
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
         subject = '🔒 Security Alert: Email Change Requested for Your Account'
         
@@ -660,16 +582,18 @@ The verification code has been sent to your new email address: {new_email}
         # Send email via SMTP
         success = _send_email_with_fallback(mail_username, old_email, subject, html_body, text_body)
         if success:
-            logger.info(f"Email change notification sent successfully to {old_email}")
+            print(f"[SUCCESS] Email change notification sent to {old_email}")
         else:
-            logger.error(f"Failed to send email change notification to {old_email}")
+            print(f"[ERROR] Failed to send email change notification to {old_email}")
         return success
         
     except Exception as e:
-        logger.exception(f"Failed to send email change notification to {old_email}: {e}")
+        print(f"[ERROR] Failed to send email change notification to {old_email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
-def send_password_change_verification(email: str, code: str, username: Optional[str] = None) -> bool:
+def send_password_change_verification(email: str, code: str, username: str = None) -> bool:
     """
     Send password change verification code to user's registered email address.
     
@@ -682,21 +606,14 @@ def send_password_change_verification(email: str, code: str, username: Optional[
         True if email sent successfully, False otherwise
     """
     try:
-        # Validate email address
-        if not _validate_email(email):
-            logger.error(f"Invalid email address format: {email}")
-            return False
-        
         # Get email configuration
-        mail_username = _get_mail_username()
-        if not mail_username and not EMAIL_TEST_MODE:
-            return False
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
         subject = 'Nutritionist App - Verify Your Password Change'
         
         # Email body
         name = username or 'there'
-        expiration_minutes = VERIFICATION_CODE_EXPIRATION_MINUTES
+        expiration_minutes = 15
         
         text_body = f"""Hi {name},
 
@@ -749,16 +666,18 @@ Nutritionist App Team"""
         # Send email via SMTP
         success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
-            logger.info(f"Password change verification email sent successfully to {email}")
+            print(f"[SUCCESS] Password change verification email sent to {email}")
         else:
-            logger.error(f"Failed to send password change verification email to {email}")
+            print(f"[ERROR] Failed to send password change verification email to {email}")
         return success
         
     except Exception as e:
-        logger.exception(f"Failed to send password change verification email to {email}: {e}")
+        print(f"[ERROR] Failed to send password change verification email to {email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
-def send_password_reset_verification(email: str, code: str, username: Optional[str] = None) -> bool:
+def send_password_reset_verification(email: str, code: str, username: str = None) -> bool:
     """
     Send password reset verification code to user's registered email address.
     
@@ -771,21 +690,14 @@ def send_password_reset_verification(email: str, code: str, username: Optional[s
         True if email sent successfully, False otherwise
     """
     try:
-        # Validate email address
-        if not _validate_email(email):
-            logger.error(f"Invalid email address format: {email}")
-            return False
-        
         # Get email configuration
-        mail_username = _get_mail_username()
-        if not mail_username and not EMAIL_TEST_MODE:
-            return False
+        mail_username = os.environ.get('GMAIL_USERNAME', 'team.nutritionapp@gmail.com')
         
         subject = 'Nutritionist App - Reset Your Password'
         
         # Email body
         name = username or 'there'
-        expiration_minutes = VERIFICATION_CODE_EXPIRATION_MINUTES
+        expiration_minutes = 15
         
         text_body = f"""Hi {name},
 
@@ -844,12 +756,14 @@ Nutritionist App Team"""
         # Send email via SMTP
         success = _send_email_with_fallback(mail_username, email, subject, html_body, text_body)
         if success:
-            logger.info(f"Password reset verification email sent successfully to {email}")
+            print(f"[SUCCESS] Password reset verification email sent to {email}")
         else:
-            logger.error(f"Failed to send password reset verification email to {email}")
+            print(f"[ERROR] Failed to send password reset verification email to {email}")
         return success
         
     except Exception as e:
-        logger.exception(f"Failed to send password reset verification email to {email}: {e}")
+        print(f"[ERROR] Failed to send password reset verification email to {email}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 

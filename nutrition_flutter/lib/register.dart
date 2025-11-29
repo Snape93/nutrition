@@ -733,43 +733,77 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   },
                                 ),
                                 const SizedBox(height: 24),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    key: const Key('registerButton'),
-                                    onPressed: _isLoading ? null : _register,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF4CAF50),
-                                      foregroundColor: Colors.white,
-                                      minimumSize: const Size.fromHeight(48),
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 14,
+                                Builder(
+                                  builder: (context) {
+                                    final widthValue =
+                                        AppDesignSystem.getResponsiveButtonWidth(
+                                      context,
+                                    );
+                                    final buttonWidth =
+                                        widthValue ?? double.infinity;
+                                    final buttonHeight =
+                                        AppDesignSystem.getResponsiveButtonHeight(
+                                      context,
+                                    );
+
+                                    final button = SizedBox(
+                                      width: buttonWidth,
+                                      child: ElevatedButton(
+                                        key: const Key('registerButton'),
+                                        onPressed:
+                                            _isLoading ? null : _register,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF4CAF50),
+                                          foregroundColor: Colors.white,
+                                          disabledBackgroundColor:
+                                              const Color(0xFF4CAF50)
+                                                  .withOpacity(0.45),
+                                          disabledForegroundColor:
+                                              Colors.white.withOpacity(0.8),
+                                          minimumSize:
+                                              Size.fromHeight(buttonHeight),
+                                          padding: EdgeInsets.zero,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          textStyle: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          elevation: 0,
+                                        ),
+                                        child: _isLoading
+                                            ? SizedBox(
+                                                width: buttonHeight / 2,
+                                                height: buttonHeight / 2,
+                                                child:
+                                                    const CircularProgressIndicator(
+                                                  strokeWidth: 2.5,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                          Color>(Colors.white),
+                                                ),
+                                              )
+                                            : const Text('Register'),
                                       ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      textStyle: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    child: const Text('Register'),
-                                  ),
+                                    );
+
+                                    final shouldCenter =
+                                        AppDesignSystem.shouldCenterButton(
+                                              context,
+                                            ) &&
+                                            buttonWidth != double.infinity;
+
+                                    return shouldCenter
+                                        ? Align(
+                                            alignment: Alignment.center,
+                                            child: button,
+                                          )
+                                        : button;
+                                  },
                                 ),
-                                if (_isLoading) ...[
-                                  const SizedBox(height: 20),
-                                  const SizedBox(
-                                    height: 48,
-                                    width: 48,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 4,
-                                      valueColor: AlwaysStoppedAnimation(
-                                        Color(0xFF4CAF50),
-                                      ),
-                                    ),
-                                  ),
-                                ],
                                 if (_message.isNotEmpty) ...[
                                   const SizedBox(height: 16),
                                   Text(

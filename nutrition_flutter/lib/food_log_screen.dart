@@ -52,6 +52,8 @@ class FoodLogScreenState extends State<FoodLogScreen> {
   List<FoodItem> _recentFoods = [];
   String? _typedFoodName;
   String? _recommendationError;
+  String? _userGoal;
+  bool _appliedGoalPreset = false;
 
   // Filter state management
   final Set<String> _selectedFilters = {}; // Stores active filter selections
@@ -63,10 +65,10 @@ class FoodLogScreenState extends State<FoodLogScreen> {
   @override
   void initState() {
     super.initState();
+    _loadUserGoalAndPreferences();
     // Use conditional fetching - will check cache first
     fetchRecommendedFoods(forceRefresh: false);
     fetchRecentFoods();
-    fetchUserProfileAndSummary();
     _searchController.addListener(() {
       if (!mounted) return;
       setState(() {
@@ -221,6 +223,132 @@ class FoodLogScreenState extends State<FoodLogScreen> {
   void _invalidateCache() {
     _recommendationsCache.clear();
     debugPrint('DEBUG: [Food Recommendations] Cache invalidated');
+  }
+
+  Future<void> _loadUserGoalAndPreferences() async {
+    try {
+      final userData =
+          await UserDatabase().getUserData(widget.usernameOrEmail);
+      if (!mounted || userData == null) return;
+
+      final goal = userData['goal']?.toString();
+      final prefs = _parsePreferenceList(
+        userData['dietary_preferences'] ??
+            userData['diet_type'] ??
+            userData['preferences'],
+      );
+
+      setState(() {
+        _userGoal = goal;
+      });
+
+      debugPrint(
+        'DEBUG: [Food Recommendations] User goal: $goal | Saved preferences: $prefs',
+      );
+
+      _applyGoalAwareDefaults(goal, prefs);
+    } catch (e) {
+      debugPrint(
+        'DEBUG: [Food Recommendations] Unable to load user profile for presets: $e',
+      );
+    }
+  }
+
+  List<String> _parsePreferenceList(dynamic raw) {
+    if (raw == null) return [];
+    if (raw is List) {
+      return raw.map((e) => e.toString()).toList();
+    }
+    if (raw is String) {
+      final trimmed = raw.trim();
+      if (trimmed.isEmpty) return [];
+      if (trimmed.startsWith('[')) {
+        try {
+          final decoded = jsonDecode(trimmed);
+          if (decoded is List) {
+            return decoded.map((e) => e.toString()).toList();
+          }
+        } catch (_) {
+          // Ignore JSON decoding errors and fallback to comma parsing
+        }
+      }
+      return trimmed
+          .split(',')
+          .map((entry) => entry.trim())
+          .where((entry) => entry.isNotEmpty)
+          .toList();
+    }
+    return [];
+  }
+
+  String? _mapPreferenceToFilter(String pref) {
+    final normalized =
+        pref.toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
+    switch (normalized) {
+      case 'healthy':
+        return 'healthy';
+      case 'comfort':
+      case 'comfort_food':
+        return 'comfort';
+      case 'spicy':
+        return 'spicy';
+      case 'sweet':
+      case 'sweet_tooth':
+        return 'sweet';
+      case 'protein':
+      case 'protein_lover':
+        return 'protein';
+      case 'plant_based':
+        return 'plant_based';
+      default:
+        return null;
+    }
+  }
+
+  void _applyGoalAwareDefaults(String? goal, List<String> savedPrefs) {
+    if (_appliedGoalPreset || !mounted) return;
+
+    final normalizedSaved = savedPrefs
+        .map(_mapPreferenceToFilter)
+        .whereType<String>()
+        .toSet();
+    final newFilters = <String>{};
+    newFilters.addAll(normalizedSaved);
+
+    final goalLower = goal?.toLowerCase() ?? '';
+    if (goalLower.contains('gain') || goalLower.contains('muscle')) {
+      newFilters.add('protein');
+      // Keep healthy filter only if the user explicitly saved it
+      if (normalizedSaved.contains('healthy')) {
+        newFilters.add('healthy');
+      }
+    } else if (goalLower.contains('lose')) {
+      newFilters.add('healthy');
+      if (normalizedSaved.contains('plant_based')) {
+        newFilters.add('plant_based');
+      }
+    } else if (goalLower.contains('maintain')) {
+      if (normalizedSaved.contains('healthy')) {
+        newFilters.add('healthy');
+      }
+    }
+
+    setState(() {
+      _appliedGoalPreset = true;
+      if (newFilters.isNotEmpty) {
+        _selectedFilters
+          ..clear()
+          ..addAll(newFilters);
+      }
+    });
+
+    if (newFilters.isNotEmpty) {
+      debugPrint(
+        'DEBUG: [Food Recommendations] Applied goal-aware preset: $newFilters (goal=$_userGoal)',
+      );
+      _invalidateCache();
+      fetchRecommendedFoods(forceRefresh: true);
+    }
   }
 
   Future<void> fetchRecommendedFoods({bool forceRefresh = false}) async {
@@ -567,10 +695,6 @@ class FoodLogScreenState extends State<FoodLogScreen> {
     }
     if (!mounted) return;
     setState(() => _recentFoods = recent);
-  }
-
-  Future<void> fetchUserProfileAndSummary() async {
-    // All code in this function is now unused and can be removed to resolve warnings.
   }
 
   Future<void> _addFoodLog() async {
